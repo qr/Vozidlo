@@ -1,24 +1,29 @@
-name: build
+name: checks
 
-# Two jobs, deliberately split by what they need.
+# What CI can and cannot do for this project, and why.
 #
-# The mock tests are plain Python and run anywhere, so they gate every push
-# without depending on Garmin tooling at all.
+# The Connect IQ app itself is NOT built here, and that is not an oversight.
+# Two things make it impossible on a hosted runner:
 #
-# The app build needs the Connect IQ SDK and the device files for every product
-# in app/manifest.xml. The SDK downloads from a public catalogue, but the device
-# files only come from the SDK Manager, which requires a Garmin login, so they
-# are restored from cache and the job fails with instructions rather than
-# silently skipping.
+#   1. The device files (~/.Garmin/ConnectIQ/Devices) come only from Garmin's
+#      SDK Manager, which is a GUI requiring a Garmin account login. There is no
+#      unauthenticated download, so a runner cannot fetch them and a cache
+#      cannot be seeded by any workflow.
+#   2. Signing needs app/developer_key.der, which is gitignored and must stay
+#      that way: anyone holding it can publish updates to the store listing.
 #
-# The app job is a matrix over those products. They are all the same device
-# family (round-260x260), so a green build on one is a very strong signal for
-# the rest, but "very strong signal" is how the glance crash survived 144
-# passing tests, so each is built and unit tested on its own.
+# An earlier version of this file tried anyway, restoring ~/.Garmin from a cache
+# that nothing could ever populate. Every run failed at the cache check, six
+# times over, on a repository whose whole point is to welcome contributions.
+# A red X that no contributor can act on is worse than no check at all.
 #
-# A green build is NOT proof a device is supported. fr255 builds clean and is
-# still excluded: it has no WatchUi.MapView implementation behind the type. See
-# app/manifest.xml for that argument in full.
+# So the maintainer runs `tools/ciq build --all` and `tools/ciq test` locally
+# before merging anything that touches app/, and CONTRIBUTING.md says so. What
+# runs here is everything that genuinely can: the mock server's own suite, and
+# the repository consistency and privacy checks in tools/checks.py.
+#
+# Cost: this repository is public, so standard GitHub-hosted runners are free
+# and unmetered. Nothing here needs a paid plan.
 
 on:
   push:
@@ -41,111 +46,27 @@ jobs:
 
       - name: Run the mock test suite
         # Includes the offline contract test against the vendored OpenAPI
-        # document, and the two named regressions for the URL bugs we shipped.
+        # document, the two named regressions for the URL bugs we shipped, and
+        # test_privacy.py, which fails on committed keys, coordinates or
+        # addresses in the fixtures.
         run: python -m pytest mock/tests -q
 
-  app:
-    name: app build and unit tests (${{ matrix.device }})
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        # Keep in step with <iq:product> in app/manifest.xml.
-        device: [fenix7pro, fenix7, fenix7pronowifi, fenix8solar47mm, fenix9prosolar47mm, fr955]
+  repo:
+    name: repository checks
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the matrix still matches the manifest
-        # A product added to the manifest but not here would ship untested.
-        run: |
-          manifest=$(grep -oE '<iq:product[[:space:]]+id="[^"]+"' app/manifest.xml \
-                     | sed -E 's/.*id="([^"]+)".*/\1/' | sort | tr '\n' ' ')
-          matrix="fenix7 fenix7pro fenix7pronowifi fenix8solar47mm fenix9prosolar47mm fr955 "
-          if [ "$manifest" != "$matrix" ]; then
-            echo "::error::manifest products [$manifest] do not match the CI matrix [$matrix]"
-            exit 1
-          fi
-
-      - name: Restore the Connect IQ SDK and device files
-        id: ciq-cache
-        uses: actions/cache@v4
+      - uses: actions/setup-python@v5
         with:
-          path: ~/.Garmin
-          key: ciq-sdk-9.2.0-devices
+          python-version: "3.12"
 
-      # A cache miss is handled differently depending on who is looking.
-      #
-      # On main it is a real problem: the cache has expired or been evicted and
-      # somebody has to reseed it, so fail loudly.
-      #
-      # On a pull request it is not the contributor's fault and not something
-      # they can fix: the device files only come from an authenticated SDK
-      # Manager. Failing their first PR over our infrastructure is a poor
-      # welcome, so skip the build with an explanation and let the mock job be
-      # the gate. The maintainer builds the app locally before merging; see
-      # CONTRIBUTING.md.
-      - name: Decide what a cache miss means here
-        id: gate
-        run: |
-          if [ "${{ steps.ciq-cache.outputs.cache-hit }}" = "true" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "run=false" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "::warning::No ~/.Garmin cache available to this run, so the"
-            echo "::warning::${{ matrix.device }} build was skipped. The Connect IQ"
-            echo "::warning::device files require a Garmin login and cannot be"
-            echo "::warning::downloaded in CI. This is not a problem with your"
-            echo "::warning::change. The maintainer will build it locally."
-          else
-            echo "::error::No ~/.Garmin cache. The device files come from the"
-            echo "::error::SDK Manager, which needs a Garmin login and cannot run here."
-            echo "::error::Seed the cache once from a developer machine."
-            exit 1
-          fi
+      - name: Install PyYAML
+        run: pip install pyyaml
 
-      - name: Install the toolchain libraries
-        if: steps.gate.outputs.run == 'true'
-        # webkit2gtk-4.0 and libsoup2 are why this job pins ubuntu-22.04: 24.04
-        # ships only 4.1 with libsoup3, and the two cannot share a process.
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            openjdk-17-jre-headless libwebkit2gtk-4.0-37 libjavascriptcoregtk-4.0-18 \
-            xvfb
-
-      - name: Build at -l 3 -w
-        if: steps.gate.outputs.run == 'true'
-        run: |
-          SDK=$(cat ~/.Garmin/ConnectIQ/current-sdk.cfg)
-          mkdir -p app/bin
-          "$SDK/bin/monkeyc" -d ${{ matrix.device }} -f app/monkey.jungle \
-            -o app/bin/vozidlo.prg -y app/developer_key.der -l 3 -w 2>&1 | tee build.log
-          if grep -qi 'warning' build.log; then
-            echo "::error::warnings are errors here"
-            exit 1
-          fi
-          SIZE=$(stat -c%s app/bin/vozidlo.prg)
-          echo "::notice::${{ matrix.device }}: prg size $SIZE bytes, $(( SIZE * 100 / 786432 ))% of the 786432 watch-app budget"
-
-      - name: Build the test executable
-        if: steps.gate.outputs.run == 'true'
-        run: |
-          SDK=$(cat ~/.Garmin/ConnectIQ/current-sdk.cfg)
-          "$SDK/bin/monkeyc" -d ${{ matrix.device }} -f app/monkey.jungle \
-            -o app/bin/vozidlo-test.prg -y app/developer_key.der -l 3 -w -t
-
-      - name: Run the unit tests
-        if: steps.gate.outputs.run == 'true'
-        # monkeydo drives the simulator, which needs a display; xvfb supplies one.
-        # Note -t, not /t: the Windows batch form in Garmin's documentation is
-        # rejected here and silently launches the app instead of the tests.
-        run: |
-          SDK=$(cat ~/.Garmin/ConnectIQ/current-sdk.cfg)
-          xvfb-run -a "$SDK/bin/connectiq" &
-          sleep 20
-          xvfb-run -a "$SDK/bin/monkeydo" app/bin/vozidlo-test.prg ${{ matrix.device }} -t \
-            2>&1 | tee test.log
-          grep -q 'FAILED' test.log && { echo "::error::unit tests failed"; exit 1; }
-          grep -q 'PASSED' test.log || { echo "::error::no test result found"; exit 1; }
+      - name: Run the repository checks
+        # Internal links, YAML validity, the manifest and the device guide
+        # agreeing with each other, no unfilled placeholders, and a repository
+        # wide sweep for personal or vehicle data. Identical to what
+        # `python3 tools/checks.py` does locally.
+        run: python3 tools/checks.py

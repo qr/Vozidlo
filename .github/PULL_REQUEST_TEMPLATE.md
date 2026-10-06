@@ -17,9 +17,10 @@ would otherwise have to ask you about. Delete any section that does not apply.
      not verification; a green build is not verification either, see
      docs/decisions.md for two bugs that compiled cleanly and crashed. -->
 
-- [ ] `tools/ciq build --all`: clean, no warnings
-- [ ] `tools/ciq test`: all tests pass
+- [ ] `tools/ciq build --all`: clean, no warnings  (CI cannot do this, see below)
+- [ ] `tools/ciq test`: all tests pass  (CI cannot do this either)
 - [ ] `mock/.venv/bin/python -m pytest mock/tests`: if anything under `mock/` changed
+- [ ] `python3 tools/checks.py`: links, device list, no personal data
 - [ ] Ran it in the simulator and looked at the screens I touched
 - [ ] Ran it on real hardware: **which watch?**
 

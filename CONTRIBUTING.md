@@ -93,6 +93,21 @@ here and most of them cite a specific reason.
 rather than fail, it is likely the type checker's memory use exploding on
 chained booleans over nullable calls, not your machine.
 
+**What CI does and does not check.** The mock suite and `tools/checks.py` run
+on every push and pull request, and you can run both locally:
+
+```bash
+mock/.venv/bin/python -m pytest mock/tests
+python3 tools/checks.py
+```
+
+The Connect IQ app itself is **not** built in CI, and cannot be: the device
+files come only from Garmin's SDK Manager behind an account login, and signing
+needs a key that must never be committed. So `tools/ciq build --all` and
+`tools/ciq test` are run locally, by you before you open the pull request and by
+the maintainer before merging. Say in the pull request what you ran and what you
+saw; that output is the only evidence anyone has.
+
 **Tests for logic that broke, or could.** Pure functions with the platform
 passed in as a callback are the pattern used throughout, see
 `ui/TextBlock.mc` and its tests for the clearest example. It is what lets the
