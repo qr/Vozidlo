@@ -1,5 +1,7 @@
 # Vozidlo
 
+<img src="store-assets/cover-500.png" alt="Vozidlo" width="120" align="right">
+
 A Connect IQ watch app that reads and controls a Škoda from the wrist, through
 the official MyŠkoda Public API. Charge, climate, lock status, and where the car
 is parked.
@@ -36,6 +38,19 @@ It is a spare-time project. Issues get answered in days, not hours.
 | Find where the car is parked | Yes, address, bearing, map, navigation |
 | Glance and complications | Yes, on an existing watch face |
 | **Lock or unlock the car** | **No.** The API has no such endpoint |
+
+<p align="center">
+  <img src="store-assets/screen-controls.png" width="240"
+       alt="The control tiles: start and stop climate, ventilation and charging, with the first tile focused">
+  &nbsp;&nbsp;
+  <img src="store-assets/screen-more.png" width="240"
+       alt="The same screen scrolled by one row, with the More tile fully visible and focused">
+</p>
+
+The controls, and the same screen scrolled one row so the overflow tile is
+whole. Only three rows of tiles fit on a round face, so the grid moves rather
+than letting the bottom one disappear under the bezel; the small carets show
+what is off screen. Both captures are from the simulator.
 
 ## How it reaches the car
 
