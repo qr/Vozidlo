@@ -1,0 +1,6 @@
+# The default jungle already compiles every .mc file under the project and every
+# resource under resources/: this is all that's needed. (:test)-annotated code
+# in tests/ is stripped automatically unless the compiler is invoked with -t, so
+# no separate test jungle is required. See CONTRIBUTING.md and the SDK's
+# Jungle Reference Guide.
+project.manifest = manifest.xml

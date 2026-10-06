@@ -1,0 +1,70 @@
+name: Feature request
+description: Suggest something the app should do
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth checking first: these are settled and will be closed, not
+        because they are bad ideas but because they are not possible or not
+        wanted. The reasoning is in
+        [docs/decisions.md](../blob/main/docs/decisions.md).
+
+        - **Lock or unlock the car**: the API has no endpoint
+        - **Background refresh or polling**: 20 requests per hour per vehicle,
+          shared with every other client on the same car
+        - **Confirming a command actually worked**: the API is
+          fire-and-forget; only a separate, quota-costing read can tell you
+        - **A watch face**: deliberately out of scope; the app publishes
+          complications so you can use the face you already have
+        - **The Škoda logo or brand colours**: no trademark licence exists for
+          third-party developers
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The situation, not the solution. "I want to know if it finished
+        charging before I walk out" tells us more than "add a notification",
+        and often has a better answer than the one you had in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you think would solve it
+    validations:
+      required: false
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: Which API endpoint would this need
+      description: >
+        If you know. The app can only expose what the MyŠkoda Public API
+        offers: `mock/openapi.json` in this repository is the full contract,
+        and it is short enough to scan.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: cost
+    attributes:
+      label: Request cost
+      description: >
+        Every read and every command spends one of 20 requests per hour, shared
+        with anything else running against the same car.
+      options:
+        - label: >
+            I have thought about whether this can work without spending extra
+            requests, or is worth the ones it spends
+
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Would you like to build it
+      options:
+        - label: I would be willing to open a pull request for this

@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!--
+    US-038 (task 10): up to four complications so an existing watch face can
+    show vehicle state without this app building one (a watch face is
+    explicitly out of scope for the product, see CONTRIBUTING.md,
+    "Out of scope"). Published from source/Complications.mc's
+    VehicleComplications module via Complications.updateComplication(id, data),
+    never by making a request of its own.
+
+    `id` is a stable index (0-255, per the SDK's Complications guide) that
+    MUST match VehicleComplications.ID_* exactly and MUST NEVER be renumbered
+    after release: the guide's own warning: doing so breaks every watch face
+    already displaying it.
+
+    access="public": any watch face can subscribe, not just ones signed with
+    this project's own developer key. US-038 exists so the USER's own watch
+    face can show this, and this app cannot know in advance which one that
+    is. icon must be an svg for public/protected access (see
+    resources/complications/drawables.xml).
+-->
+<complications xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+
+    <!-- id 0: state of charge. VehicleComplications.ID_SOC. Marked as the
+         glance-folder preview value: the single most representative reading
+         when this app's own glance sits in someone's glance folder. -->
+    <complication id="0" access="public" glancePreview="true"
+        longLabel="@Strings.ComplicationSocLongLabel"
+        shortLabel="@Strings.ComplicationSocShortLabel"
+        icon="@Drawables.ComplicationSocIcon">
+        <faceIt defaultText="@Strings.ComplicationSocLongLabel" />
+    </complication>
+
+    <!-- id 1: charging state. VehicleComplications.ID_CHARGING_STATE. -->
+    <complication id="1" access="public"
+        longLabel="@Strings.ComplicationChargingLongLabel"
+        shortLabel="@Strings.ComplicationChargingShortLabel"
+        icon="@Drawables.ComplicationChargingIcon">
+        <faceIt defaultText="@Strings.ComplicationChargingLongLabel" />
+    </complication>
+
+    <!-- id 2: lock state. VehicleComplications.ID_LOCK_STATE. -->
+    <complication id="2" access="public"
+        longLabel="@Strings.ComplicationLockLongLabel"
+        shortLabel="@Strings.ComplicationLockShortLabel"
+        icon="@Drawables.ComplicationLockIcon">
+        <faceIt defaultText="@Strings.ComplicationLockLongLabel" />
+    </complication>
+
+    <!-- id 3: remaining range. VehicleComplications.ID_RANGE. -->
+    <complication id="3" access="public"
+        longLabel="@Strings.ComplicationRangeLongLabel"
+        shortLabel="@Strings.ComplicationRangeShortLabel"
+        icon="@Drawables.ComplicationRangeIcon">
+        <faceIt defaultText="@Strings.ComplicationRangeLongLabel" />
+    </complication>
+
+</complications>

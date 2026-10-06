@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<!--
+    Vozidlo watch app manifest.
+
+    type="watch-app", API level 5.2, see docs/best-practices/garmin-connect-iq.md,
+    section "Scope".
+
+    Products: every one is device family round-260x260 with a watch-app budget
+    of 786,432 B and a glance budget of 65,536 B, so one set of layouts covers
+    all of them and ControlsView's fixed 260x260 grid needs no rework. This is
+    read from each device's own compiler.json, not inferred from model names.
+
+      fenix7pro           fēnix® 7 Pro. Per the store's Compatible Devices list
+                          this one id covers four retail SKUs: 7 Pro, 7 Pro
+                          Solar, 7 Pro Sapphire Solar and 7 Pro Sapphire Dual
+                          Power. Listed FIRST because tools/ciq treats the first
+                          product as the primary: the one `build`, `run` and
+                          `test` use by default, and that should be the watch
+                          we can actually put this on.
+      fenix7              fēnix® 7 / quatix® 7 / 7 Sapphire Dual Power.
+      fenix7pronowifi     fēnix® 7 Pro - Solar Edition (no Wi-Fi).
+      fenix8solar47mm     fēnix® 8 Solar 47mm. Connect IQ 6.0.2.
+      fenix9prosolar47mm  fēnix® 9 Pro Solar 47mm. Connect IQ 6.0.3.
+      fr955               Forerunner® 955 / 955 Solar.
+
+    Every one of these carries the full implementation of all four APIs this app
+    needs, checked against each device's own <device>.api.debug.xml, not
+    assumed: WatchUi.MapView, Toybox.Complications, Toybox.PersistedContent and
+    WatchUi.GlanceView.
+
+    DELIBERATELY EXCLUDED, and why, so nobody re-adds them by accident:
+
+      fr255, fr255m       Forerunner® 255 / 255 Music. Same family, same
+                          Connect IQ version, and they BUILD CLEAN at -l 3 -w,
+                          which is exactly the trap. Their api.debug.xml has
+                          zero Toybox_WatchUi_MapView entries against nine on
+                          every device above: the type resolves, the
+                          implementation is absent. These watches have no
+                          onboard maps. ui/MapPreviewView.mc extends
+                          WatchUi.MapView at class level, so a green build says
+                          nothing about whether it loads. Compare the glance
+                          crash, which also compiled.
+      fenix6, fenix6pro,  Connect IQ 3.x, below our minApiLevel of 5.2.0, and
+      vivoactive4,        fenix6 has a 131,072 B watch-app budget: about half
+      approachs62,        what this app needs, with no glance support at all.
+      the legacy hero
+      and saga watches
+      7S / 7X Pro and     240x240 and 280x280. A different device family, so
+      the 42/51mm 8, 9    ControlsView's grid would need a real layout pass
+                          before we could honestly claim them.
+-->
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application id="96a4e892-508e-4772-8a91-2c464b118264" type="watch-app" name="@Strings.AppName" entry="VozidloApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="5.2.0">
+        <iq:products>
+            <iq:product id="fenix7pro"/>
+            <iq:product id="fenix7"/>
+            <iq:product id="fenix7pronowifi"/>
+            <iq:product id="fenix8solar47mm"/>
+            <iq:product id="fenix9prosolar47mm"/>
+            <iq:product id="fr955"/>
+        </iq:products>
+        <iq:permissions>
+            <!--
+                Communications: Toybox.Communications, for the REST calls to the
+                mock/real Škoda API (task 4).
+
+                Positioning: Toybox.Position, for Find My Car (task 9). The task
+                brief names this permission "Positions", but the SDK's actual
+                permission id is "Positioning": there is no "Positions" id.
+                See doc/docs/Core_Topics/Manifest_and_Permissions.html in the
+                Connect IQ SDK.
+
+                ComplicationPublisher: Toybox.Complications, for task 10's four
+                published complications (US-038): one <complication> per id in
+                resources/complications/complications.xml, updated from
+                source/Complications.mc. Confirmed as the correct permission id
+                against the SDK's own compiled permission table
+                (monkeybrains.jar's projectInfo.xml) rather than trusted from
+                the SDK's Manifest_and_Permissions.html doc page alone: that
+                page's permission TABLE lists this row as "ComplicationProvider",
+                which does not match: the compiler's own permission list, and
+                the Complications core-topic guide's worked example, both say
+                "ComplicationPublisher". Treated the compiler as authoritative.
+
+                PersistedContent: Toybox.PersistedContent, for Find My Car's
+                "Navigate" action (task 9, US-032): PersistedContent.saveWaypoint()/
+                getAppWaypoints(). Added here rather than by task 9 itself because
+                this file is task 10's alone to edit (see the file-ownership split);
+                without it the whole app fails to build, which blocks every task's
+                own verification, not only task 9's.
+            -->
+            <iq:uses-permission id="Communications"/>
+            <iq:uses-permission id="Positioning"/>
+            <iq:uses-permission id="ComplicationPublisher"/>
+            <iq:uses-permission id="PersistedContent"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+        <iq:barrels/>
+    </iq:application>
+</iq:manifest>

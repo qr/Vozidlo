@@ -1,0 +1,21 @@
+# NOTE: GitHub requires absolute URLs in contact_links; relative paths are
+# rejected. These three are therefore the only place in the repository that
+# hardcodes the owner and repo name. Everything else is relative and survives a
+# rename or a fork untouched.
+blank_issues_enabled: true
+contact_links:
+  - name: Security or privacy issue
+    url: https://github.com/qr/Vozidlo/blob/main/SECURITY.md
+    about: >
+      Please report these privately rather than in a public issue: especially
+      anything involving a key, a VIN or a vehicle position.
+  - name: How do I install this on my watch
+    url: https://github.com/qr/Vozidlo/blob/main/INSTALL.md
+    about: >
+      Installation, the beta route, and why app settings need the store rather
+      than a sideload.
+  - name: Why does the app not do X
+    url: https://github.com/qr/Vozidlo/blob/main/docs/decisions.md
+    about: >
+      Lock/unlock, polling, command confirmation and a few others are settled
+      questions with reasons written down.

@@ -1,0 +1,96 @@
+name: Bug report
+description: Something behaves differently from how it is described
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you write this out, three things that are **not** bugs and are
+        documented as such:
+
+        - **It cannot lock or unlock the car.** The Škoda API has no endpoint
+          for it. No app built on that API can.
+        - **A command says "sent", not "succeeded".** The API is
+          fire-and-forget; the app genuinely does not know whether the car
+          acted.
+        - **The data is old.** It is whatever the car last reported: sometimes
+          minutes, sometimes hours. Each section shows its own age. A refresh
+          that changes nothing is normal.
+
+        Anything else, please do report.
+
+  - type: input
+    id: watch
+    attributes:
+      label: Watch and firmware
+      placeholder: fēnix 7 Pro Sapphire Solar, firmware 20.26
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Garmin Connect → the app → its store page shows the version.
+      placeholder: 0.2.0-beta
+    validations:
+      required: true
+
+  - type: input
+    id: car
+    attributes:
+      label: Vehicle
+      description: >
+        Model and whether it is petrol, diesel, hybrid or electric. The API
+        returns different sections per drivetrain, which is often the cause.
+      placeholder: plug-in hybrid
+    validations:
+      required: false
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      description: >
+        Numbered steps from opening the app. If it only happens sometimes, say
+        roughly how often and what seems to differ.
+      placeholder: |
+        1. Open the app
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Crash log
+      description: |
+        A crash writes `GARMIN/APPS/LOGS/CIQ_LOG.YAML` on the watch. Connect it
+        by USB and copy that file: it carries the error and a stack trace with
+        file and line, which usually identifies the bug outright.
+
+        Note its `ConnectIQ-Version` field is the SDK the app was built with,
+        not your firmware version.
+
+        **Check it for your VIN before pasting.**
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you post
+      options:
+        - label: >
+            I have removed my VIN, API key, GPS coordinates and any address
+            from everything pasted above
+          required: true

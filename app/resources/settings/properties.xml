@@ -1,0 +1,39 @@
+<properties xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+
+    <!--
+        Reading an undeclared property throws Properties.InvalidKeyException, so every
+        setting the app reads (see source/Settings.mc) must be declared here, even with
+        an empty default.
+
+        TemperatureUnit is a `list` setting, which the resource compiler only accepts
+        against a `number` property (see doc/docs/Core_Topics/Properties_and_App_Settings.html,
+        "settingConfig types are only valid for certain property types"). -1 is a sentinel
+        for "never set"; Settings.load() then falls back to this watch's system unit
+        (US-005), which can only be resolved at runtime, not at build time. 0 and 1 mirror
+        System.UNIT_METRIC / System.UNIT_STATUTE so Settings.mc can reuse them directly.
+    -->
+    <property id="ApiKey" type="string"></property>
+    <property id="Vin" type="string"></property>
+    <property id="TemperatureUnit" type="number">-1</property>
+    <property id="Spin" type="string"></property>
+
+    <!--
+        US-018: whole degrees, in whatever unit TemperatureUnit names. 0 is the
+        "never set" sentinel (Settings.isTargetTemperatureSet): 0 degrees is not a
+        plausible cabin target in either Celsius or Fahrenheit, so it is safe to
+        reserve. When unset, the climate command falls back to the value the car
+        itself last reported (Cache's "airConditioning" section) rather than a
+        number this app invented.
+    -->
+    <property id="TargetTemperature" type="number">0</property>
+
+    <!--
+        Debug-only base URL override, so the app can be pointed at mock/ without
+        editing source. Empty means "use the real API". It is deliberately NOT
+        exposed as a <setting>, so it never appears in the phone UI, and
+        Endpoints.baseUrl() only consults it in debug builds - a release build
+        physically cannot reach it. See mock/README.md.
+    -->
+    <property id="MockBaseUrl" type="string"></property>
+
+</properties>

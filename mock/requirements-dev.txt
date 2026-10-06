@@ -1,0 +1,13 @@
+# The mock server itself is standard library only (see server.py's docstring
+# for why: no framework, no jsonschema package - just http.server, ssl and a
+# purpose-built validator in jsonschema_lite.py).
+#
+# pytest is the one dependency the test suite (mock/tests/) needs. Install
+# it however suits your environment, for example:
+#
+#   python3 -m venv mock/.venv && mock/.venv/bin/pip install -r mock/requirements-dev.txt
+#   # or, inside the project's ciq-docker container / on Debian/Ubuntu:
+#   apt install python3-pytest
+#
+# See mock/README.md for how to then run the suite.
+pytest>=8

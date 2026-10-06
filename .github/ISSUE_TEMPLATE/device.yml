@@ -1,0 +1,107 @@
+name: Device support request
+description: Ask for a watch to be supported, or tell us one does not work
+title: "[device] "
+labels: ["device"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If you own the watch and can run a couple of commands, you are most of
+        the way to a pull request: [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md)
+        has the whole procedure and it is short. Send that instead if you can;
+        it will be merged faster than this issue will be read.
+
+        If you cannot, this is the right place. The commands below are all
+        read-only and answer the questions that actually decide it.
+
+  - type: input
+    id: watch
+    attributes:
+      label: Which watch
+      description: The retail name, exactly as Garmin sells it.
+      placeholder: fēnix 7X Pro Sapphire Solar
+    validations:
+      required: true
+
+  - type: input
+    id: deviceid
+    attributes:
+      label: Connect IQ device id
+      description: >
+        The folder name under ~/.Garmin/ConnectIQ/Devices after installing it
+        in the SDK Manager. Leave blank if you do not have the SDK.
+      placeholder: fenix7xpro
+    validations:
+      required: false
+
+  - type: textarea
+    id: compiler
+    attributes:
+      label: Device family and budgets
+      description: |
+        If you have the SDK installed:
+
+        ```bash
+        python3 -c "
+        import json; c=json.load(open('$HOME/.Garmin/ConnectIQ/Devices/<id>/compiler.json'))
+        print(c['deviceFamily'], c['displayName'])
+        print([(t['type'], t.get('memoryLimit')) for t in c['appTypes']])
+        print(sorted({p['connectIQVersion'] for p in c['partNumbers']}))"
+        ```
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: apis
+    attributes:
+      label: API implementation counts
+      description: |
+        This is the step that decides it. A device can build perfectly and
+        still be missing the implementation behind an API: that is why the
+        Forerunner 255 is not supported.
+
+        ```bash
+        f=$HOME/.Garmin/ConnectIQ/Devices/<id>/<id>.api.debug.xml
+        for sym in Toybox_WatchUi_MapView Toybox_Complications \
+                   Toybox_PersistedContent Toybox_WatchUi_GlanceView; do
+          echo "$sym: $(grep -c $sym $f)"
+        done
+        ```
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: buttons
+    attributes:
+      label: How many physical buttons does it have
+      description: >
+        Five with UP and DOWN means the existing navigation works. Fewer means
+        an input redesign, which is a much larger change: worth knowing up
+        front.
+      options:
+        - "Five (UP, DOWN, START, BACK, LIGHT), like a fēnix"
+        - "Three"
+        - "Two, touch-first, like a Venu"
+        - "I am not sure"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: owner
+    attributes:
+      label: Do you own it
+      options:
+        - label: I own this watch and can test a build on it
+        - label: I am willing to be the person who checks future releases on it
+
+  - type: textarea
+    id: anything
+    attributes:
+      label: Anything else
+      description: >
+        If you tried a build and it failed, paste the error. If it installed
+        but misbehaved, say what you saw: a photo of the screen is ideal.
+    validations:
+      required: false

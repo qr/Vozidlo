@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+#
+# Connect IQ toolchain in an Ubuntu 22.04 container.
+#
+# Why: the SDK Manager and the simulator are linked against webkit2gtk-4.0
+# and libsoup2. Ubuntu 24.04 only has webkit2gtk-4.1 with libsoup3, and those
+# two cannot coexist in one process. See CONTRIBUTING.md, "Setting up".
+#
+# The SDK, the devices and your project live on the host; the container is
+# disposable.
+#
+# Commands:
+#   ciq sdkmanager   GUI to log in and download the device files
+#   ciq build        compile the app for the primary device
+#   ciq build --all  compile it for every product in the manifest
+#   ciq test         run the unit tests in the simulator
+#   ciq run          build, start the simulator and load the app
+#   ciq sim          start the simulator on its own
+#   ciq package      build a release .iq for the store (all products)
+#   ciq package --beta   same, but under the beta app id (private testing)
+#   ciq shell        bash in the container
+#
+# The device list comes from app/manifest.xml, so it cannot drift from what
+# we actually ship. Override with CIQ_DEVICE=<id> for a one-off.
+#
+set -uo pipefail
+
+IMAGE=ciq:22.04
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+GARMIN="$HOME/.Garmin"
+# Products, in manifest order. The first is the primary: what `build`, `run`
+# and `test` use unless CIQ_DEVICE says otherwise. Parsed rather than repeated
+# here so adding a product to the manifest is the only edit needed.
+PROJECT_MANIFEST="$(cd "$(dirname "$0")/.." && pwd)/app/manifest.xml"
+mapfile -t DEVICES < <(grep -oE '<iq:product[[:space:]]+id="[^"]+"' "$PROJECT_MANIFEST" \
+                       | sed -E 's/.*id="([^"]+)".*/\1/')
+[[ ${#DEVICES[@]} -gt 0 ]] || { echo "ERROR: no <iq:product> in $PROJECT_MANIFEST" >&2; exit 1; }
+DEVICE="${CIQ_DEVICE:-${DEVICES[0]}}"
+APP_DIR=app
+APP_NAME=vozidlo
+KEY="$APP_DIR/developer_key.der"
+
+# Strict typing and warnings from the first commit. Retrofitting is far more
+# work than starting this way.
+TYPECHECK="-l 3 -w"
+
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+note() { printf '%s\n' "$*"; }
+
+# ------------------------------------------------------------------ container
+docker image inspect "$IMAGE" >/dev/null 2>&1 || die "image $IMAGE is missing. Build it with:
+  cd $(dirname \"$0\") && docker build \\
+      --build-arg UID=\$(id -u) --build-arg GID=\$(id -g) \\
+      --build-arg HOME_DIR=\"\$HOME\" -t $IMAGE ."
+
+# ------------------------------------------------------------------------ SDK
+sdk_root() {
+  local cfg="$GARMIN/ConnectIQ/current-sdk.cfg"
+  if [[ -f "$cfg" ]]; then tr -d '\r\n' < "$cfg"
+  else ls -d "$GARMIN"/ConnectIQ/Sdks/*/ 2>/dev/null | sort -V | tail -1 | sed 's:/$::'
+  fi
+}
+SDK="${CIQ_SDK:-$(sdk_root)}"
+[[ -n "$SDK" && -x "$SDK/bin/monkeyc" ]] || die "no Connect IQ SDK found.
+
+Expected: \$HOME/.Garmin/ConnectIQ/Sdks/<version>/bin/monkeyc
+Found:    ${SDK:-<nothing>}
+
+Install it with the SDK Manager, or point at it:
+  CIQ_SDK=/path/to/connectiq-sdk $0 $*"
+
+have_device() { [[ -d "$GARMIN/ConnectIQ/Devices/${1:-$DEVICE}" ]]; }
+need_device() {
+  local d="${1:-$DEVICE}"
+  have_device "$d" || die "device files for '$d' are missing.
+
+They are only available through the SDK Manager, which needs a Garmin login:
+  $0 sdkmanager
+
+Expected at: $GARMIN/ConnectIQ/Devices/$d"
+}
+
+# A package build compiles every product, so all of them must be present or
+# the .iq silently ships fewer devices than the manifest claims.
+need_all_devices() { local d; for d in "${DEVICES[@]}"; do need_device "$d"; done; }
+
+# The signing key identifies us to the store. A different key than the previous
+# upload is rejected, so generate once and never lose it.
+need_key() {
+  [[ -f "$PROJECT_ROOT/$KEY" ]] && return 0
+  note "No developer key yet, generating $KEY"
+  openssl genrsa -out /tmp/ciq_key.$$.pem 4096 2>/dev/null \
+    && openssl pkcs8 -topk8 -inform PEM -outform DER \
+         -in /tmp/ciq_key.$$.pem -out "$PROJECT_ROOT/$KEY" -nocrypt \
+    && rm -f /tmp/ciq_key.$$.pem \
+    && chmod 600 "$PROJECT_ROOT/$KEY" \
+    || die "could not generate a developer key"
+  note "Generated. Back this file up: losing it means losing the store listing."
+}
+
+# A beta upload needs a DIFFERENT app id from the production one, so the two
+# can coexist in the store. Keeping both in the repo and swapping them in a
+# temporary copy beats an instruction to remember to change it back.
+BETA_ID_FILE="$APP_DIR/beta-app-id.txt"
+need_beta_id() {
+  [[ -f "$PROJECT_ROOT/$BETA_ID_FILE" ]] && return 0
+  local id; id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  printf '%s\n' "$id" > "$PROJECT_ROOT/$BETA_ID_FILE"
+  note "Generated a beta app id: $id"
+  note "Stored in $BETA_ID_FILE. The production id in $APP_DIR/manifest.xml is untouched."
+}
+
+# --------------------------------------------------------------------- X11
+x11_args=()
+if [[ -n "${DISPLAY:-}" ]]; then
+  x11_args+=(-e "DISPLAY=$DISPLAY")
+  [[ -d /tmp/.X11-unix ]] && x11_args+=(-v /tmp/.X11-unix:/tmp/.X11-unix)
+  if [[ -n "${XAUTHORITY:-}" && -f "$XAUTHORITY" ]]; then
+    x11_args+=(-e "XAUTHORITY=$XAUTHORITY" -v "$XAUTHORITY:$XAUTHORITY:ro")
+  fi
+fi
+
+run() {
+  # -it only when there really is a terminal, so the same script works in CI.
+  local tty=(); [[ -t 0 && -t 1 ]] && tty=(-it)
+  docker run --rm "${tty[@]}" \
+    --net=host \
+    -v "$GARMIN:$GARMIN" \
+    -v "$PROJECT_ROOT:$PROJECT_ROOT" \
+    -w "$PROJECT_ROOT" \
+    -e "HOME=$HOME" \
+    "${x11_args[@]}" \
+    "$IMAGE" "$@"
+}
+
+report_size() {  # report_size <device> <prg path>
+  local prg="$PROJECT_ROOT/$2"
+  [[ -f "$prg" ]] || return 0
+  local bytes; bytes=$(stat -c%s "$prg")
+  # The watch-app limit on this device, from compiler.json.
+  printf 'Built %s for %s: %s bytes (%d%% of the 786432 watch-app budget)\n' \
+      "$2" "$1" "$bytes" $(( bytes * 100 / 786432 ))
+}
+
+# build_one <device> [extra monkeyc flags...]
+# The primary device keeps the plain vozidlo.prg name, because `run` and
+# every doc reference expect it there; the others get a suffix so a build of
+# all products leaves one file per device to inspect.
+build_one() {
+  local dev="$1"; shift
+  need_device "$dev"; need_key
+  local out="$APP_DIR/bin/$APP_NAME.prg"
+  [[ "$dev" == "${DEVICES[0]}" ]] || out="$APP_DIR/bin/$APP_NAME-$dev.prg"
+  run bash -c "mkdir -p $APP_DIR/bin && '$SDK/bin/monkeyc' \
+      -d $dev -f $APP_DIR/monkey.jungle \
+      -o $out -y $KEY $TYPECHECK $*" || return 1
+  report_size "$dev" "$out"
+}
+
+build() {  # build [--all] [extra monkeyc flags...]
+  if [[ "${1:-}" == "--all" ]]; then
+    shift
+    local dev rc=0
+    for dev in "${DEVICES[@]}"; do
+      build_one "$dev" "$@" || rc=1
+    done
+    return $rc
+  fi
+  build_one "$DEVICE" "$@"
+}
+
+start_simulator() {
+  pgrep -f "$SDK/bin/simulator" >/dev/null 2>&1 && { note "Simulator already running"; return 0; }
+  run "$SDK/bin/connectiq" >/dev/null 2>&1 &
+  note "Simulator starting, waiting for it..."
+  sleep 18   # it needs roughly 15s inside a container
+}
+
+case "${1:-help}" in
+
+  sdkmanager|manager)
+    [[ -x "$GARMIN/sdk-manager/bin/sdkmanager" ]] || die "SDK Manager not found in $GARMIN/sdk-manager"
+    note "SDK Manager starting. Log in with your Garmin account and add 'fenix 7'"
+    note "under Devices. Close the window when you're done."
+    run "$GARMIN/sdk-manager/bin/sdkmanager"
+    have_device && note "OK: device '$DEVICE' is now on the host." \
+                || note "NOTE: '$DEVICE' not found yet under $GARMIN/ConnectIQ/Devices"
+    ;;
+
+  build)   shift; build "$@" ;;
+
+  test)
+    need_device; need_key
+    run bash -c "
+      set -e
+      mkdir -p $APP_DIR/bin
+      '$SDK/bin/monkeyc' -d $DEVICE -f $APP_DIR/monkey.jungle \
+          -o $APP_DIR/bin/$APP_NAME-test.prg -y $KEY $TYPECHECK -t
+    " || die "test build failed"
+    start_simulator
+    # -t, not /t: the Windows batch form in Garmin's docs is rejected by the
+    # Linux monkeydo script, which then silently launches the app instead.
+    run "$SDK/bin/monkeydo" "$APP_DIR/bin/$APP_NAME-test.prg" "$DEVICE" -t
+    ;;
+
+  run)
+    build || die "build failed"
+    start_simulator
+    run "$SDK/bin/monkeydo" "$APP_DIR/bin/$APP_NAME.prg" "$DEVICE"
+    ;;
+
+  sim)
+    need_device
+    run "$SDK/bin/connectiq"
+    ;;
+
+  package)
+    need_all_devices; need_key
+    out="$APP_NAME.iq"
+    if [[ "${2:-}" == "--beta" ]]; then
+      need_beta_id
+      beta_id="$(tr -d '\r\n' < "$PROJECT_ROOT/$BETA_ID_FILE")"
+      out="$APP_NAME-beta.iq"
+      # Swap the id in place, build, and always put it back: even on failure.
+      cp "$PROJECT_ROOT/$APP_DIR/manifest.xml" "$PROJECT_ROOT/$APP_DIR/manifest.xml.orig"
+      restore_manifest() {
+        mv -f "$PROJECT_ROOT/$APP_DIR/manifest.xml.orig" "$PROJECT_ROOT/$APP_DIR/manifest.xml" 2>/dev/null
+      }
+      trap restore_manifest EXIT
+      sed -i -E "s/(<iq:application[^>]*id=\")[^\"]+(\")/\1$beta_id\2/" \
+          "$PROJECT_ROOT/$APP_DIR/manifest.xml"
+      note "Building under the beta app id $beta_id"
+    fi
+    run bash -c "mkdir -p $APP_DIR/bin && '$SDK/bin/monkeyc' \
+        -e -f $APP_DIR/monkey.jungle \
+        -o $APP_DIR/bin/$out -y $KEY $TYPECHECK -r" \
+      || die "packaging failed"
+    note "Built $APP_DIR/bin/$out"
+    [[ "$out" == *-beta.iq ]] && note "Upload this with the \"Beta App\" checkbox ticked."
+    ;;
+
+  shell)  run bash ;;
+
+  *)
+    sed -n '/^# Commands/,/^#$/p' "$0" | sed 's/^# \?//'
+    note "SDK:     $SDK"
+    note "Devices: (primary first, from app/manifest.xml)"
+    for d in "${DEVICES[@]}"; do
+      note "  $d $(have_device "$d" && echo '(present)' || echo '(MISSING - run: '"$0"' sdkmanager)')"
+    done
+    note "Project: $PROJECT_ROOT"
+    ;;
+esac

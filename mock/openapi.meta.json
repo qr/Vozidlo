@@ -1,0 +1,10 @@
+{
+  "source": "https://public.api.connect.skoda-auto.cz/v3/api-docs",
+  "retrievedAt": "2026-09-07T09:51:04Z",
+  "openapiVersion": "3.1.0",
+  "contractVersion": "1.0.0",
+  "contractVersionNote": "Škoda's published contract version per the feasibility study and changelog page. The document's own info.version field says 'v0' - the OpenAPI generator's build tag, not the contract version - so both are recorded here for transparency.",
+  "infoVersionField": "v0",
+  "endpointCount": 12,
+  "note": "Vendored verbatim, byte for byte, from the command in mock/README.md. Refresh with that same command and commit the diff; do not hand-edit openapi.json."
+}

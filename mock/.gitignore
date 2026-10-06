@@ -1,0 +1,2 @@
+# Local dev virtualenv used to run the test suite (see requirements-dev.txt).
+.venv/

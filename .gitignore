@@ -1,0 +1,44 @@
+# Build output
+app/bin/
+*.prg
+*.prg.debug.xml
+*.iq
+
+# Signing key: never commit this. Losing it means losing the store listing,
+# and committing it means anyone can publish as you. tools/ciq generates one
+# on first use, so a fresh clone needs nothing.
+*.der
+*.pem
+
+# The beta app id is per developer. It must differ from the production id in
+# app/manifest.xml so the two can coexist in the store, and it identifies one
+# person's private beta: there is nothing to share. tools/ciq generates it on
+# the first `package --beta`.
+app/beta-app-id.txt
+
+# Locally generated mock certificates and keys, made on first run.
+mock/tls/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Personal data captured from a real vehicle: VIN, GPS coordinates, address
+skoda-response.json
+skoda-202-headers.txt
+skoda-202-body.txt
+
+*.swp
+.DS_Store
+
+# Every top-level dot-directory is ignored except the ones this project needs.
+# Editors and local tooling drop these in a working directory without asking,
+# they hold machine-specific settings, and a stray `git add -A` commits them.
+# An allow-list is the only version of this rule that does not need updating
+# every time somebody uses a different tool.
+/.*/
+!/.github/
+
+# Local overrides of any config, by convention.
+*.local.json

@@ -1,0 +1,41 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!--
+    Task 11 (US-056): original launcher icon. A car silhouette with a
+    control motif, NOT the Škoda winged-arrow logo, not their brand green,
+    not their typeface (see docs/best-practices/garmin-connect-iq.md,
+    "Publishing to the Connect IQ Store", and docs/decisions.md "Branding"
+    for why: no third-party trademark licence exists for any of it).
+
+    Two flat colours only (#2B2F36 dark / #C7CDD6 light: matching the
+    complication icons' own palette in resources/complications/, for one
+    consistent icon family), no gradients, no thin single-pixel strokes:
+    bold shapes for a 64-colour memory-in-pixel panel where fine detail and
+    subtle hues both disappear (docs/best-practices, "Publishing to the
+    Connect IQ Store"; US-056's own acceptance criteria).
+
+    Composition: a simplified car body/cabin silhouette (the wheel wells are
+    cut as two dark half-circles overdrawn on the light body: a bold,
+    common icon technique, not a stroke) with a power-toggle ring: the
+    universal "⏻" control glyph: sitting just above the roof, reading as
+    "a car with a control signal", not a badge or crest. Verified to stay
+    legible at 40x40 (the resource's own native size) with nothing here
+    thinner than a 3px stroke.
+-->
+<rect width="40" height="40" rx="8" fill="#2B2F36"/>
+
+<!-- Car body + cabin, one silhouette. -->
+<path d="M5 31 L5 25 L9 25 L14 16 L26 16 L31 25 L35 25 L35 31 Z" fill="#C7CDD6"/>
+
+<!-- Wheel wells: dark circles over the light body, reading as two bold
+     notches at the bottom edge: never a separate stroked wheel, which
+     would be exactly the "fine detail" the 64-colour panel punishes. -->
+<circle cx="12.5" cy="31.5" r="4.5" fill="#2B2F36"/>
+<circle cx="27.5" cy="31.5" r="4.5" fill="#2B2F36"/>
+
+<!-- Control motif: a power-toggle ring above the roof (the universal
+     "on/off control" glyph), reading as "a control signal over the car":
+     bold ring + a straight tick through its notch, not a crest. -->
+<circle cx="29" cy="10" r="6.5" stroke="#C7CDD6" stroke-width="3" fill="none"/>
+<rect x="27.5" y="1.5" width="3" height="5.5" fill="#2B2F36"/>
+<line x1="29" y1="3" x2="29" y2="10" stroke="#C7CDD6" stroke-width="3" stroke-linecap="round"/>
+</svg>

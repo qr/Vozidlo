@@ -1,0 +1,50 @@
+<strings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+
+    <string id="AppName">Vozidlo</string>
+
+    <string id="SettingApiKeyTitle">API key</string>
+    <string id="SettingApiKeyHelp">Create a key in the MyŠkoda app (v8.16 or later), then paste it here. It is masked on this screen but stored unencrypted on the watch.</string>
+
+    <string id="SettingVinTitle">Vehicle VIN</string>
+    <string id="SettingVinHelp">The 17-character vehicle identification number for the car this key covers. Find it in the MyŠkoda app or your vehicle registration documents.</string>
+    <string id="SettingVinError">A VIN is exactly 17 characters.</string>
+
+    <string id="SettingTemperatureUnitTitle">Temperature unit</string>
+    <string id="SettingTemperatureUnitHelp">Unit used for the climate target temperature. Leave unset to use this watch's system unit.</string>
+    <string id="TemperatureUnitCelsius">Celsius</string>
+    <string id="TemperatureUnitFahrenheit">Fahrenheit</string>
+
+    <string id="SettingSpinTitle">Auxiliary heating S-PIN</string>
+    <string id="SettingSpinHelp">Optional: only needed to start auxiliary heating. Connect IQ stores app settings unencrypted on the watch, so only set this if you accept that trade-off.</string>
+
+    <!-- Task 7 (US-018): whole degrees, in the unit chosen above. Also editable
+         on-device, see ui/TargetTemperatureSettingsView.mc. -->
+    <string id="SettingTargetTemperatureTitle">Climate target temperature</string>
+    <string id="SettingTargetTemperatureHelp">Whole degrees, in the unit above. Leave at 0 to use the value your car last reported.</string>
+    <string id="SettingTargetTemperatureError">Enter a whole number, or 0 to use the car's last reported value.</string>
+
+    <!-- Task 5 (onboarding): US-002, US-003, US-004, US-007. -->
+    <string id="OnboardingGuidanceMessage">A key is created in the MyŠkoda app (v8.16+), not here. It only works for the vehicles you selected when you created it. Enter it in this app's phone settings. Menu for more.</string>
+    <string id="OnboardingCheckingMessage">Checking your key against your car…</string>
+    <string id="OnboardingQuotaBlockedMessage">This hour's request quota is spent. Try again once it resets.</string>
+    <string id="OnboardingKeyExpiredPrefix">Your API key expired on </string>
+    <string id="OnboardingKeyExpiredFallback">Your API key has expired.</string>
+    <string id="OnboardingExpiryNoticeMessage">Your key is probably close to expiring: this is an estimate, not a fact. If you would rather not be caught out, create a new one soon in the MyŠkoda app. Select to continue.</string>
+    <string id="OnboardingMenuTitle">Onboarding</string>
+    <string id="OnboardingMenuOpenKeyPage">Get a key</string>
+    <string id="OnboardingMenuClearData">Clear stored data</string>
+    <string id="OnboardingClearConfirmMessage">Erase your key, VIN, S-PIN and cached data?</string>
+    <string id="OnboardingKeyPageUrl">https://go.skoda.eu/api-keys</string>
+
+    <!-- Task 10 (US-038): complication labels, see
+         resources/complications/complications.xml and source/Complications.mc. -->
+    <string id="ComplicationSocLongLabel">Battery charge</string>
+    <string id="ComplicationSocShortLabel">SoC</string>
+    <string id="ComplicationChargingLongLabel">Charging state</string>
+    <string id="ComplicationChargingShortLabel">Chrg</string>
+    <string id="ComplicationLockLongLabel">Lock state</string>
+    <string id="ComplicationLockShortLabel">Lock</string>
+    <string id="ComplicationRangeLongLabel">Range</string>
+    <string id="ComplicationRangeShortLabel">Rng</string>
+
+</strings>

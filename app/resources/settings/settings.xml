@@ -1,0 +1,46 @@
+<settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+
+    <!--
+        US-001: API key and VIN, entered from the phone rather than on-device, see
+        docs/best-practices/garmin-connect-iq.md, "Minimise on-device text entry".
+        "password" masks the key in the Garmin Connect Mobile settings UI; the value
+        is still stored unencrypted on the watch (US-006 makes this explicit for the
+        S-PIN, where the stakes are higher).
+    -->
+    <setting propertyKey="@Properties.ApiKey" title="@Strings.SettingApiKeyTitle" prompt="@Strings.SettingApiKeyHelp">
+        <settingConfig type="password" />
+    </setting>
+
+    <!--
+        US-001: the watch validates the VIN's length itself (source/Settings.mc,
+        Settings.isVinValid) before any request is made: maxLength here is only a
+        phone-side UX nicety, not the source of truth.
+    -->
+    <setting propertyKey="@Properties.Vin" title="@Strings.SettingVinTitle" prompt="@Strings.SettingVinHelp">
+        <settingConfig type="alphaNumeric" maxLength="17" errorMessage="@Strings.SettingVinError" />
+    </setting>
+
+    <!-- US-005: unset (-1) until the user picks one; Settings.load() falls back to the
+         device's system unit while it is unset. 0/1 mirror System.UNIT_METRIC/UNIT_STATUTE. -->
+    <setting propertyKey="@Properties.TemperatureUnit" title="@Strings.SettingTemperatureUnitTitle" prompt="@Strings.SettingTemperatureUnitHelp">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.TemperatureUnitCelsius</listEntry>
+            <listEntry value="1">@Strings.TemperatureUnitFahrenheit</listEntry>
+        </settingConfig>
+    </setting>
+
+    <!-- US-006: optional, and the help text carries the honest warning that Connect IQ
+         settings are stored unencrypted on the watch. -->
+    <setting propertyKey="@Properties.Spin" title="@Strings.SettingSpinTitle" prompt="@Strings.SettingSpinHelp">
+        <settingConfig type="password" />
+    </setting>
+
+    <!-- US-018: also editable on the watch itself via AppBase.getSettingsView()
+         (source/ui/TargetTemperatureSettingsView.mc): this is the phone-side half of
+         the same value. min/max span both plausible unit ranges (10-40 C, up to 100 F)
+         since the same property is used whichever unit TemperatureUnit names. -->
+    <setting propertyKey="@Properties.TargetTemperature" title="@Strings.SettingTargetTemperatureTitle" prompt="@Strings.SettingTargetTemperatureHelp">
+        <settingConfig type="numeric" min="0" max="100" errorMessage="@Strings.SettingTargetTemperatureError" />
+    </setting>
+
+</settings>

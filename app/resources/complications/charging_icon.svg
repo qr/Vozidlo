@@ -1,0 +1,7 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Bolt glyph for the charging-state complication (task 10). Plain,
+     neutral, no Škoda branding: matches resources/drawables/launcher_icon.svg's
+     own style rule. -->
+<rect width="24" height="24" rx="5" fill="#2B2F36"/>
+<path d="M13 5L7 13H11.5L10.5 19L17 10.5H12.5L13 5Z" fill="#C7CDD6"/>
+</svg>

@@ -1,0 +1,13 @@
+<drawables xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+    <!-- One icon per complications.xml entry. SVG, per the Complications
+         guide's own requirement for public/protected access. Plain,
+         geometric, single-colour glyphs matching launcher_icon.svg's own
+         "no Škoda logo, no Škoda colours" rule (docs/best-practices,
+         "Publishing to the Connect IQ Store"): never re-used as this
+         app's own launcher icon (Manifest doc: "the icon resource should
+         not be re-used within your application"). -->
+    <bitmap id="ComplicationSocIcon" filename="soc_icon.svg" dithering="none" />
+    <bitmap id="ComplicationChargingIcon" filename="charging_icon.svg" dithering="none" />
+    <bitmap id="ComplicationLockIcon" filename="lock_icon.svg" dithering="none" />
+    <bitmap id="ComplicationRangeIcon" filename="range_icon.svg" dithering="none" />
+</drawables>

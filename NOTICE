@@ -1,0 +1,34 @@
+Vozidlo
+Copyright 2026 qr
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+
+TRADEMARKS
+
+This is an independent, unofficial application. It is not affiliated with,
+endorsed by, or sponsored by Škoda Auto a.s., the Volkswagen Group, or Garmin
+Ltd.
+
+"Škoda", "MyŠkoda", "Garmin", "Connect IQ", "fēnix", "Forerunner" and "quatix"
+are trademarks of their respective owners. They appear here only as words, to
+say what this software is compatible with. No trademark licence is granted by
+the Apache License (see its section 6) and none is claimed here.
+
+The application deliberately uses no Škoda logo, no Škoda brand colour and no
+Škoda typeface. Its icon is original. If you fork this project and publish it,
+that constraint travels with you: no third-party trademark licence exists for
+this API, and reproducing a logo is a different act in law from naming a brand
+in text.
+
+
+THIRD-PARTY MATERIAL
+
+mock/openapi.json is the MyŠkoda Public API OpenAPI description, published by
+Škoda Auto a.s. It is vendored so the mock server can be checked against the
+contract offline. It is Škoda's document, not ours, and is not covered by this
+project's licence.
+
+store-assets/ contains images generated with OpenAI's image model and edited
+for the Connect IQ Store's size and colour-depth requirements. They are listing
+artwork, not part of the application.
