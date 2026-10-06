@@ -19,6 +19,18 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 failures: list[str] = []
 
+# Files that necessarily contain the very strings the checks look for, and so
+# would report themselves. This file holds every pattern; test_privacy.py holds
+# the same ones again; openapi.json is Škoda's document, carrying their example
+# coordinates. Kept in one place because the placeholder check and the privacy
+# check both need it, and one of them having its own copy is exactly how this
+# list goes stale.
+SELF_REFERENTIAL = {
+    "tools/checks.py",
+    "mock/tests/test_privacy.py",
+    "mock/openapi.json",
+}
+
 
 def check(name: str):
     """Decorator that runs a check and records its failures."""
@@ -105,6 +117,8 @@ def _devices():
 def _placeholders():
     bad = []
     for f in tracked_files():
+        if str(f.relative_to(ROOT)) in SELF_REFERENTIAL:
+            continue
         try:
             text = f.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
@@ -130,14 +144,10 @@ def _privacy():
     # both deserve a human looking at them.
     allowed_coords = {"52.100000", "5.100000"}
     allowed_addresses = {"Testlaan 1"}
-    skip = {"mock/openapi.json",           # Škoda's own document, with their examples
-            "tools/checks.py",             # this file, which contains the patterns
-            "mock/tests/test_privacy.py"}  # likewise
-
     bad = []
     for f in tracked_files():
         rel = str(f.relative_to(ROOT))
-        if rel in skip:
+        if rel in SELF_REFERENTIAL:
             continue
         try:
             text = f.read_text(encoding="utf-8")
