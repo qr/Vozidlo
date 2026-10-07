@@ -3,6 +3,25 @@
 Notable changes, newest first. Versions match what is published to the Connect
 IQ Store.
 
+## 1.0.3: 2026-10-07
+
+### Fixed
+
+- **Opening the map showed the Connect IQ error screen.** "Find my car" drew the
+  bearing arrow and the parked address correctly, but selecting it to open the
+  map crashed the app with `UnexpectedTypeException: Screen visible area top
+  left is not set`.
+
+  `MapPreviewView` built its markers, map mode and visible area in `onShow()`,
+  which runs once the view is already being rendered, too late for state the
+  render reads. It also never called `setScreenVisibleArea()`. Both are fixed:
+  every map call now happens in the constructor, in the order Garmin's own
+  `MapSample` uses.
+
+  Nothing else was affected. The bearing arrow and the address come from the
+  cached parking position and never touch `MapView`, which is why that half kept
+  working.
+
 ## 1.0.0: 2026-10-06
 
 First public release.

@@ -2,6 +2,7 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
 import Toybox.Position;
+import Toybox.System;
 import Toybox.WatchUi;
 
 // US-030/US-031: the map screen, split out of LocationView.mc on purpose.
@@ -23,30 +24,30 @@ class MapPreviewView extends WatchUi.MapView {
     // is also plotted.
     private const _PREVIEW_RADIUS_METERS = 400.0d;
 
-    private var _carLocation as Position.Location;
-    private var _myLocation as Position.Location?;
-
+    // Everything the map needs is set up HERE, not in onShow(), and that is
+    // load-bearing. Setting the markers, the visible area and the screen
+    // area from onShow() throws
+    // "UnexpectedTypeException: Screen visible area top left is not set"
+    // out of WatchUi.pushView(), and the watch shows the IQ error screen:
+    // by the time onShow() runs the view is already being rendered, and the
+    // render reads state the constructor was supposed to have left behind.
+    // That is how this screen shipped in 1.0.0. The order below is Garmin's
+    // own from samples/MapSample/source/MapSampleMapView.mc, including
+    // setScreenVisibleArea() last.
+    //
+    // This view is constructed fresh by LocationView.openMap() on every
+    // open and discarded on the pop, so a constructor is as good a place as
+    // onShow() for state that must be rebuilt each time.
     function initialize(carLocation as Position.Location, myLocation as Position.Location?) {
         MapView.initialize();
-        _carLocation = carLocation;
-        _myLocation = myLocation;
-    }
 
-    function onLayout(dc as Dc) as Void {
-    }
-
-    // Markers, mode and visible area are all (re)built here rather than in
-    // initialize(): onShow() is what runs every time this view is
-    // actually displayed, so a fresh instance is never missing them.
-    function onShow() as Void {
         setMapMode(WatchUi.MAP_MODE_PREVIEW);
 
-        var carMarker = new WatchUi.MapMarker(_carLocation);
+        var carMarker = new WatchUi.MapMarker(carLocation);
         carMarker.setIcon(WatchUi.MAP_MARKER_ICON_PIN, 0, 0);
         carMarker.setLabel("Car");
         var markers = [ carMarker ] as Array<WatchUi.MapMarker>;
 
-        var myLocation = _myLocation;
         if (myLocation != null) {
             var myMarker = new WatchUi.MapMarker(myLocation as Position.Location);
             myMarker.setIcon(WatchUi.MAP_MARKER_ICON_PIN, 0, 0);
@@ -55,9 +56,19 @@ class MapPreviewView extends WatchUi.MapView {
         }
         setMapMarker(markers);
 
-        var topLeft = _carLocation.getProjectedLocation(Math.toRadians(315.0d), _PREVIEW_RADIUS_METERS);
-        var bottomRight = _carLocation.getProjectedLocation(Math.toRadians(135.0d), _PREVIEW_RADIUS_METERS);
+        var topLeft = carLocation.getProjectedLocation(Math.toRadians(315.0d), _PREVIEW_RADIUS_METERS);
+        var bottomRight = carLocation.getProjectedLocation(Math.toRadians(135.0d), _PREVIEW_RADIUS_METERS);
         setMapVisibleArea(topLeft, bottomRight);
+
+        // The whole screen, where MapSample passes screenHeight / 2: that
+        // sample draws a label over the bottom half, and this view draws
+        // nothing on top of the map (see the note on onUpdate() below), so
+        // nothing is obscured.
+        var screen = System.getDeviceSettings();
+        setScreenVisibleArea(0, 0, screen.screenWidth, screen.screenHeight);
+    }
+
+    function onLayout(dc as Dc) as Void {
     }
 
     // US-030: release this view's own map state. Every MapMarker and any
