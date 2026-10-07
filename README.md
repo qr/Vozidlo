@@ -20,12 +20,6 @@ verified in the simulator and against the included mock server, and nothing
 more. They are claimed on the strength of identical device family, memory
 budgets and API implementations rather than on anyone having worn one.
 
-Worth weighing before relying on it. The two worst bugs found so far were a
-glance that crashed on every launch, and onboarding text drawn off both edges
-of the screen. Both compiled cleanly and passed the entire test suite. Both
-were found by looking at the screen. The post-mortems are in
-[docs/decisions.md](docs/decisions.md).
-
 It is a spare-time project. Issues get answered in days, not hours.
 
 ## What it does, and does not
