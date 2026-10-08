@@ -1,0 +1,235 @@
+<title>Vozidlo redesign PoC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Roboto:wght@700&family=Roboto+Condensed:wght@700&display=swap">
+<style>
+/* Layout: a review board. Header, sticky toolbar, "What changes" box, the interactive pair,
+   then one section per app area with one full-width row per screen: Today | Proposal (1 or 2). */
+:root {
+  --bg: #eceae6;          /* brushed-titanium paper */
+  --surface: #f7f6f3;
+  --ink: #1d1f22;
+  --ink-2: #565a60;
+  --rule: #d3d0ca;
+  --accent: #0077b6;      /* the one UI accent, darkened for paper */
+  --accent-bg: #e0eef6;
+  --flag: #b45309;        /* design finding */
+  --flag-bg: #fbecd9;
+  --chip: #e2dfd9;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tb-h: 64px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+    --accent: #3db8ff; --accent-bg: #13283a; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+  --accent: #3db8ff; --accent-bg: #13283a; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); overflow-x: hidden; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code { font: .85em var(--font-mono); background: var(--chip); padding: .05em .3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+header h1 { font: 700 2.4rem/1.05 var(--font-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+header .meta { font: 500 .8rem/1.5 var(--font-mono); color: var(--ink-2); margin-top: .5rem; }
+header p { max-width: 72ch; margin: .9rem 0 0; color: var(--ink-2); }
+
+/* toolbar */
+.toolbar { position: sticky; top: 0; z-index: 5; margin-top: 1.25rem; padding: .6rem 0;
+  background: var(--bg); border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; }
+.toolbar .grp { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
+.toolbar .lbl { font: 600 .72rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-right: .25rem; }
+.toolbar button, .toolbar label { font: 500 .85rem/1 var(--font-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; padding: .45rem .65rem; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center; }
+.toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.toolbar label:has(input:checked) { border-color: var(--accent); }
+.toolbar label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toolbar input { accent-color: var(--accent); margin: 0; }
+.toolbar input:focus-visible { outline: none; }
+.toolbar nav { display: flex; gap: .25rem .9rem; flex-wrap: wrap; margin-left: auto; }
+.toolbar nav a { color: var(--ink-2); text-decoration: none; font: 600 .8rem/1.6 var(--font-display); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.toolbar nav a:hover { color: var(--accent); }
+
+/* what changes */
+.changes { margin-top: 1.75rem; border: 1px solid var(--rule); border-left: 4px solid var(--accent); background: var(--surface); border-radius: 4px; padding: 1rem 1.25rem;
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1rem 2.5rem; }
+.changes h2 { font: 700 1.1rem/1.2 var(--font-display); margin: 0 0 .5rem; letter-spacing: .02em; }
+.changes h3 { font: 700 .95rem/1.2 var(--font-display); margin: 0 0 .4rem; letter-spacing: .02em; }
+.changes ul, .changes ol { margin: 0; padding-left: 1.2rem; display: grid; gap: .4rem; }
+.changes li::marker { color: var(--accent); }
+.changes .side { display: grid; gap: 1.1rem; align-content: start; }
+.changes .fact { border-left: 3px solid var(--flag); background: var(--flag-bg); padding: .55rem .8rem; border-radius: 0 4px 4px 0; font-size: .92rem; }
+.changes .fact strong { color: var(--flag); }
+.dec { font: 600 .7rem/1 var(--font-mono); color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: .15rem .3rem; margin-right: .35rem; white-space: nowrap; vertical-align: .1em; }
+
+/* try it */
+#try { margin-top: 2.75rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+#try > h2, section.area > h2 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
+#try > p { color: var(--ink-2); margin: .4rem 0 0; max-width: 85ch; }
+#sim { margin-top: 1rem; max-width: 100%; }
+
+/* board */
+section.area { margin-top: 2.75rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+section.area > h2 small { font: 500 .78rem/1 var(--font-mono); color: var(--ink-2); }
+section.area > p { color: var(--ink-2); margin: .4rem 0 0; max-width: 85ch; }
+section.area > p.neu { color: var(--ink); }
+section.area > .empty { color: var(--ink-2); font-style: italic; margin-top: 1rem; }
+.cards { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
+.card { min-width: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1rem 1.1rem 1.1rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+.card:target { border-color: var(--accent); }
+.card > h3 { font: 700 1.15rem/1.2 var(--font-display); margin: 0; letter-spacing: .01em; display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: baseline; }
+.card > h3 a { color: inherit; text-decoration: none; }
+.card > h3 a:hover { color: var(--accent); }
+.card > h3 .id { font: 500 .72rem/1 var(--font-mono); color: var(--ink-2); }
+.pair { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin-top: .9rem; align-items: flex-start; }
+.pair .neus { display: flex; flex-wrap: wrap; gap: 1rem 2rem; flex: 1 1 0; min-width: min(100%, 300px); }
+.pair figure { margin: 0; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: .45rem; }
+.pair figure.old { padding-right: 2rem; border-right: 1px solid var(--rule); }
+.pair figcaption { display: flex; flex-wrap: wrap; gap: .3rem .4rem; align-items: center; min-height: 1.4rem; }
+.pair figcaption .who { font: 700 .78rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.pair figure.neu figcaption .who { color: var(--accent); }
+.pair figcaption .vl { font: 600 .9rem/1.2 var(--font-body); }
+.pair .src { font: .72rem/1.3 var(--font-mono); color: var(--ink-2); overflow-wrap: anywhere; max-width: 333px; }
+.tag { font: 600 .66rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .28rem .45rem; border-radius: 3px; background: var(--chip); color: var(--ink-2); white-space: nowrap; }
+.tag.mock { color: var(--accent); }
+.tag.sys { font-style: italic; }
+.tag.ex { color: var(--flag); }
+.fix { font: 500 .72rem/1 var(--font-mono); padding: .25rem .4rem; border-radius: 3px; background: var(--chip); color: var(--ink); white-space: nowrap; }
+
+.info { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem 2rem; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--rule); }
+.info h4 { font: 700 .74rem/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin: 0 0 .4rem; }
+.info h4 + h4, .info dl + h4, .info ul + h4 { margin-top: .8rem; }
+.info .fixes { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .6rem; }
+.info ul { margin: 0; padding-left: 1.05rem; font-size: .9rem; display: grid; gap: .25rem; }
+.notes li.flag { color: var(--flag); }
+.notes li.flag::marker { content: "▲ "; font-size: .7em; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: .15rem .7rem; font-size: .88rem; margin: 0; }
+.keys dt { font: 600 .7rem/1.75 var(--font-mono); color: var(--ink-2); }
+.keys dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.keys .vh { grid-column: 1 / -1; font: 600 .8rem/1.4 var(--font-body); color: var(--ink-2); margin-top: .2rem; }
+
+/* the watch: sizes in % of the figure so it shrinks to the column on narrow screens */
+.watch { position: relative; flex: none; aspect-ratio: 1; max-width: 100%; }
+.watch svg.bezel { position: absolute; inset: 0; width: 100%; height: 100%; }
+.watch canvas { position: absolute; border-radius: 50%; image-rendering: pixelated; background: #000; }
+.watch.flat canvas { position: static; display: block; width: 100%; height: 100%; }
+.watch.none { border: 1.5px dashed var(--rule); border-radius: 50%; display: grid; place-items: center; text-align: center; color: var(--ink-2);
+  font: 600 .95rem/1.3 var(--font-display); letter-spacing: .02em; padding: 18%; }
+.watch.none small { display: block; font: 400 .82rem/1.35 var(--font-body); margin-top: .3rem; }
+
+footer { margin-top: 3rem; color: var(--ink-2); font-size: .88rem; border-top: 1px solid var(--rule); padding-top: 1rem; max-width: 90ch; display: grid; gap: .6rem; }
+footer p { margin: 0; }
+.bootfail { margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--flag); background: var(--flag-bg); color: var(--ink); border-radius: 4px; }
+
+@media (max-width: 900px) {
+  .changes { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .watch.none { aspect-ratio: auto; border-radius: 6px; padding: 1.25rem 1rem; width: 100% !important; }
+  .wrap { padding-inline: 16px; padding-block: 20px 48px; }
+  header h1 { font-size: 1.9rem; }
+  .toolbar { gap: .4rem .8rem; }
+  .toolbar nav { margin-left: 0; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding-bottom: .15rem; scrollbar-width: thin; }
+  .changes { padding: .9rem 1rem; }
+  .card { padding: .8rem .75rem .9rem; }
+  .pair, .pair .neus { gap: 1rem; }
+  .pair figure { width: 100%; }
+  .pair figure.old { padding-right: 0; border-right: 0; padding-bottom: 1rem; border-bottom: 1px solid var(--rule); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+<script>
+// Count JS errors from the very start, so a throw in any part still shows up in data-js-errors.
+window.__jsErrors = 0;
+window.addEventListener("error", function () { window.__jsErrors++; if (document.body) document.body.dataset.jsErrors = window.__jsErrors; });
+window.addEventListener("unhandledrejection", function () { window.__jsErrors++; if (document.body) document.body.dataset.jsErrors = window.__jsErrors; });
+</script>
+
+<div class="wrap">
+<header>
+  <h1>Vozidlo redesign</h1>
+  <div class="meta">fēnix 7 Pro · 260 × 260 round MIP · OLD = app at 3c4d005 · NEW = "Night Panel" proposal · 2026-10-07</div>
+  <p>Each row shows one screen twice. The left watch is the app today, redrawn from its code. The right watch is the proposal. Garmin's own UI (menus, confirmations, toasts) is drawn from the device files. Values come from the mock car unless a card says Example.</p>
+</header>
+
+<div class="toolbar" role="toolbar" aria-label="View options" id="toolbar">
+  <div class="grp"><span class="lbl">Scale</span>
+    <button type="button" data-scale="1">1×</button>
+    <button type="button" data-scale="1.5">1.5×</button>
+    <button type="button" data-scale="2">2×</button>
+  </div>
+  <div class="grp"><span class="lbl">Show</span>
+    <label for="optBezel"><input type="checkbox" id="optBezel" data-opt="bezel"> Bezel</label>
+    <label for="optGaps"><input type="checkbox" id="optGaps" data-opt="gaps"> Font gaps</label>
+    <label for="optGuides"><input type="checkbox" id="optGuides" data-opt="guides"> Guides</label>
+    <label for="optMono" title="Draws the proposal in black and white only"><input type="checkbox" id="optMono" data-opt="mono"> Monochrome (NEW)</label>
+  </div>
+  <nav aria-label="Sections">
+    <a href="#try">Try it</a><a href="#entry">Entry</a><a href="#home">Home</a><a href="#status">Status</a><a href="#charging">Charging</a><a href="#findcar">Find my car</a><a href="#settings">Settings</a><a href="#onboarding">Onboarding</a><a href="#garmin">Garmin UI</a>
+  </nav>
+</div>
+
+<div class="changes" id="changes">
+  <div>
+    <h2>What changes</h2>
+    <ul>
+      <li><strong>One accent colour: Škoda green.</strong> Electric Green (#78FAAE on skoda-auto.com, #55FFAA on the watch's 64-colour screen) for titles, focus and progress. Amber only for warnings, always with "!". Red only for failures. No orange.</li>
+      <li><strong>One hero value per screen,</strong> at the widest part of the circle. Digits and % in the number font, words in a text font, so no screen relies on glyphs the number font lacks.</li>
+      <li><strong>Status as chips.</strong> Closed things are outline chips with a check; things that need attention are amber chips ("! Plug in", "! Trunk").</li>
+      <li><strong>No text hints.</strong> The bottom hint lines are gone. Where a button does something you cannot guess, a short arc or glyph sits next to that button.</li>
+      <li><strong>Everything fits the circle.</strong> Every proposal text line is checked against the width of the circle at its height. Dynamic text is cut with "…" or wrapped.</li>
+      <li><strong>Charging is reachable again.</strong> Home gets a Charging tile (grid) or row (list), so it no longer depends on a swipe.</li>
+      <li><strong>Focus survives.</strong> After a command the focus stays on the tile you used. The grid scrolls under a fixed band and never covers it.</li>
+      <li><strong>Plain labels.</strong> Sentence case, no raw API values ("Plugged in", not READY_FOR_CHARGING), one age format ("12 min ago").</li>
+    </ul>
+  </div>
+  <div class="side">
+    <p class="fact"><strong>Checked on the watch:</strong> on home, UP and DOWN move the tile focus. The hint "UP charging - DOWN status" is wrong. So today Charging detail, charge limit, mode and profiles cannot be reached with buttons; only an unconfirmed swipe down might get there.</p>
+    <div>
+      <h3>Open decisions, shown as variants</h3>
+      <ul>
+        <li><span class="dec">D1</span>Home: grid with fixes, or hero value with an action list. <a href="#home-mock">Home</a></li>
+        <li><span class="dec">D2</span>Charging: its own view, or a page inside the Status loop. <a href="#ch-detail">Charging</a></li>
+        <li><span class="dec">D4</span>START on Status: refresh directly, or open an action menu. <a href="#st-lock">Status</a></li>
+        <li><span class="dec">D7</span>Page indicator: Garmin's own arc, or dots. <a href="#st-lock">Status</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Still to check on the watch</h3>
+      <ul>
+        <li>What the number font draws for letters it does not have.</li>
+        <li>Whether a single tap runs a tile.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<section id="try" aria-labelledby="try-h">
+  <h2 id="try-h">Try it</h2>
+  <p>Click the buttons on the bezel; hold UP for MENU. After clicking the area you can also use the arrow keys, Enter, Esc and M. Drag up or down on a screen to swipe.</p>
+  <div id="sim"></div>
+</section>
+
+<main id="board" aria-label="Screens, today and proposed"></main>
+
+<footer>
+  <p><strong>How it is drawn.</strong> Each screen of today is a JavaScript port of the view's <code>onUpdate()</code> at 3c4d005, with the same coordinates and colours. The proposal uses the same drawing calls. Every character sits on the advance width of the fēnix 7 Pro font files from the Connect IQ SDK, so line lengths, wrapping and clipping match the device. Every proposal text line is checked against the circle by an automated fit check.</p>
+  <p><strong>Source.</strong> The proposal and the fix ids (A1 to A23, C1a to C8) are in <code>docs/design/ui-improvements.md</code>. The board of today's screens alone is <code>docs/design/vozidlo-screens.html</code>.</p>
+</footer>
+</div>
+<script>

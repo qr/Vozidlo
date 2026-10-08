@@ -164,6 +164,158 @@ def _privacy():
     return bad
 
 
+def monkey_c_sources() -> list[pathlib.Path]:
+    """Every .mc file under app/source, tracked or not.
+
+    Not tracked_files(): a new view is exactly what these checks are for, and
+    it is untracked until someone commits it.
+    """
+    return sorted((ROOT / "app/source").rglob("*.mc"))
+
+
+def strip_comments(text: str) -> str:
+    """Monkey C with // and /* */ comments blanked out, strings kept.
+
+    Comments are where this code base explains why an old pattern is gone
+    ("orange 0xFF5500 is retired"), so the UI checks below look at code only.
+    Newlines survive, so line numbers still match the file.
+    """
+    out = []
+    i, n = 0, len(text)
+    in_string = False
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == '"':
+                in_string = False
+            i += 1
+        elif ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+        elif text.startswith("//", i):
+            while i < n and text[i] != "\n":
+                i += 1
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end < 0 else end + 2
+            out.append("\n" * text.count("\n", i, end))
+            i = end
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+def function_bodies(code: str, name: str):
+    """(line number, body) of every `function <name>(...) { ... }` in code."""
+    for m in re.finditer(r"\bfunction\s+" + re.escape(name) + r"\s*\(", code):
+        start = code.find("{", m.end())
+        if start < 0:
+            continue
+        depth = 0
+        in_string = False
+        j = start
+        while j < len(code):
+            ch = code[j]
+            if in_string:
+                if ch == "\\":
+                    j += 1
+                elif ch == '"':
+                    in_string = False
+            elif ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    yield code.count("\n", 0, m.start()) + 1, code[start:j + 1]
+                    break
+            j += 1
+
+
+@check("No loadResource inside onUpdate")
+def _load_resource_in_on_update():
+    # ui-improvements.md A23: onUpdate runs on every redraw (a menu scroll
+    # redraws per frame), and loadResource reads the resource from flash
+    # each time. Load in initialize()/onShow() and keep the value.
+    bad = []
+    for f in monkey_c_sources():
+        code = strip_comments(f.read_text(encoding="utf-8"))
+        for lineno, body in function_bodies(code, "onUpdate"):
+            if "loadResource" in body:
+                bad.append(f"{f.relative_to(ROOT)}:{lineno} onUpdate calls loadResource")
+    return bad
+
+
+@check("No vertical slide in menu delegate files")
+def _menu_slides():
+    # ui-improvements.md A20/A23 and decisions.md "Night Panel navigation":
+    # menus slide in from the right and out to the right (Theme.SLIDE_IN /
+    # SLIDE_OUT); the old menus popped SLIDE_DOWN and Find my car's slid UP.
+    # Only Status (up) and Charging (down) move vertically, and only through
+    # the Theme constants, so a SLIDE_UP/SLIDE_DOWN literal next to a menu
+    # delegate is that bug coming back. Subclasses count (NightMenuDelegate
+    # is the Menu2InputDelegate every menu here uses).
+    files = {f: strip_comments(f.read_text(encoding="utf-8")) for f in monkey_c_sources()}
+    extends = {}
+    for f, code in files.items():
+        for cls, parent in re.findall(r"\bclass\s+(\w+)\s+extends\s+(?:\w+\.)*(\w+)", code):
+            extends[cls] = (parent, f)
+    menu_delegates = {"Menu2InputDelegate"}
+    changed = True
+    while changed:
+        changed = False
+        for cls, (parent, _) in extends.items():
+            if parent in menu_delegates and cls not in menu_delegates:
+                menu_delegates.add(cls)
+                changed = True
+    menu_files = {f for cls, (parent, f) in extends.items() if parent in menu_delegates}
+    bad = []
+    for f in sorted(menu_files):
+        for lineno, line in enumerate(files[f].splitlines(), 1):
+            for hit in re.findall(r"\bSLIDE_(?:UP|DOWN)\b", line):
+                bad.append(f"{f.relative_to(ROOT)}:{lineno} uses {hit} in a file with a menu delegate")
+    print(f"   {len(menu_files)} files define a Menu2InputDelegate subclass")
+    return bad
+
+
+@check("No orange in the app")
+def _no_orange():
+    # ui-improvements.md D3 and decisions.md "Branding": Škoda Electric Green
+    # (0x55FFAA) is the single accent and orange is retired; it used to mean
+    # both "error" and "unlocked". Warnings are amber (Theme.WARNING).
+    bad = []
+    for f in monkey_c_sources():
+        code = strip_comments(f.read_text(encoding="utf-8"))
+        for lineno, line in enumerate(code.splitlines(), 1):
+            for hit in re.findall(r"\bCOLOR_ORANGE\b|\b0[xX][fF][fF]5500\b", line):
+                bad.append(f"{f.relative_to(ROOT)}:{lineno} uses {hit}")
+    return bad
+
+
+@check("No request sent with a null body")
+def _no_null_body():
+    # Garmin Connect on Android does not send a JSON POST whose body is null:
+    # the watch gets responseCode 0 and nothing reaches Škoda (measured
+    # 2026-10-08). Every request passes a dictionary; a command without a
+    # body passes ApiClient.noBody(), an empty one.
+    bad = []
+    for f in monkey_c_sources():
+        code = strip_comments(f.read_text(encoding="utf-8"))
+        # A GET has no body by definition; reading works with null.
+        for m in re.finditer(r"makeWebRequest\(\s*[^,]+,\s*null\s*,\s*\{[^}]*?HTTP_REQUEST_METHOD_(POST|PUT)", code, re.S):
+            lineno = code.count("\n", 0, m.start()) + 1
+            bad.append(f"{f.relative_to(ROOT)}:{lineno} sends a {m.group(1)} with a null body")
+    return bad
+
+
 if __name__ == "__main__":
     print(f"\n{len(failures)} problem(s)" if failures else "\nAll checks passed")
     for f in failures:

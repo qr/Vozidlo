@@ -19,8 +19,9 @@ name: checks
 #
 # So the maintainer runs `tools/ciq build --all` and `tools/ciq test` locally
 # before merging anything that touches app/, and CONTRIBUTING.md says so. What
-# runs here is everything that genuinely can: the mock server's own suite, and
-# the repository consistency and privacy checks in tools/checks.py.
+# runs here is everything that genuinely can: the mock server's own suite, the
+# repository consistency and privacy checks in tools/checks.py, and the UI
+# design checks in tools/ui/ (plain node, no SDK).
 #
 # Cost: this repository is public, so standard GitHub-hosted runners are free
 # and unmetered. Nothing here needs a paid plan.
@@ -70,3 +71,20 @@ jobs:
         # wide sweep for personal or vehicle data. Identical to what
         # `python3 tools/checks.py` does locally.
         run: python3 tools/checks.py
+
+  ui:
+    name: UI design checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Design reference matches its sources
+        # docs/design/vozidlo-poc.html is built from tools/ui/poc/; a change to
+        # one without the other fails here. Node is preinstalled on the runner.
+        run: bash tools/ui/build.sh --check
+
+      - name: Every new screen fits the round display
+        # Text hidden by the curve or too close to it, overlaps, letters in a
+        # digits-only font, text on grey, retired colours, monochrome pass.
+        # See docs/design/style-guide.md, section 11.
+        run: node tools/ui/fitcheck.mjs

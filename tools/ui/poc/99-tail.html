@@ -1,0 +1,9 @@
+</script>
+<script>
+// If a part threw before boot ran, say so on the page instead of showing an empty board.
+setTimeout(function () {
+  if (window.__booted) return;
+  var b = document.getElementById("board");
+  if (b && !b.children.length) b.insertAdjacentHTML("afterbegin", '<p class="bootfail">The screens did not load because a script failed. Errors: ' + (window.__jsErrors || 0) + '.</p>');
+}, 8000);
+</script>
