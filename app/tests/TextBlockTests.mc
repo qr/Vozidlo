@@ -1,3 +1,4 @@
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Test;
 
@@ -241,6 +242,39 @@ module TextBlockTests {
         return true;
     }
 
+    // A1: the box fittedLineY() checks must be the box drawFittedLine()
+    // draws. It draws with VCENTER, so y is the middle of the line and the
+    // whole glyph box (fittedLineTop .. + lineHeight) has to fit; drawn
+    // top-aligned at y, as before, it would sit half a line lower than the
+    // box that was checked and run off the chord.
+    (:test)
+    function aFittedLineIsDrawnInTheBoxThatWasChecked(logger as Logger) as Boolean {
+        if ((TextBlock.FITTED_JUSTIFY & Graphics.TEXT_JUSTIFY_VCENTER) == 0) {
+            logger.error("drawFittedLine must draw VCENTER so y is the middle of the checked box");
+            return false;
+        }
+        var radius = 130;
+        var centerY = 130;
+        var lineHeight = 19;
+        var wide = TextBlock.lineWidth(radius, centerY, 220, 220 + lineHeight) + 30;
+        var y = TextBlock.fittedLineY(radius, centerY, lineHeight, 230, wide);
+        var top = TextBlock.fittedLineTop(y, lineHeight);
+        if (top != y - lineHeight / 2) {
+            logger.error("the drawn box must be centred on y");
+            return false;
+        }
+        if (TextBlock.lineWidth(radius, centerY, top, top + lineHeight) < wide) {
+            logger.error("the drawn box at y " + y.toString() + " does not fit " + wide.toString() + " px");
+            return false;
+        }
+        // The old top-aligned draw would have used y..y+lineHeight: too low.
+        if (TextBlock.lineWidth(radius, centerY, y, y + lineHeight) >= wide) {
+            logger.error("test set-up: the top-aligned box should not fit here");
+            return false;
+        }
+        return true;
+    }
+
     // Something that already fits must not be moved: the hint belongs at the
     // bottom whenever the bottom can hold it.
     (:test)
@@ -269,12 +303,13 @@ module TextBlockTests {
     // 6px per character at this size, and the block is centred, so this is
     // the closest the pure tests get to the actual onboarding screen. Every
     // line must fit the chord available at its own height, which is the
-    // check that would have caught the original bug.
+    // check that would have caught the original bug. The copy is
+    // OnboardingGuidanceMessage as shipped (no "Menu for more." since C7).
     (:test)
     function theOnboardingMessageFitsA260RoundFace(logger as Logger) as Boolean {
-        var text = "A key is created in the MySkoda app (v8.16+), not here. It only "
+        var text = "A key is created in the MyŠkoda app (v8.16+), not here. It only "
                  + "works for the vehicles you selected when you created it. Enter it "
-                 + "in this app's phone settings. Menu for more.";
+                 + "in this app's phone settings.";
         var radius = 130;
         var centerY = 130;
         var lineHeight = 21;

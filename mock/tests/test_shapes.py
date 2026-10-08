@@ -39,6 +39,22 @@ def test_every_command_endpoint_has_the_202_shape(live_mock, vin):
         assert "Content-Type" not in headers, path
 
 
+def test_bodiless_commands_accept_an_empty_json_object(live_mock, vin):
+    """The app sends `{}` where Škoda defines no body: Garmin Connect on
+    Android does not send a JSON POST with a null body (the watch gets
+    responseCode 0 and nothing goes out, measured 2026-10-08). The real API
+    answers `{}` on air-conditioning/stop with the same 202; the mock must
+    too, or the app's own requests would fail against it.
+    """
+    for op in ("air-conditioning/stop", "charging/start", "charging/stop",
+               "active-ventilation/start", "active-ventilation/stop",
+               "auxiliary-heating/stop"):
+        path = f"/api/v1/vehicles/{vin}/{op}"
+        status, headers, body = live_mock.request("POST", path, body={})
+        assert status == 202, path
+        assert body == b"", path
+
+
 def test_errors_are_problem_json_with_required_fields(live_mock):
     status, headers, body = live_mock.request("GET", "/api/v1/nonsense")
     assert status == 404

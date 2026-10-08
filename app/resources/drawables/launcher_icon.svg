@@ -1,41 +1,40 @@
 <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
 <!--
-    Task 11 (US-056): original launcher icon. A car silhouette with a
-    control motif, NOT the Škoda winged-arrow logo, not their brand green,
-    not their typeface (see docs/best-practices/garmin-connect-iq.md,
-    "Publishing to the Connect IQ Store", and docs/decisions.md "Branding"
-    for why: no third-party trademark licence exists for any of it).
+    US-056: the app's own launcher icon, redrawn for the Night Panel (1.1.0).
+    A three-spoke steering wheel: the one object everybody reads as "car"
+    at 40 px, and an original drawing, NOT the Škoda winged-arrow logo and no
+    Škoda typeface (docs/decisions.md, "Branding": no trademark licence
+    exists for either).
 
-    Two flat colours only (#2B2F36 dark / #C7CDD6 light: matching the
-    complication icons' own palette in resources/complications/, for one
-    consistent icon family), no gradients, no thin single-pixel strokes:
-    bold shapes for a 64-colour memory-in-pixel panel where fine detail and
-    subtle hues both disappear (docs/best-practices, "Publishing to the
-    Connect IQ Store"; US-056's own acceptance criteria).
+    Colours: the owner's decision of 2026-10-07 makes Škoda Electric Green
+    the app's single accent (docs/decisions.md, "Branding"). Both colours sit
+    exactly on the 64-colour grid of the memory-in-pixel panel, so
+    dithering="none" in drawables.xml keeps them as drawn:
+      #55FFAA  Electric Green, Škoda's #78FAAE shown as #55FFAA on the
+               panel: rim and spokes
+      #005555  Emerald, Škoda's #0E3A2F shown as #005555 on the panel: the
+               hub's face
+    Emerald on its own all but vanishes on the system's black, which is why
+    the hub carries a green edge.
 
-    Composition: a simplified car body/cabin silhouette (the wheel wells are
-    cut as two dark half-circles overdrawn on the light body: a bold,
-    common icon technique, not a stroke) with a power-toggle ring: the
-    universal "⏻" control glyph: sitting just above the roof, reading as
-    "a car with a control signal", not a badge or crest. Verified to stay
-    legible at 40x40 (the resource's own native size) with nothing here
-    thinner than a 3px stroke.
+    No background shape: the icon is transparent and sits on the black the
+    system draws behind the app list and the glance list. The rim's outer
+    edge stops 2 px inside the 40 px square so a circular crop never clips
+    it. Bold shapes only, nothing thinner than 3 px, no gradients: fine
+    detail and subtle hues both disappear on this panel
+    (docs/best-practices/garmin-connect-iq.md, "Publishing to the Connect IQ
+    Store").
 -->
-<rect width="40" height="40" rx="8" fill="#2B2F36"/>
 
-<!-- Car body + cabin, one silhouette. -->
-<path d="M5 31 L5 25 L9 25 L14 16 L26 16 L31 25 L35 25 L35 31 Z" fill="#C7CDD6"/>
+<!-- Rim: outer edge at r 18, inner edge at r 13. -->
+<circle cx="20" cy="20" r="15.5" stroke="#55FFAA" stroke-width="5" fill="none"/>
 
-<!-- Wheel wells: dark circles over the light body, reading as two bold
-     notches at the bottom edge: never a separate stroked wheel, which
-     would be exactly the "fine detail" the 64-colour panel punishes. -->
-<circle cx="12.5" cy="31.5" r="4.5" fill="#2B2F36"/>
-<circle cx="27.5" cy="31.5" r="4.5" fill="#2B2F36"/>
+<!-- Spokes, slightly wider where they meet the hub, so the three read as
+     one moulded piece rather than three sticks. -->
+<path d="M6 18.25 L14.5 17 L14.5 23 L6 21.75 Z" fill="#55FFAA"/>
+<path d="M34 18.25 L25.5 17 L25.5 23 L34 21.75 Z" fill="#55FFAA"/>
+<path d="M17.75 34 L22.25 34 L23.25 25.5 L16.75 25.5 Z" fill="#55FFAA"/>
 
-<!-- Control motif: a power-toggle ring above the roof (the universal
-     "on/off control" glyph), reading as "a control signal over the car":
-     bold ring + a straight tick through its notch, not a crest. -->
-<circle cx="29" cy="10" r="6.5" stroke="#C7CDD6" stroke-width="3" fill="none"/>
-<rect x="27.5" y="1.5" width="3" height="5.5" fill="#2B2F36"/>
-<line x1="29" y1="3" x2="29" y2="10" stroke="#C7CDD6" stroke-width="3" stroke-linecap="round"/>
+<!-- Hub: Emerald face, 3 px green edge (outer radius 6). -->
+<circle cx="20" cy="20" r="4.5" fill="#005555" stroke="#55FFAA" stroke-width="3"/>
 </svg>

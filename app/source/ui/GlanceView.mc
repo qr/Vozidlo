@@ -1,25 +1,23 @@
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Math;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// US-034/US-035 (task 10): AppBase.getGlanceView() implementation, see
-// VozidloApp.getGlanceView() for the wiring. Shows state of charge, charging
-// state and lock state straight from Cache.mc, with an age indicator, and
-// NOTHING else: WatchUi.GlanceView has no input delegate. Garmin's own
+// US-034/US-035: AppBase.getGlanceView() implementation, see
+// VozidloApp.getGlanceView() for the wiring. Shows state of charge, lock,
+// charging and climate state straight from Cache.mc, with an age indicator,
+// and NOTHING else: WatchUi.GlanceView has no input delegate. Garmin's own
 // doc says it is "prohibited from using page control functionality", so
 // this file only draws, it never acts. Selecting the glance in the
-// carousel falls straight through to AppBase.getInitialView(), which is
-// what already lands on ControlsView with the primary tile preselected
-// (US-037); there is nothing to wire for that here, only not to break it.
+// carousel falls straight through to AppBase.getInitialView(), which
+// lands on the home screen with the primary action focused (US-037);
+// there is nothing to wire for that here, only not to break it.
 //
 // HARD CONSTRAINT: no web request, in any code path, ever (US-034). Every
 // value below comes from Cache.mc, which is itself Storage-backed and
 // makes no request of its own; nothing in this file imports
-// Toybox.Communications or references ApiClient. Verified two ways: by
-// this code-inspection argument, and by watching mock/run.sh
-// --log-requests log nothing while the simulator's glance renders, see
-// the task's final report for both.
+// Toybox.Communications or references ApiClient.
 //
 // (:glance): every symbol reachable from glance mode must carry this
 // annotation to be compiled into the glance arena (65,536 B on this
@@ -39,11 +37,12 @@ import Toybox.WatchUi;
 // those two modules were annotated (:glance) themselves. See VozidloApp.mc
 // for the same mistake in onStart(). Annotating a module is enough; its
 // members follow.
+//
+// So the Night Panel layout (C6) draws only through glance-safe modules:
+// Theme, Age, Labels, StateIcons, Cache. Ui, Bezel, NightIcons and Chips are
+// app scope (they keep the glance arena small) and must never be called here.
 (:glance)
 module GlanceFormat {
-
-    const EM_DASH = "—";
-    const ELLIPSIS = "…";
 
     // True once there is anything at all worth drawing: false is exactly
     // the "no cached data" case US-034 requires an invitation for.
@@ -51,9 +50,10 @@ module GlanceFormat {
         return soc != null || chargingState != null || locked != null;
     }
 
+    // Digits and "%" only; a missing reading is the app-wide dash, never "0%".
     function socText(value as Object?) as String {
         if (value == null) {
-            return EM_DASH;
+            return Labels.DASH;
         }
         if (value instanceof Float) {
             return (value as Float).toNumber().toString() + "%";
@@ -61,16 +61,34 @@ module GlanceFormat {
         return value.toString() + "%";
     }
 
-    function textOr(value as String?) as String {
-        return (value != null) ? value : EM_DASH;
+    // Pixels of the SoC bar to fill (C6 row 3). Anything that is not a
+    // number reads as empty rather than crashing: the cache copies enum-ish
+    // and numeric fields through verbatim (Cache.mc), so a future API change
+    // must not take the glance down.
+    function barFill(value as Object?, width as Number) as Number {
+        var pct = 0.0;
+        if (value instanceof Number) {
+            pct = (value as Number).toFloat();
+        } else if (value instanceof Float) {
+            pct = value as Float;
+        } else {
+            return 0;
+        }
+        if (pct < 0) {
+            pct = 0.0;
+        }
+        if (pct > 100) {
+            pct = 100.0;
+        }
+        return Math.round(width * pct / 100.0).toNumber();
     }
 
     // Trim `text` until it fits `maxWidth`, marking the cut. A glance is a
     // narrow band and the strings here are built from whatever the API
     // returned, so an unrecognised state value can be far longer than
-    // anything anticipated: the old code drew it straight and let it run off
-    // the right edge. `measure` is passed in rather than a Dc so this is
-    // testable without graphics, the same arrangement ui/TextBlock.mc uses.
+    // anything anticipated. `measure` is passed in rather than a Dc so this
+    // is testable without graphics. Ui.fit() does the same for the app, but
+    // Ui is app scope, so the glance keeps this copy.
     function truncated(text as String, maxWidth as Number,
                        measure as Method(s as String) as Number) as String {
         if (maxWidth <= 0) {
@@ -80,31 +98,15 @@ module GlanceFormat {
             return text;
         }
         var shown = text;
-        while (shown.length() > 1 && measure.invoke(shown + ELLIPSIS) > maxWidth) {
+        while (shown.length() > 1 && measure.invoke(shown + Labels.ELLIPSIS) > maxWidth) {
             shown = shown.substring(0, shown.length() - 1) as String;
         }
-        return shown + ELLIPSIS;
-    }
-
-    // Mirrors ControlsView._lockLabel(): duplicated rather than shared
-    // because that method lives on a class this file has no reason to
-    // depend on, and the mapping is three lines long.
-    function lockText(raw as String?) as String {
-        if (raw == null) {
-            return EM_DASH;
-        }
-        if (raw.equals("YES")) {
-            return "LOCKED";
-        }
-        if (raw.equals("NO")) {
-            return "UNLOCKED";
-        }
-        return raw;
+        return shown + Labels.ELLIPSIS;
     }
 
     // The newer (smaller-age / more-recent) of two section ages, tolerating
     // either or both being unknown: US-034 wants ONE age indicator for the
-    // glance's compact strip, not one per section.
+    // glance, not one per section.
     function newerAge(a as Number?, b as Number?) as Number? {
         if (a == null) {
             return b;
@@ -115,27 +117,19 @@ module GlanceFormat {
         return (a > b) ? a : b;
     }
 
-    // US-034: "with an age indicator". Coarse buckets, not exact seconds,
-    // matching the glance's small drawing area and low update-rate ceiling.
-    // StatusView (task 6) is where an exact reading belongs.
+    // US-034's age indicator in the chip form ("Just now", "5 min", "2 h"):
+    // the glance has no room for "ago" (B4 copy rule). Stale gets "! " in
+    // front so it survives the monochrome test, as Age.line() does.
+    // Empty when nothing was ever captured, so no bogus age is drawn.
     function ageText(capturedAtSeconds as Number?, nowSeconds as Number) as String {
-        if (capturedAtSeconds == null) {
+        var elapsed = Age.elapsed(capturedAtSeconds, nowSeconds);
+        if (elapsed == null) {
             return "";
         }
-        var elapsed = nowSeconds - capturedAtSeconds;
-        if (elapsed < 0) {
-            elapsed = 0;
+        if (Age.isStale(elapsed)) {
+            return "! " + Age.short(elapsed);
         }
-        if (elapsed < 60) {
-            return "just now";
-        }
-        if (elapsed < 3600) {
-            return (elapsed / 60).toString() + " min ago";
-        }
-        if (elapsed < 86400) {
-            return (elapsed / 3600).toString() + " h ago";
-        }
-        return (elapsed / 86400).toString() + " d ago";
+        return Age.short(elapsed);
     }
 
 }
@@ -143,118 +137,178 @@ module GlanceFormat {
 (:glance)
 class VozidloGlanceView extends WatchUi.GlanceView {
 
+    // Side padding inside the 171 px content area (PoC NG.content X = 6).
+    private const PAD = 6;
+    // Row 1 top and the SoC bar (C6: row 1 y 2, 4 px bar 8 px above the bottom).
+    private const ROW1_Y = 2;
+    private const BAR_H = 4;
+    private const BAR_BOTTOM_GAP = 8;
+    // Row 2 icons: r 8, centre 13 px after the SoC, text 11 px after the
+    // lock icon's centre, 12 px between the label and the next icon (PoC).
+    private const ICON_R = 8;
+    private const ICON_GAP = 13;
+    private const ICON_TEXT = 11;
+    private const ICON_STEP = 20;
+
+    private const APP_NAME as String = "Vozidlo";
+    private const INVITATION as String = "Open for your car";
+
     private var _hasData as Boolean = false;
-    private var _summaryLine as String = "";
-    private var _ageLine as String = "";
-    // US-059: the same lock-state icon as ControlsView's top strip,
-    // StatusView and the complications: resolved once in onShow(), same
-    // as every other field on this class, so onUpdate() only ever draws.
-    // Defaults to the plain :unknown symbol rather than StateIcons.UNKNOWN
-    // so this field's initializer resolves without reaching across files at
-    // all; StateIcons.mc is (:glance)-annotated now, but a literal is still
-    // the cheaper thing to run before onShow() has filled this in.
+    private var _socText as String = "";
+    private var _socRaw as Object? = null;
+    private var _lockText as String = "";
+    private var _ageText as String = "";
+    private var _stale as Boolean = false;
+    private var _insecure as Boolean = false;
+    private var _charging as Boolean = false;
+    // US-059: the same state icons as the home screen and Status. A literal
+    // default so the initializer resolves before onShow() has run.
     private var _lockIcon as Symbol = :unknown;
+    private var _chargeIcon as Symbol? = null;
+    private var _climateIcon as Symbol? = null;
 
     function initialize() {
         GlanceView.initialize();
     }
 
-    // Nothing needs `dc` up front, see ControlsView.onLayout()'s identical
-    // reasoning. All drawing happens in onUpdate() from state built here in
-    // onShow(), never inside onUpdate() itself (docs/best-practices,
-    // "Never load resources inside onUpdate()" / "Pre-compute, then draw").
     function onLayout(dc as Dc) as Void {
     }
 
     // Rebuilt every time the glance becomes visible: Cache.mc is
-    // Storage-backed and effectively instant (see ControlsView.onShow()'s
-    // own comment on the same point), so this is cheap, and it is the ONLY
-    // place this file touches Cache.mc; onUpdate() only draws.
+    // Storage-backed and effectively instant, and this is the ONLY place this
+    // file touches Cache.mc; onUpdate() only measures and draws
+    // (docs/best-practices, "Pre-compute, then draw").
     function onShow() as Void {
+        Theme.refresh();
         var charging = Cache.section("charging");
         var status = Cache.section("status");
+        var climate = Cache.section("airConditioning");
 
         var soc = (charging != null) ? charging.get("batterySocPercent") : null;
         var chargingState = (charging != null) ? (charging.get("state") as String?) : null;
         var locked = (status != null) ? (status.get("doorsLocked") as String?) : null;
-        _lockIcon = StateIcons.forLockStatus(locked);
+        var climateState = (climate != null) ? (climate.get("state") as String?) : null;
 
         _hasData = GlanceFormat.hasAnyData(soc, chargingState, locked);
+        _socRaw = soc;
+        _socText = GlanceFormat.socText(soc);
+        _lockIcon = StateIcons.forLockStatus(locked);
+        _lockText = Labels.lock(locked);
+        _insecure = Labels.isInsecureLock(locked);
+        _chargeIcon = StateIcons.forChargingStatus(chargingState);
+        _climateIcon = StateIcons.forClimateStatus(climateState);
+        _charging = chargingState != null && chargingState.equals("CHARGING");
+
+        var captured = GlanceFormat.newerAge(Cache.sectionAge("charging"), Cache.sectionAge("status"));
+        var now = Time.now().value();
+        _ageText = _hasData ? GlanceFormat.ageText(captured, now) : "";
+        var elapsed = Age.elapsed(captured, now);
+        _stale = elapsed != null && Age.isStale(elapsed);
+    }
+
+    // C6, three rows in the glance's own dc (171 x 63 on fenix7pro):
+    //   row 1  "Vozidlo" grey left, age right ("12 min", amber "! 17 h")
+    //   row 2  "100%" tiny, padlock + "Locked", charging and climate icons
+    //   row 3  4 px SoC bar: track RULE, fill white, accent while charging
+    // Empty cache: the name and "Open for your car" (US-034: never blank).
+    // Row heights come from the fonts, so fēnix 8/9 font scaling moves row 2
+    // down instead of overlapping row 1.
+    function onUpdate(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var xtiny = Graphics.FONT_XTINY;
+        var tiny = Graphics.FONT_TINY;
+        var row2Y = ROW1_Y + dc.getFontHeight(xtiny) + 1;
+        var right = w - PAD;
+
+        dc.setColor(Theme.c(Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
+        dc.drawText(PAD, ROW1_Y, xtiny, APP_NAME, Graphics.TEXT_JUSTIFY_LEFT);
+
         if (!_hasData) {
-            _summaryLine = "";
-            _ageLine = "";
+            var invite = GlanceFormat.truncated(INVITATION, right - PAD, (new GlanceMetrics(dc, tiny)).method(:width));
+            dc.drawText(PAD, row2Y, tiny, invite, Graphics.TEXT_JUSTIFY_LEFT);
             return;
         }
 
-        var age = GlanceFormat.newerAge(Cache.sectionAge("charging"), Cache.sectionAge("status"));
-        _summaryLine = GlanceFormat.socText(soc) + "  " + GlanceFormat.textOr(chargingState)
-            + "  " + GlanceFormat.lockText(locked);
-        _ageLine = GlanceFormat.ageText(age, Time.now().value());
-    }
+        // Row 1: the age, right-aligned, never over the name.
+        if (_ageText.length() > 0) {
+            var nameW = dc.getTextWidthInPixels(APP_NAME, xtiny);
+            var age = GlanceFormat.truncated(_ageText, right - PAD - nameW - 6,
+                (new GlanceMetrics(dc, xtiny)).method(:width));
+            dc.setColor(Theme.c(_stale ? Theme.WARNING : Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
+            dc.drawText(right, ROW1_Y, xtiny, age, Graphics.TEXT_JUSTIFY_RIGHT);
+        }
 
-    // Bounded by the glance's own small dc (WatchUi.GlanceView's own
-    // contract), so this stays to two short lines of Graphics.FONT_XTINY:
-    // no attempt at the full top-strip layout ControlsView draws. US-059
-    // adds one small icon (StateIcons.mc, (:glance)-annotated like Cache.mc)
-    // to the left of the summary line.
-    // Two lines: what this is, then what the car is doing.
-    //
-    // The name earns its line. A glance sits in a carousel among a dozen
-    // others, and "72%  CHARGING  LOCKED" on its own does not say whose
-    // numbers those are. Below it the state, with its age, or an invitation
-    // when nothing has been fetched yet (US-034: never a blank glance).
-    //
-    // Both lines go through GlanceFormat.truncated(). The old code drew
-    // straight and let anything too long run off the right edge, which is
-    // what an unrecognised state value from the API did.
-    function onUpdate(dc as Dc) as Void {
-        var midY = dc.getHeight() / 2;
-        var left = 18;
-        var maxWidth = dc.getWidth() - left - 4;
-        var measure = (new GlanceMetrics(dc)).method(:width);
+        // Row 2: SoC, lock icon + word, then the charging and climate icons.
+        var mid = row2Y + dc.getFontHeight(tiny) / 2;
+        dc.setColor(Theme.c(Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
+        dc.drawText(PAD, row2Y, tiny, _socText, Graphics.TEXT_JUSTIFY_LEFT);
 
-        // Name on top, at the margin. No icon here: a lock symbol next to the
-        // app's name says nothing about the app, and with no data cached it
-        // would show the "unknown" glyph as though that were a reading.
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(8, midY - 10, Graphics.FONT_XTINY,
-            GlanceFormat.truncated(APP_NAME, dc.getWidth() - 12, measure),
-            Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        var trailing = 0;
+        if (_chargeIcon != null) {
+            trailing += 1;
+        }
+        if (_climateIcon != null) {
+            trailing += 1;
+        }
+        // Room the trailing icons need right of the label: each takes a 12 px
+        // gap plus its 8 px half-size, i.e. one ICON_STEP.
+        var trailingW = trailing * ICON_STEP;
 
-        // The lock icon belongs on the state line, where it is one of the
-        // readings (US-059: never colour or words alone).
-        if (_hasData) {
-            StateIcons.draw(dc, _lockIcon, 8, midY + 10, 7, Graphics.COLOR_WHITE);
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(left, midY + 10, Graphics.FONT_XTINY,
-                GlanceFormat.truncated(_summaryLine + "  " + _ageLine, maxWidth, measure),
-                Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        } else {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(8, midY + 10, Graphics.FONT_XTINY,
-                GlanceFormat.truncated(INVITATION, dc.getWidth() - 12, measure),
-                Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        var x = PAD + dc.getTextWidthInPixels(_socText, tiny) + ICON_GAP;
+        // Unlocked/open in amber with its own icon shape (B3: never colour alone).
+        var lockColor = Theme.c(_insecure ? Theme.WARNING : Theme.TEXT_1);
+        StateIcons.draw(dc, _lockIcon, x, mid, ICON_R, lockColor);
+        x += ICON_TEXT;
+        var lock = GlanceFormat.truncated(_lockText, right - trailingW - x,
+            (new GlanceMetrics(dc, tiny)).method(:width));
+        dc.setColor(lockColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x, row2Y, tiny, lock, Graphics.TEXT_JUSTIFY_LEFT);
+        x += dc.getTextWidthInPixels(lock, tiny) + (ICON_STEP - ICON_R);
+
+        var white = Theme.c(Theme.TEXT_1);
+        var chargeIcon = _chargeIcon;
+        if (chargeIcon != null) {
+            StateIcons.draw(dc, chargeIcon, x, mid, ICON_R, white);
+            x += ICON_STEP;
+        }
+        var climateIcon = _climateIcon;
+        if (climateIcon != null) {
+            StateIcons.draw(dc, climateIcon, x, mid, ICON_R, white);
+        }
+
+        // Row 3: SoC bar. Fill white, accent only while charging, like the rings.
+        var barY = h - BAR_BOTTOM_GAP;
+        var barW = right - PAD;
+        var fill = GlanceFormat.barFill(_socRaw, barW);
+        if (fill < barW) {
+            dc.setColor(Theme.c(Theme.RULE), Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(PAD + fill, barY, barW - fill, BAR_H);
+        }
+        if (fill > 0) {
+            dc.setColor(Theme.c(_charging ? Theme.ACCENT : Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(PAD, barY, fill, BAR_H);
         }
     }
 
-    private const APP_NAME as String = "Vozidlo";
-    private const INVITATION as String = "Open for your car";
-
 }
 
-// Wraps a Dc so its text measurement can be passed as a Method, which is what
-// lets GlanceFormat.truncated() be tested with arithmetic instead of graphics.
-// (:glance) because the glance binary only contains annotated code: an
-// unannotated symbol is absent, not merely discouraged, and calling it crashes.
+// Wraps a Dc and a font so text measurement can be passed as a Method, which
+// is what lets GlanceFormat.truncated() be tested with arithmetic instead of
+// graphics. (:glance) because the glance binary only contains annotated code:
+// an unannotated symbol is absent, not merely discouraged, and calling it
+// crashes. Ui.Measure does the same for the app, but Ui is app scope.
 (:glance)
 class GlanceMetrics {
     private var _dc as Dc;
+    private var _font as Graphics.FontType;
 
-    function initialize(dc as Dc) {
+    function initialize(dc as Dc, font as Graphics.FontType) {
         _dc = dc;
+        _font = font;
     }
 
     function width(s as String) as Number {
-        return _dc.getTextWidthInPixels(s, Graphics.FONT_XTINY);
+        return _dc.getTextWidthInPixels(s, _font);
     }
 }

@@ -1,8 +1,7 @@
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<!-- Road/route glyph for the range complication (task 10). Plain, neutral,
-     no Škoda branding: matches resources/drawables/launcher_icon.svg's own
-     style rule. -->
-<rect width="24" height="24" rx="5" fill="#2B2F36"/>
-<path d="M6 18L11 6H13L18 18" stroke="#C7CDD6" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
-<path d="M12 9V11.5M12 14V16" stroke="#C7CDD6" stroke-width="1.6" stroke-linecap="round"/>
+<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+<!-- Road for the range complication (US-038). 28x28, white solid
+     silhouette on transparent: a road narrowing to the horizon with the
+     centre line as 2 px cut-outs. Plain, neutral, no Škoda branding:
+     matches resources/drawables/launcher_icon.svg's own style rule. -->
+<path fill="#FFFFFF" fill-rule="evenodd" d="M10.5 3H17.5L25 25H3ZM13 7V10.5H15V7ZM13 13V17H15V13ZM13 19.5V23.5H15V19.5Z"/>
 </svg>

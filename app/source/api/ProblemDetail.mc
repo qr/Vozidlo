@@ -50,10 +50,38 @@ module ProblemDetail {
             if (mapped != null) {
                 return mapped;
             }
-            return new Message(_fallbackMessage(status), type, false);
+            return new Message(_describeStatus(status, retryAtEpoch), type, false);
         }
 
-        return new Message(_fallbackMessage(status), null, false);
+        return new Message(_describeStatus(status, retryAtEpoch), null, false);
+    }
+
+    // When there is no readable type, the HTTP status alone. A command never
+    // has a body (ApiClient.mc: its problem+json answer is lost on purpose),
+    // so before this every failed command read "Something went wrong" and
+    // the status, at the end of the line, was cut off on the watch. 404
+    // stays generic: without `detail` it cannot be told apart from a
+    // malformed URL (see the about:blank case above).
+    function _describeStatus(status as Number, retryAtEpoch as Number?) as String {
+        if (status == 401) {
+            return "The API key was not accepted. Check it in the settings.";
+        }
+        if (status == 403) {
+            return "This API key doesn't cover this vehicle.";
+        }
+        if (status == 409) {
+            return "The car is busy. Try again shortly.";
+        }
+        if (status == 422) {
+            return "Your car can't do this.";
+        }
+        if (status == 429) {
+            return _rateLimitMessage(retryAtEpoch);
+        }
+        if (status >= 500 && status < 600) {
+            return "Škoda's server had a problem. Try again later.";
+        }
+        return _fallbackMessage(status);
     }
 
     // The four Connect IQ codes US-044 and US-045 name explicitly. Every

@@ -3,8 +3,8 @@ import Toybox.Time;
 import Toybox.Time.Gregorian;
 
 // Parses a decoded VehicleResponse (the "vehicle" object plus its sibling
-// "errors" array from GET /vehicles/{vin}) into the projection StatusView
-// draws from (US-008 through US-015).
+// "errors" array from GET /vehicles/{vin}) into the projection the status
+// pages (StatusModel.mc, StatusPages.mc) draw from (US-008 through US-015).
 //
 // This is deliberately a SEPARATE projection from model/Cache.mc, not a
 // reuse of it, even though the two look similar at a glance:
@@ -14,13 +14,13 @@ import Toybox.Time.Gregorian;
 //   - This module's job is to drive a live screen, so it keeps that error
 //     classification (US-014/US-015: UNSUPPORTED vs UNAVAILABLE vs DISABLED
 //     is a real, user-visible distinction) and is never persisted itself:
-//     StatusView asks Cache for the compact form when there is no live
+//     StatusModel asks Cache for the compact form when there is no live
 //     response to parse (no BLE connection, US-013).
 //
 // Every section is optional and every field inside it is optional (US-008's
 // "any value missing renders as an em dash, never a zero or a stale value"
 // starts here: a field this module could not find is null, full stop. It
-// is StatusView's job to turn null into an em dash, never this module's job
+// is the screens' job (Labels.DASH) to turn null into an em dash, never this module's job
 // to invent a placeholder value).
 module VehicleState {
 
@@ -39,7 +39,7 @@ module VehicleState {
     const KIND_UNSUPPORTED as String = "unsupported";
     const KIND_UNAVAILABLE as String = "unavailable";
     const KIND_DISABLED as String = "disabled";
-    // Not one of the API's own distinctions: StatusView uses this for a
+    // Not one of the API's own distinctions: StatusModel uses this for a
     // section it has never fetched at all (US-013: reconstructing a Vehicle
     // from Cache.mc when there is no BLE connection, and Cache.mc does not
     // persist which VehicleError, if any, explained a section's absence).
@@ -195,8 +195,8 @@ module VehicleState {
     // US-019: front and rear are reported separately and must stay that way
     //: windowHeating itself may be entirely absent (an older vehicle that
     // never sends it), which is exactly what a null windowHeatingFront/Rear
-    // here means; StatusView only draws a line when the value is present
-    // AND not "UNSUPPORTED" (see StatusView._drawPage's airConditioning
+    // here means; the climate status page only draws a line when the value
+    // is present AND not "UNSUPPORTED" (see StatusPages.mc's US-019
     // branch), never inferring a state from an absent "enabled" field.
     function _airConditioningValues(raw as Dictionary) as Dictionary {
         var windowHeating = raw.get("windowHeating") as Dictionary?;
@@ -213,7 +213,7 @@ module VehicleState {
     // openapi.json documents that clients "must tolerate values they do not
     // recognize", and tolerating means passing through, not translating or
     // rejecting. Deciding what a value MEANS for display (e.g. hiding
-    // `windows` when it reads "UNSUPPORTED") is StatusView's job, not this
+    // `windows` when it reads "UNSUPPORTED") is StatusPages.mc's job, not this
     // parser's: this keeps the parser honest about what the API actually
     // said.
     function _statusValues(raw as Dictionary) as Dictionary {

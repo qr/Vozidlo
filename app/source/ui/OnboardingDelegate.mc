@@ -6,7 +6,7 @@ import Toybox.WatchUi;
 // OnboardingBlockedView (a validation failure) and
 // OnboardingExpiryNoticeView (the 159-day estimate). One delegate rather
 // than one per view, because the three screens differ only in what select
-// does (open the key page, retry, or continue) and the Menu2 escape
+// does (open the key page, retry, or continue) and the menu escape
 // hatches are identical everywhere. BehaviorDelegate, not InputDelegate,
 // per docs/best-practices/garmin-connect-iq.md; back is left untouched, so
 // there is no onBack() override here.
@@ -48,8 +48,7 @@ class OnboardingDelegate extends WatchUi.BehaviorDelegate {
         if (view instanceof OnboardingExpiryNoticeView) {
             // Non-blocking: select always proceeds into the app. There is
             // nothing here to retry, only to acknowledge.
-            var controls = new ControlsView();
-            WatchUi.switchToView(controls, new ControlsDelegate(controls), WatchUi.SLIDE_IMMEDIATE);
+            HomeScreen.switchTo();
             return true;
         }
 

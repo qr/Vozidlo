@@ -28,6 +28,14 @@
     <property id="TargetTemperature" type="number">0</property>
 
     <!--
+        Read the car once, 15 s after a command, and say whether it changed
+        (source/ui/CommandCheck.mc). On by default; costs one request per
+        command. Settings.resolveCheckAfterCommand() treats a missing value
+        as on, the same as this default.
+    -->
+    <property id="CheckAfterCommand" type="boolean">true</property>
+
+    <!--
         Debug-only base URL override, so the app can be pointed at mock/ without
         editing source. Empty means "use the real API". It is deliberately NOT
         exposed as a <setting>, so it never appears in the phone UI, and

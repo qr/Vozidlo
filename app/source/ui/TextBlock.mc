@@ -169,8 +169,8 @@ module TextBlock {
                          preferredY as Number, textWidth as Number) as Number {
         var y = preferredY;
         while (y > centerY) {
-            var half = lineHeight / 2;
-            if (lineWidth(radius, centerY, y - half, y + half) >= textWidth) {
+            var top = fittedLineTop(y, lineHeight);
+            if (lineWidth(radius, centerY, top, top + lineHeight) >= textWidth) {
                 return y;
             }
             y -= 2;
@@ -178,9 +178,22 @@ module TextBlock {
         return centerY;
     }
 
+    // drawFittedLine() draws with VCENTER, so `y` is the middle of the glyph
+    // box and this is its top. Kept as the one place both the check above and
+    // the draw below derive the box from (A1): before, the check assumed a
+    // centred box while the text was drawn top-aligned at y, half a line
+    // lower than the box that had been checked.
+    function fittedLineTop(y as Number, lineHeight as Number) as Number {
+        return y - lineHeight / 2;
+    }
+
+    // Justification drawFittedLine() uses; public so a test pins A1.
+    const FITTED_JUSTIFY = Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER;
+
     // Draws one line at the lowest point at or above `preferredY` where it fits
-    // whole, truncating only if it cannot fit even across the middle. Returns
-    // the y actually used, so a caller can lay something else out around it.
+    // whole, truncating only if it cannot fit even across the middle. `y` is
+    // the vertical centre of the line (A1). Returns the y actually used, so a
+    // caller can lay something else out around it.
     function drawFittedLine(dc as Dc, text as String, font as Graphics.FontType,
                             color as Graphics.ColorType, preferredY as Number) as Number {
         var width = dc.getWidth();
@@ -194,14 +207,15 @@ module TextBlock {
         var y = fittedLineY(radius, centerY, lineHeight, preferredY, textWidth);
 
         // Too wide even across the middle: trim until it fits there.
-        var available = lineWidth(radius, centerY, y - lineHeight / 2, y + lineHeight / 2);
+        var top = fittedLineTop(y, lineHeight);
+        var available = lineWidth(radius, centerY, top, top + lineHeight);
         while (textWidth > available && shown.length() > 1) {
             shown = (shown.substring(0, shown.length() - 2) as String) + "…";
             textWidth = dc.getTextWidthInPixels(shown, font);
         }
 
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(width / 2, y, font, shown, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(width / 2, y, font, shown, FITTED_JUSTIFY);
         return y;
     }
 

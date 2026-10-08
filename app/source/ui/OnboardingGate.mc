@@ -43,6 +43,14 @@ module Onboarding {
         return settings.apiKey.length() > 0 && settings.vinValid;
     }
 
+    // Whether OnboardingView.onShow() starts the validating request: only
+    // in validating mode, never over a failure waiting for its manual retry
+    // (US-002 "never retry automatically"), and never while one is already
+    // on its way (onShow() fires again after anything pushed on top pops).
+    function shouldValidate(validating as Boolean, hasTransientError as Boolean, inFlight as Boolean) as Boolean {
+        return validating && !hasTransientError && !inFlight;
+    }
+
     // US-002: maps the outcome of the validation request to the specific
     // onboarding screen its cause names, or null when the failure isn't one
     // of onboarding's four distinguished causes: the caller falls back to

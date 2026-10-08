@@ -23,13 +23,18 @@
     <string id="SettingTargetTemperatureHelp">Whole degrees, in the unit above. Leave at 0 to use the value your car last reported.</string>
     <string id="SettingTargetTemperatureError">Enter a whole number, or 0 to use the car's last reported value.</string>
 
-    <!-- Task 5 (onboarding): US-002, US-003, US-004, US-007. -->
-    <string id="OnboardingGuidanceMessage">A key is created in the MyŠkoda app (v8.16+), not here. It only works for the vehicles you selected when you created it. Enter it in this app's phone settings. Menu for more.</string>
+    <string id="SettingCheckAfterCommandTitle">Check the car after a command</string>
+    <string id="SettingCheckAfterCommandHelp">About 15 seconds after a command, read the car once to show whether it changed. Uses one of your 20 requests per hour.</string>
+
+    <!-- Task 5 (onboarding): US-002, US-003, US-004, US-007. No button hints
+         in the copy ("Menu for more.", "Select to continue."): the screens
+         show bezel glyphs at UP and START instead (C7). -->
+    <string id="OnboardingGuidanceMessage">A key is created in the MyŠkoda app (v8.16+), not here. It only works for the vehicles you selected when you created it. Enter it in this app's phone settings.</string>
     <string id="OnboardingCheckingMessage">Checking your key against your car…</string>
     <string id="OnboardingQuotaBlockedMessage">This hour's request quota is spent. Try again once it resets.</string>
     <string id="OnboardingKeyExpiredPrefix">Your API key expired on </string>
     <string id="OnboardingKeyExpiredFallback">Your API key has expired.</string>
-    <string id="OnboardingExpiryNoticeMessage">Your key is probably close to expiring: this is an estimate, not a fact. If you would rather not be caught out, create a new one soon in the MyŠkoda app. Select to continue.</string>
+    <string id="OnboardingExpiryNoticeMessage">Your key is probably close to expiring: this is an estimate, not a fact. If you would rather not be caught out, create a new one soon in the MyŠkoda app.</string>
     <string id="OnboardingMenuTitle">Onboarding</string>
     <string id="OnboardingMenuOpenKeyPage">Get a key</string>
     <string id="OnboardingMenuClearData">Clear stored data</string>

@@ -2,15 +2,17 @@ import Toybox.Communications;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// Handles the two items OnboardingActionMenu.push() builds.
-class OnboardingActionMenuDelegate extends WatchUi.Menu2InputDelegate {
+// Handles the two items OnboardingActionMenu.push() builds. The menu stays
+// up on select (popOnSelect false), as before: "Get a key" only hands a URL
+// to the phone, and the clear-data confirmation returns to this menu on
+// "No". BACK slides out to the right (NightMenuDelegate, A20).
+class OnboardingActionMenuDelegate extends NightMenuDelegate {
 
     function initialize() {
-        Menu2InputDelegate.initialize();
+        NightMenuDelegate.initialize(false);
     }
 
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        var id = item.getId();
+    function onPick(id as Object?) as Void {
         if (id == :openKeyPage) {
             // Fire-and-forget: openWebPage() takes no callback, so nothing
             // downstream may ever depend on this having worked (US-003).
@@ -25,12 +27,8 @@ class OnboardingActionMenuDelegate extends WatchUi.Menu2InputDelegate {
             var dialog = new WatchUi.Confirmation(
                 WatchUi.loadResource(Rez.Strings.OnboardingClearConfirmMessage) as String
             );
-            WatchUi.pushView(dialog, new OnboardingClearConfirmDelegate(), WatchUi.SLIDE_IMMEDIATE);
+            WatchUi.pushView(dialog, new OnboardingClearConfirmDelegate(), Theme.SLIDE_DIALOG);
         }
-    }
-
-    function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_DOWN);
     }
 
 }

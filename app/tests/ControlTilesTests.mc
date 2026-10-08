@@ -1,10 +1,10 @@
 import Toybox.Lang;
 import Toybox.Test;
 
-// Unit tests for ui/ControlsView.mc's ControlTiles module (US-036, US-037):
-// tile filtering from operations[], the S-PIN gate, the hard constraint that
-// climate's stop action is never hidden, and the primary-action fallback
-// when the vehicle does not support climate at all.
+// Unit tests for ui/ControlTiles.mc (US-036, US-037, US-061): row filtering
+// from operations[], the S-PIN gate, the hard constraint that climate's stop
+// action is never hidden, the primary-action fallback when the vehicle does
+// not support climate at all, and the home rows in TileOrder order.
 module ControlTilesTests {
 
     (:test)
@@ -163,9 +163,8 @@ module ControlTilesTests {
         return true;
     }
 
-    // The primary tile must be first in display order: ControlsView relies
-    // on this to preselect it via the framework's own "first Selectable in
-    // setLayout() starts highlighted" behaviour (US-037).
+    // The primary action comes first within its group (US-037), so with the
+    // default order it is the first row and the hero stays in view.
     (:test)
     function orderedForDisplayPutsPrimaryFirst(logger as Logger) as Boolean {
         var ops = ["startAirConditioning", "stopAirConditioning"] as Array<String>;
@@ -182,126 +181,168 @@ module ControlTilesTests {
         return true;
     }
 
-    // ------------------------------------------------------------------
-    // REGRESSION FIX (task 11, US-036): "at most seven tiles are shown;
-    // anything beyond that moves into a secondary menu." Tasks 7, 8, 9 and
-    // 10 each added tiles independently: climate (2) + ventilation (2) +
-    // aux heat (2) + charging (2) + find my car (1) + status (1) +
-    // settings (1) is eleven when a vehicle supports everything and the
-    // user has an S-PIN set, and nothing capped the total until now. These
-    // tests exercise ControlTiles.capped()/overflow() directly, exactly the
-    // "whatever the vehicle supports" the task asks for: they never
-    // construct a live ControlsView, only the plain descriptor list its
-    // _buildTiles() now builds before capping.
+    // ------------------------------------------------------------ rows
 
-    function _descriptors(count as Number) as Array<ControlTiles.TileDescriptor> {
-        var list = [] as Array<ControlTiles.TileDescriptor>;
-        for (var i = 0; i < count; i += 1) {
-            list.add(new ControlTiles.TileDescriptor(:action, "Tile " + i.toString()));
+    function _labels(rows as Array<ControlTiles.TileDescriptor>) as String {
+        var s = "";
+        for (var i = 0; i < rows.size(); i += 1) {
+            s += (i > 0 ? "|" : "") + (rows[i] as ControlTiles.TileDescriptor).label;
         }
-        return list;
+        return s;
     }
 
+    // PoC NH.TILES: the default order with the new Charging (detail) row
+    // right after the charging commands; labels without "\n" (A14).
     (:test)
-    function cappedNeverExceedsSevenWhateverTheVehicleSupports(logger as Logger) as Boolean {
-        // 0 through 11 covers every count this screen could ever build
-        // (five categories, climate contributing up to six tiles on its
-        // own) plus a margin either side.
-        for (var count = 0; count <= 11; count += 1) {
-            var all = _descriptors(count);
-            var visible = ControlTiles.capped(all, :moreActions, "More");
-            if (visible.size() > ControlTiles.MAX_VISIBLE_TILES) {
-                logger.error("capped() returned " + visible.size().toString() + " tiles for " + count.toString() + " candidates: must never exceed " + ControlTiles.MAX_VISIBLE_TILES.toString());
+    function rowsFollowTheDefaultTileOrder(logger as Logger) as Boolean {
+        TileOrder.clear();
+        var ops = ["startAirConditioning", "stopAirConditioning", "startCharging", "stopCharging"] as Array<String>;
+        var rows = ControlTiles.rows(ops, false, ConfirmationPolicy.START_CLIMATE, true, true);
+        var got = _labels(rows);
+        var want = "Start climate|Stop climate|Start charging|Stop charging|Charging|Find my car|Status|Settings";
+        if (!got.equals(want)) {
+            logger.error("expected " + want + ", got " + got);
+            return false;
+        }
+        return true;
+    }
+
+    // Commands carry no icon; every navigation row does (PoC NH.ICON).
+    (:test)
+    function navigationRowsCarryIcons(logger as Logger) as Boolean {
+        TileOrder.clear();
+        var rows = ControlTiles.rows(null, false, ConfirmationPolicy.START_CLIMATE, true, true);
+        for (var i = 0; i < rows.size(); i += 1) {
+            var row = rows[i] as ControlTiles.TileDescriptor;
+            var navigation = row.actionId == ControlTiles.OPEN_CHARGING || row.actionId == ControlTiles.FIND_MY_CAR
+                || row.actionId == ControlTiles.OPEN_STATUS || row.actionId == ControlTiles.OPEN_TILE_ORDER;
+            if (navigation != (row.icon != null)) {
+                logger.error("icon mismatch on row " + row.label);
+                return false;
+            }
+            if (row.label.find("\n") != null) {
+                logger.error("row labels must be single-line: " + row.label);
                 return false;
             }
         }
         return true;
     }
 
+    // First launch (operations unknown): every action, ten rows (PoC
+    // NH.TILES_UNKNOWN), with no cap and no More row.
     (:test)
-    function cappedLeavesAShortListUntouched(logger as Logger) as Boolean {
-        var all = _descriptors(5);
-        var visible = ControlTiles.capped(all, :moreActions, "More");
-        if (visible.size() != 5) {
-            logger.error("a list already within the cap must come back unchanged");
-            return false;
-        }
-        if (ControlTiles.overflow(all).size() != 0) {
-            logger.error("a list already within the cap must have no overflow");
+    function rowsWithUnknownOperationsOfferEverything(logger as Logger) as Boolean {
+        TileOrder.clear();
+        var rows = ControlTiles.rows(null, false, ConfirmationPolicy.START_CLIMATE,
+            ControlTiles.hasChargingDetail(null, false), true);
+        if (rows.size() != 10) {
+            logger.error("expected 10 rows on first launch, got " + rows.size().toString() + ": " + _labels(rows));
             return false;
         }
         return true;
     }
 
+    // Hidden categories and unsupported navigation drop out; the user's own
+    // order wins over the default (US-061).
     (:test)
-    function cappedAtExactlySevenAddsNoMoreTile(logger as Logger) as Boolean {
-        var all = _descriptors(7);
-        var visible = ControlTiles.capped(all, :moreActions, "More");
-        if (visible.size() != 7) {
-            logger.error("exactly seven candidates must show all seven, no More tile");
+    function rowsHonourHiddenAndUserOrder(logger as Logger) as Boolean {
+        TileOrder.clear();
+        TileOrder.setOrder([
+            TileOrder.CATEGORY_SETTINGS, TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_CHARGING,
+            TileOrder.CATEGORY_CHARGING_DETAIL, TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL
+        ] as Array<Symbol>);
+        TileOrder.toggleHidden(TileOrder.CATEGORY_CHARGING);
+        var ops = ["startAirConditioning", "stopAirConditioning", "startCharging", "stopCharging"] as Array<String>;
+        var rows = ControlTiles.rows(ops, false, ConfirmationPolicy.STOP_CLIMATE, false, false);
+        var got = _labels(rows);
+        TileOrder.clear();
+        var want = "Settings|Stop climate|Start climate|Status";
+        if (!got.equals(want)) {
+            logger.error("expected " + want + ", got " + got);
             return false;
         }
-        for (var i = 0; i < visible.size(); i += 1) {
-            if ((visible[i] as ControlTiles.TileDescriptor).actionId == :moreActions) {
-                logger.error("a More tile must never appear when everything already fits");
+        return true;
+    }
+
+    // US-037: focus at launch is the primary action's row, wherever the
+    // user's order put it; 0 when there is none.
+    (:test)
+    function indexOfFindsThePrimaryRow(logger as Logger) as Boolean {
+        TileOrder.clear();
+        TileOrder.setOrder([
+            TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_CLIMATE
+        ] as Array<Symbol>);
+        var ops = ["startAirConditioning", "stopAirConditioning", "startCharging", "stopCharging"] as Array<String>;
+        var rows = ControlTiles.rows(ops, false, ConfirmationPolicy.START_CLIMATE, true, true);
+        var visible = ControlTiles.visibleCandidates(ops, false);
+        var index = ControlTiles.indexOf(rows, ControlTiles.primaryAction(visible, ConfirmationPolicy.START_CLIMATE));
+        TileOrder.clear();
+        // charging (2) + charging detail first, so Start climate is row 3.
+        if (index != 3) {
+            logger.error("expected the primary row at index 3, got " + index.toString());
+            return false;
+        }
+        if (ControlTiles.indexOf(rows, null) != 0) {
+            logger.error("no primary action must focus the first row");
+            return false;
+        }
+        return true;
+    }
+
+    // A11: the signature changes when the rows change and only then.
+    (:test)
+    function signatureTracksTheRows(logger as Logger) as Boolean {
+        TileOrder.clear();
+        var ops = ["startAirConditioning", "stopAirConditioning"] as Array<String>;
+        var a = ControlTiles.signature(ControlTiles.rows(ops, false, ConfirmationPolicy.START_CLIMATE, true, true));
+        var b = ControlTiles.signature(ControlTiles.rows(ops, false, ConfirmationPolicy.START_CLIMATE, true, true));
+        var c = ControlTiles.signature(ControlTiles.rows(ops, false, ConfirmationPolicy.START_CLIMATE, false, true));
+        var d = ControlTiles.signature(ControlTiles.rows(ops, false, ConfirmationPolicy.STOP_CLIMATE, true, true));
+        if (!a.equals(b)) {
+            logger.error("the same rows must give the same signature");
+            return false;
+        }
+        if (a.equals(c) || a.equals(d)) {
+            logger.error("a removed or reordered row must change the signature");
+            return false;
+        }
+        return true;
+    }
+
+    // Charging detail: shown when a charging section is cached, or when
+    // nothing is known yet; hidden once operations are known and no
+    // charging data ever arrived.
+    (:test)
+    function chargingDetailNeedsDataOrUnknownOperations(logger as Logger) as Boolean {
+        var ops = ["startAirConditioning"] as Array<String>;
+        if (!ControlTiles.hasChargingDetail(null, false)) {
+            logger.error("unknown operations must offer charging detail");
+            return false;
+        }
+        if (!ControlTiles.hasChargingDetail(ops, true)) {
+            logger.error("a cached charging section must offer charging detail");
+            return false;
+        }
+        if (ControlTiles.hasChargingDetail(ops, false)) {
+            logger.error("known operations without charging data must hide charging detail");
+            return false;
+        }
+        return true;
+    }
+
+    // One definition of "climate running", shared with CommandCheck.
+    (:test)
+    function climateRunningCoversEveryActiveState(logger as Logger) as Boolean {
+        var on = ["HEATING", "COOLING", "VENTILATION", "HEATING_AUXILIARY"] as Array<String>;
+        for (var i = 0; i < on.size(); i += 1) {
+            if (!ControlTiles.isClimateRunning(on[i])) {
+                logger.error(on[i] + " must count as running");
                 return false;
             }
         }
-        return true;
-    }
-
-    (:test)
-    function cappedAddsAMoreTileAndOverflowCarriesEverythingElse(logger as Logger) as Boolean {
-        var all = _descriptors(11);
-        var visible = ControlTiles.capped(all, :moreActions, "More");
-        if (visible.size() != 7) {
-            logger.error("eleven candidates must cap at exactly seven visible tiles");
+        if (ControlTiles.isClimateRunning("OFF") || ControlTiles.isClimateRunning(null) || ControlTiles.isClimateRunning("UNKNOWN")) {
+            logger.error("OFF, null and UNKNOWN are not running");
             return false;
-        }
-        var last = visible[6] as ControlTiles.TileDescriptor;
-        if (last.actionId != :moreActions || !last.label.equals("More")) {
-            logger.error("the 7th slot must be the More tile");
-            return false;
-        }
-        // US-036's regression-fix brief: "do not silently drop
-        // functionality: everything must remain reachable."
-        var overflow = ControlTiles.overflow(all);
-        if (overflow.size() != 5) {
-            logger.error("expected the remaining 5 candidates (11 - 6 direct tiles) in overflow, got " + overflow.size().toString());
-            return false;
-        }
-        if ((6 + overflow.size()) != all.size()) {
-            logger.error("every candidate must be accounted for between the 6 direct tiles and overflow");
-            return false;
-        }
-        return true;
-    }
-
-    // The user's own TileOrder ordering (and, within climate, US-037's
-    // primary-first rule) is what decides "most used" here: capped() must
-    // never reorder, only truncate.
-    (:test)
-    function cappedPreservesOriginalOrderForTheTilesItKeeps(logger as Logger) as Boolean {
-        var all = _descriptors(9);
-        var visible = ControlTiles.capped(all, :moreActions, "More");
-        for (var i = 0; i < 6; i += 1) {
-            if ((visible[i] as ControlTiles.TileDescriptor).label != (all[i] as ControlTiles.TileDescriptor).label) {
-                logger.error("capped() must keep the first six candidates in their original order");
-                return false;
-            }
-        }
-        return true;
-    }
-
-    (:test)
-    function overflowPreservesOrderToo(logger as Logger) as Boolean {
-        var all = _descriptors(9);
-        var overflow = ControlTiles.overflow(all);
-        for (var i = 0; i < overflow.size(); i += 1) {
-            if ((overflow[i] as ControlTiles.TileDescriptor).label != (all[6 + i] as ControlTiles.TileDescriptor).label) {
-                logger.error("overflow() must preserve the original order of whatever didn't fit");
-                return false;
-            }
         }
         return true;
     }

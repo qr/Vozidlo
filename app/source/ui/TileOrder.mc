@@ -2,26 +2,26 @@ import Toybox.Application.Storage;
 import Toybox.Lang;
 
 // US-061 (task 10): the user's own order and visibility for the landing
-// screen's top-level tile categories: climate, charging, find my car,
-// status detail, settings, exactly the five named in the story, in that
-// default order. Deliberately just these five, fixed forever: this module
+// screen's top-level row categories: climate, charging, find my car,
+// status detail, settings, the five named in the story, plus charging detail
+// (Night Panel D1: the home list gives Charging detail its own row so it is
+// reachable with buttons, ui-improvements.md A-list "Home grid"). This module
 // NEVER reorders itself by usage (the story's own hard constraint, see
 // docs/requirements.md, US-061: "Do not reorder tiles
 // automatically by usage count").
 //
 // A pure ordering/persistence layer, with no dependency on Cache.mc,
 // ControlTiles or any live vehicle state: every "is this supported"
-// question is answered by the CALLER (ControlsView.mc, TileOrderView.mc)
+// question is answered by the CALLER (ControlTiles.rows(), TileOrderView.mc)
 // and passed in as plain booleans, so this module never needs to know
 // what an operations[] name looks like and stays trivially testable in
-// isolation (see tests/TileOrderTests.mc). This mirrors
-// ui/ControlsView.mc's own ControlTiles module: a pure, side-effect-free
-// module deliberately kept separate from any live View.
+// isolation (see tests/TileOrderTests.mc). This mirrors ui/ControlTiles.mc:
+// a pure module deliberately kept separate from any live View.
 //
 // Persisted in Application.Storage rather than a Properties-backed
 // <setting>: Settings are typed list/boolean/numeric/alphaNumeric/password
 // (docs/best-practices, "Storage, Properties and Settings are three
-// different things") and none of those model "an ordered subset of five
+// different things") and none of those model "an ordered subset of six
 // symbols": this is exclusively an on-device preference with no natural
 // phone-side UI, same reasoning as Cache.mc's own choice of Storage for
 // vehicle state.
@@ -29,6 +29,7 @@ module TileOrder {
 
     const CATEGORY_CLIMATE = :climate;
     const CATEGORY_CHARGING = :charging;
+    const CATEGORY_CHARGING_DETAIL = :chargingDetail;
     const CATEGORY_FIND_MY_CAR = :findMyCar;
     const CATEGORY_STATUS_DETAIL = :statusDetail;
     const CATEGORY_SETTINGS = :settings;
@@ -38,8 +39,8 @@ module TileOrder {
 
     function defaultOrder() as Array<Symbol> {
         return [
-            CATEGORY_CLIMATE, CATEGORY_CHARGING, CATEGORY_FIND_MY_CAR,
-            CATEGORY_STATUS_DETAIL, CATEGORY_SETTINGS
+            CATEGORY_CLIMATE, CATEGORY_CHARGING, CATEGORY_CHARGING_DETAIL,
+            CATEGORY_FIND_MY_CAR, CATEGORY_STATUS_DETAIL, CATEGORY_SETTINGS
         ] as Array<Symbol>;
     }
 
@@ -47,25 +48,29 @@ module TileOrder {
     // operations[] gate rather than being a separate concept in that
     // module: this is the one place that distinction is turned back into
     // a category boundary for ordering purposes. Pure and string-based
-    // (never touches Cache/ControlTiles types) so both ControlsView.mc and
-    // TileOrderView.mc can call it without either depending on the other.
+    // (never touches Cache/ControlTiles types).
     function isChargingOperation(operation as String) as Boolean {
         return operation.equals("startCharging") || operation.equals("stopCharging");
     }
 
     // US-061: "tiles for unsupported actions never appear, in the ordering
-    // screen either": ControlsView passes `hasFindMyCarTile` as
-    // !ParkingFeature.isKnownUnsupported() (task 9's own persisted flag;
-    // see ui/LocationView.mc). Status detail and settings are always
-    // offered: both are always-available navigation, never gated on
-    // vehicle capability.
-    function supportedCategories(hasClimateTile as Boolean, hasChargingTile as Boolean, hasFindMyCarTile as Boolean) as Array<Symbol> {
+    // screen either": callers pass `hasFindMyCarTile` as
+    // !ParkingFeature.isKnownUnsupported() (model/Parking.mc's persisted flag) and
+    // `hasChargingDetail` as ControlTiles.hasChargingDetail() (a charging
+    // section is cached, or operations are still unknown). Status detail
+    // and settings are always offered: both are always-available
+    // navigation, never gated on vehicle capability.
+    function supportedCategories(hasClimateTile as Boolean, hasChargingTile as Boolean, hasChargingDetail as Boolean,
+                                 hasFindMyCarTile as Boolean) as Array<Symbol> {
         var result = [] as Array<Symbol>;
         if (hasClimateTile) {
             result.add(CATEGORY_CLIMATE);
         }
         if (hasChargingTile) {
             result.add(CATEGORY_CHARGING);
+        }
+        if (hasChargingDetail) {
+            result.add(CATEGORY_CHARGING_DETAIL);
         }
         if (hasFindMyCarTile) {
             result.add(CATEGORY_FIND_MY_CAR);
@@ -76,12 +81,14 @@ module TileOrder {
     }
 
     // The persisted order, falling back to defaultOrder() when nothing has
-    // been saved yet. Never returns fewer than all five categories: a
+    // been saved yet. Never returns fewer than all six categories: a
     // category present in defaultOrder() but missing from what was stored
     // (corrupt data, or a category added by a later app version) is
     // appended in its default relative position rather than silently
     // dropped, so a caller never needs to null-check a category out of
-    // this list.
+    // this list. Charging detail is the one exception: orders saved before
+    // it existed get it right after charging, where the default puts it,
+    // instead of after settings at the very end of the home list.
     function order() as Array<Symbol> {
         var stored = Storage.getValue(_ORDER_STORAGE_KEY);
         var result = [] as Array<Symbol>;
@@ -93,6 +100,16 @@ module TileOrder {
                     result.add(category);
                 }
             }
+        }
+        if (!_contains(result, CATEGORY_CHARGING_DETAIL)) {
+            var migrated = [] as Array<Symbol>;
+            for (var i = 0; i < result.size(); i += 1) {
+                migrated.add(result[i] as Symbol);
+                if (result[i] == CATEGORY_CHARGING) {
+                    migrated.add(CATEGORY_CHARGING_DETAIL);
+                }
+            }
+            result = migrated;
         }
         var defaults = defaultOrder();
         for (var i = 0; i < defaults.size(); i += 1) {
@@ -112,9 +129,17 @@ module TileOrder {
         Storage.setValue(_ORDER_STORAGE_KEY, names as Storage.ValueType);
     }
 
+    // Settings is the only way into this ordering screen, so hiding it
+    // would lock the user out of unhiding anything; HomeRows only brought
+    // it back once every row was hidden.
+    function isHideable(category as Symbol) as Boolean {
+        return category != CATEGORY_SETTINGS;
+    }
+
     // Named hiddenCategories(), not hidden(): `hidden` is a reserved word
     // in Monkey C (a member-visibility keyword), which the compiler rejects
-    // as a function name.
+    // as a function name. A stored hidden Settings (saved before
+    // isHideable() existed) is ignored, which shows it again.
     function hiddenCategories() as Array<Symbol> {
         var stored = Storage.getValue(_HIDDEN_STORAGE_KEY);
         var result = [] as Array<Symbol>;
@@ -122,7 +147,7 @@ module TileOrder {
             var names = stored as Array;
             for (var i = 0; i < names.size(); i += 1) {
                 var category = _fromName(names[i] as Object?);
-                if (category != null && !_contains(result, category)) {
+                if (category != null && isHideable(category) && !_contains(result, category)) {
                     result.add(category);
                 }
             }
@@ -144,7 +169,7 @@ module TileOrder {
 
     // Swaps `category` with its predecessor in the persisted order. A no-op
     // at the front, or for a category the caller passes that isn't in
-    // order() at all (cannot happen given order() always returns all five,
+    // order() at all (cannot happen given order() always returns all six,
     // but guarded rather than assumed).
     function moveUp(category as Symbol) as Void {
         var current = order();
@@ -166,7 +191,11 @@ module TileOrder {
         setOrder(current);
     }
 
+    // A no-op for a category that cannot be hidden (isHideable()).
     function toggleHidden(category as Symbol) as Void {
+        if (!isHideable(category)) {
+            return;
+        }
         var current = hiddenCategories();
         if (_contains(current, category)) {
             var kept = [] as Array<Symbol>;
@@ -182,7 +211,7 @@ module TileOrder {
         }
     }
 
-    // What ControlsView actually draws: the user's order, restricted to
+    // What the home list actually shows: the user's order, restricted to
     // categories this build currently supports AND that the user has not
     // hidden.
     function visible(supported as Array<Symbol>) as Array<Symbol> {
@@ -220,7 +249,13 @@ module TileOrder {
         if (category == CATEGORY_CLIMATE) {
             return "Climate";
         }
+        // The start/stop commands. "Charging" now names the detail screen,
+        // as on its home row, so the command pair gets a short label of its
+        // own (fits the focus pill in FONT_MEDIUM on every target).
         if (category == CATEGORY_CHARGING) {
+            return "Charge on/off";
+        }
+        if (category == CATEGORY_CHARGING_DETAIL) {
             return "Charging";
         }
         if (category == CATEGORY_FIND_MY_CAR) {
@@ -272,6 +307,9 @@ module TileOrder {
         if (category == CATEGORY_CHARGING) {
             return "charging";
         }
+        if (category == CATEGORY_CHARGING_DETAIL) {
+            return "chargingDetail";
+        }
         if (category == CATEGORY_FIND_MY_CAR) {
             return "findMyCar";
         }
@@ -291,6 +329,9 @@ module TileOrder {
         }
         if (name.equals("charging")) {
             return CATEGORY_CHARGING;
+        }
+        if (name.equals("chargingDetail")) {
+            return CATEGORY_CHARGING_DETAIL;
         }
         if (name.equals("findMyCar")) {
             return CATEGORY_FIND_MY_CAR;

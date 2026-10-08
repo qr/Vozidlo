@@ -11,12 +11,12 @@ import Toybox.WatchUi;
 // there is exactly one value regardless of which side changed it last.
 class TargetTemperatureSettingsView extends WatchUi.View {
 
-    // Whole degrees, in whatever unit Settings.Config.temperatureUnit names
-    //: never converted here (see ControlsView._airConditioningBody()'s own
-    // comment on why this app does not do C/F conversion).
+    // Whole degrees, in whatever unit Settings.Config.temperatureUnit names:
+    // never converted here (the air-conditioning command, lifted from
+    // ControlsView into Commands.mc, explains why the app does no C/F
+    // conversion).
     private var _value as Number;
     private var _unitSuffix as String;
-    private var _label as WatchUi.Text?;
 
     function initialize() {
         View.initialize();
@@ -46,23 +46,32 @@ class TargetTemperatureSettingsView extends WatchUi.View {
     }
 
     function onLayout(dc as Dc) as Void {
-        var label = new WatchUi.Text({
-            :text => _text(),
-            :color => Graphics.COLOR_WHITE,
-            :font => Graphics.FONT_NUMBER_MEDIUM,
-            :locX => WatchUi.LAYOUT_HALIGN_CENTER,
-            :locY => WatchUi.LAYOUT_VALIGN_CENTER,
-            :justification => Graphics.TEXT_JUSTIFY_CENTER
-        });
-        _label = label;
-        setLayout([ label ]);
     }
 
-    function onUpdate(dc as Dc) as Void {
-        View.onUpdate(dc);
-        TextBlock.drawFittedLine(dc, "UP/DOWN to adjust", Graphics.FONT_XTINY,
-            Graphics.COLOR_DK_GRAY, dc.getHeight() - 30);
+    // Monochrome flag cached per onShow (A21).
+    function onShow() as Void {
+        Theme.refresh();
     }
+
+    // PoC NSet.temp: the title sits at y 48 because "Target temperature" is
+    // about 182 px in FONT_TINY and the chord at y 34 leaves only 158; the
+    // value is centred, digits in the number font and the unit in a text
+    // font (A8: FONT_NUMBER_MEDIUM has no "C" or "F"); "+" and "−" glyphs at
+    // UP and DOWN replace the old "UP/DOWN to adjust" line (A3 superseded).
+    function onUpdate(dc as Dc) as Void {
+        dc.setColor(Theme.TEXT_1, Theme.BG);
+        dc.clear();
+        Ui.title(dc, TITLE, TITLE_Y);
+        var numFont = Graphics.FONT_NUMBER_MEDIUM;
+        var y = dc.getHeight() / 2 - dc.getFontHeight(numFont) / 2;
+        Ui.drawValueWithUnit(dc, dc.getWidth() / 2, y, _value.toString(), _unitSuffix,
+            numFont, Graphics.FONT_MEDIUM, Theme.TEXT_1);
+        Bezel.glyph(dc, Bezel.BTN_UP, :plus, Theme.TEXT_1, null);
+        Bezel.glyph(dc, Bezel.BTN_DOWN, :minus, Theme.TEXT_1, null);
+    }
+
+    private const TITLE as String = "Target temperature";
+    private const TITLE_Y = 48;
 
     function increase() as Void {
         _value += 1;
@@ -88,17 +97,9 @@ class TargetTemperatureSettingsView extends WatchUi.View {
         // A Properties write made from inside the app, not synced in from
         // the phone, does not trigger onSettingsChanged() on its own (same
         // situation OnboardingClearConfirmDelegate documents): call it
-        // directly so ControlsView's next command picks this up immediately.
+        // directly so the home screen's next command picks this up immediately.
         getApp().onSettingsChanged();
-        var label = _label;
-        if (label != null) {
-            label.setText(_text());
-        }
         WatchUi.requestUpdate();
-    }
-
-    function _text() as String {
-        return _value.toString() + _unitSuffix;
     }
 
 }
@@ -128,6 +129,21 @@ class TargetTemperatureSettingsDelegate extends WatchUi.BehaviorDelegate {
             view.decrease();
         }
         return true;
+    }
+
+    // Touch: a swipe up raises the value, like pushing a slider up (A19).
+    // BehaviorDelegate maps swipe up to onNextPage(), which is DOWN's
+    // "decrease", so swipes are handled here and never reach the page
+    // behaviours; the buttons keep UP = +1, DOWN = -1.
+    function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
+        var dir = evt.getDirection();
+        if (dir == WatchUi.SWIPE_UP) {
+            return onPreviousPage();
+        }
+        if (dir == WatchUi.SWIPE_DOWN) {
+            return onNextPage();
+        }
+        return false;
     }
 
     function _resolve() as TargetTemperatureSettingsView? {

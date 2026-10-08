@@ -2,8 +2,9 @@ import Toybox.Lang;
 import Toybox.Test;
 
 // Unit tests for ui/TileOrder.mc (US-061): default order, persistence
-// round-trips, move/hide, and the two derived views (visible() for what
-// ControlsView draws, orderableCategories() for what TileOrderView lists).
+// round-trips, move/hide, the charging-detail migration, and the two derived
+// views (visible() for the home rows, orderableCategories() for what
+// TileOrderView lists).
 // TileOrder.clear() opens every test that touches Storage, matching this
 // project's existing convention (see tests/QuotaTests.mc's own comment on
 // the same pattern).
@@ -14,16 +15,16 @@ module TileOrderTests {
         TileOrder.clear();
         var order = TileOrder.order();
         var expected = [
-            TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_FIND_MY_CAR,
-            TileOrder.CATEGORY_STATUS_DETAIL, TileOrder.CATEGORY_SETTINGS
+            TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_CHARGING_DETAIL,
+            TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL, TileOrder.CATEGORY_SETTINGS
         ] as Array<Symbol>;
         if (order.size() != expected.size()) {
-            logger.error("expected all five categories with nothing persisted yet");
+            logger.error("expected all six categories with nothing persisted yet");
             return false;
         }
         for (var i = 0; i < expected.size(); i += 1) {
             if (order[i] != expected[i]) {
-                logger.error("default order must be climate, charging, find my car, status detail, settings");
+                logger.error("default order must be climate, charging, charging detail, find my car, status detail, settings");
                 return false;
             }
         }
@@ -35,7 +36,7 @@ module TileOrderTests {
         TileOrder.clear();
         var newOrder = [
             TileOrder.CATEGORY_SETTINGS, TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_CHARGING,
-            TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL
+            TileOrder.CATEGORY_CHARGING_DETAIL, TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL
         ] as Array<Symbol>;
         TileOrder.setOrder(newOrder);
 
@@ -56,7 +57,7 @@ module TileOrderTests {
     (:test)
     function moveUpAndMoveDownSwapNeighboursAndClampAtTheEnds(logger as Logger) as Boolean {
         TileOrder.clear();
-        // Default: climate, charging, findMyCar, statusDetail, settings.
+        // Default: climate, charging, chargingDetail, findMyCar, statusDetail, settings.
         TileOrder.moveUp(TileOrder.CATEGORY_CLIMATE); // already first: no-op
         var order = TileOrder.order();
         if (order[0] != TileOrder.CATEGORY_CLIMATE) {
@@ -100,7 +101,36 @@ module TileOrderTests {
         return true;
     }
 
-    // What ControlsView actually draws: supported AND not hidden.
+    // Settings is the way into tile order: hiding it would lock the user
+    // out, so it cannot be hidden, and a hidden Settings saved before this
+    // rule is ignored.
+    (:test)
+    function settingsCannotBeHidden(logger as Logger) as Boolean {
+        TileOrder.clear();
+        if (TileOrder.isHideable(TileOrder.CATEGORY_SETTINGS) || !TileOrder.isHideable(TileOrder.CATEGORY_CLIMATE)) {
+            logger.error("only Settings is not hideable");
+            return false;
+        }
+        TileOrder.toggleHidden(TileOrder.CATEGORY_SETTINGS);
+        if (TileOrder.isHidden(TileOrder.CATEGORY_SETTINGS)) {
+            logger.error("toggleHidden must not hide Settings");
+            return false;
+        }
+        TileOrder.setHidden([TileOrder.CATEGORY_SETTINGS, TileOrder.CATEGORY_CLIMATE] as Array<Symbol>);
+        if (TileOrder.isHidden(TileOrder.CATEGORY_SETTINGS) || !TileOrder.isHidden(TileOrder.CATEGORY_CLIMATE)) {
+            logger.error("a stored hidden Settings must be ignored, climate kept hidden");
+            return false;
+        }
+        var visible = TileOrder.visible([TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_SETTINGS] as Array<Symbol>);
+        if (visible.size() != 1 || visible[0] != TileOrder.CATEGORY_SETTINGS) {
+            logger.error("home must still show Settings");
+            return false;
+        }
+        TileOrder.clear();
+        return true;
+    }
+
+    // What the home list shows: supported AND not hidden.
     (:test)
     function visibleFiltersByBothSupportedAndHidden(logger as Logger) as Boolean {
         TileOrder.clear();
@@ -165,7 +195,7 @@ module TileOrderTests {
 
     (:test)
     function supportedCategoriesAlwaysOffersStatusAndSettings(logger as Logger) as Boolean {
-        var supported = TileOrder.supportedCategories(false, false, false);
+        var supported = TileOrder.supportedCategories(false, false, false, false);
         if (supported.size() != 2) {
             logger.error("with nothing else supported, only status detail and settings must remain");
             return false;
@@ -197,8 +227,8 @@ module TileOrderTests {
     function orderNeverChangesOnItsOwn(logger as Logger) as Boolean {
         TileOrder.clear();
         var first = TileOrder.order();
-        // Reading state repeatedly (as ControlsView._buildTiles() does on
-        // every onShow()) must never itself mutate the persisted order.
+        // Reading state repeatedly (as the home does on every onShow())
+        // must never itself mutate the persisted order.
         TileOrder.order();
         TileOrder.order();
         var again = TileOrder.order();
@@ -207,6 +237,71 @@ module TileOrderTests {
                 logger.error("repeated reads must never change the order by themselves");
                 return false;
             }
+        }
+        return true;
+    }
+
+    // An order saved before charging detail existed (five names) gets it
+    // right after charging, not at the end; the stored value itself is left
+    // alone until the user changes the order (storage keys unchanged).
+    (:test)
+    function storedOrderWithoutChargingDetailGetsItAfterCharging(logger as Logger) as Boolean {
+        TileOrder.clear();
+        TileOrder.setOrder([
+            TileOrder.CATEGORY_SETTINGS, TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_CLIMATE,
+            TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL
+        ] as Array<Symbol>);
+        var order = TileOrder.order();
+        var expected = [
+            TileOrder.CATEGORY_SETTINGS, TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_CHARGING_DETAIL,
+            TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL
+        ] as Array<Symbol>;
+        TileOrder.clear();
+        if (order.size() != expected.size()) {
+            logger.error("expected six categories after the migration, got " + order.size().toString());
+            return false;
+        }
+        for (var i = 0; i < expected.size(); i += 1) {
+            if (order[i] != expected[i]) {
+                logger.error("charging detail must land right after charging, mismatch at " + i.toString());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // A stored order that already lists charging detail keeps it where the
+    // user put it: the migration only fills a gap.
+    (:test)
+    function storedChargingDetailPositionIsKept(logger as Logger) as Boolean {
+        TileOrder.clear();
+        TileOrder.setOrder([
+            TileOrder.CATEGORY_CHARGING_DETAIL, TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_CHARGING
+        ] as Array<Symbol>);
+        var order = TileOrder.order();
+        TileOrder.clear();
+        if (order[0] != TileOrder.CATEGORY_CHARGING_DETAIL || order[2] != TileOrder.CATEGORY_CHARGING
+            || order[3] != TileOrder.CATEGORY_FIND_MY_CAR) {
+            logger.error("a stored charging detail position must be kept, the rest appended");
+            return false;
+        }
+        return true;
+    }
+
+    // The detail row and the command pair carry different labels, so the
+    // ordering screen never lists "Charging" twice.
+    (:test)
+    function chargingCategoriesHaveDistinctLabels(logger as Logger) as Boolean {
+        var commands = TileOrder.label(TileOrder.CATEGORY_CHARGING);
+        var detail = TileOrder.label(TileOrder.CATEGORY_CHARGING_DETAIL);
+        if (commands.equals(detail) || !detail.equals("Charging")) {
+            logger.error("expected a short command label and Charging for the detail, got " + commands + " / " + detail);
+            return false;
+        }
+        var supported = TileOrder.supportedCategories(true, true, true, true);
+        if (supported.size() != 6 || supported[2] != TileOrder.CATEGORY_CHARGING_DETAIL) {
+            logger.error("supportedCategories must include charging detail after charging when flagged");
+            return false;
         }
         return true;
     }

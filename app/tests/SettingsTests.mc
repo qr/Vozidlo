@@ -41,4 +41,19 @@ module SettingsTests {
         return true;
     }
 
+    // The check after a command is on unless switched off; a watch that
+    // has not synced the new property yet (null) checks too.
+    (:test)
+    function checkAfterCommandDefaultsToOn(logger as Logger) as Boolean {
+        if (!Settings.resolveCheckAfterCommand(null) || !Settings.resolveCheckAfterCommand(true)) {
+            logger.error("null and true must mean on");
+            return false;
+        }
+        if (Settings.resolveCheckAfterCommand(false)) {
+            logger.error("false must stay off");
+            return false;
+        }
+        return true;
+    }
+
 }

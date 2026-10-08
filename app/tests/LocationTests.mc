@@ -3,11 +3,12 @@ import Toybox.Math;
 import Toybox.System;
 import Toybox.Test;
 
-// Unit tests for source/ui/LocationView.mc (US-028..US-033): the pure
+// Unit tests for source/model/Parking.mc and the Find my car layout in
+// source/ui/LocationView.mc (US-028..US-033): the pure
 // geometry (LocationMath), the parkingPosition parser and its four edge
 // cases (ParkingPosition), and the small Storage-backed modules
 // (ParkingFeature, LastParked) that let this screen behave correctly across
-// restarts without reaching into Cache.mc, see LocationView.mc's own module
+// restarts without reaching into Cache.mc, see Parking.mc's own module
 // comments for why each of these exists separately from task 6/4's own
 // model code.
 //
@@ -105,41 +106,71 @@ module LocationTests {
         return true;
     }
 
-    (:test)
-    function formatDistanceMetricUnderAKilometer(logger as Logger) as Boolean {
-        var text = LocationMath.formatDistance(500.0d, System.UNIT_METRIC);
-        if (!text.equals("500 m")) {
-            logger.error("expected '500 m', got '" + text + "'");
+    // US-029 + A8: number and unit split for the number font; the examples
+    // are the PoC's and the 1.0 strings' ("500 m", "1.5 km", "328 ft",
+    // "3.1 mi"), so the thresholds and rounding did not move.
+    function _expectParts(logger as Logger, meters as Double, units as System.UnitsSystem,
+                          number as String, unit as String) as Boolean {
+        var parts = LocationMath.distanceParts(meters, units);
+        if (!parts[0].equals(number) || !parts[1].equals(unit)) {
+            logger.error("expected '" + number + "'/'" + unit + "', got '" + parts[0] + "'/'" + parts[1] + "'");
+            return false;
+        }
+        if (!Ui.isNumberGlyphs(parts[0])) {
+            logger.error("number part '" + parts[0] + "' has glyphs the number font lacks");
             return false;
         }
         return true;
     }
 
     (:test)
-    function formatDistanceMetricOverAKilometer(logger as Logger) as Boolean {
-        var text = LocationMath.formatDistance(1500.0d, System.UNIT_METRIC);
-        if (!text.equals("1.5 km")) {
-            logger.error("expected '1.5 km', got '" + text + "'");
-            return false;
-        }
-        return true;
+    function distancePartsMetricUnderAKilometer(logger as Logger) as Boolean {
+        return _expectParts(logger, 240.0d, System.UNIT_METRIC, "240", "m")
+            && _expectParts(logger, 500.0d, System.UNIT_METRIC, "500", "m")
+            && _expectParts(logger, 999.9d, System.UNIT_METRIC, "999", "m");
     }
 
     (:test)
-    function formatDistanceStatuteUnderAMile(logger as Logger) as Boolean {
-        var text = LocationMath.formatDistance(100.0d, System.UNIT_STATUTE);
-        if (!text.equals("328 ft")) {
-            logger.error("expected '328 ft', got '" + text + "'");
-            return false;
-        }
-        return true;
+    function distancePartsMetricOverAKilometer(logger as Logger) as Boolean {
+        return _expectParts(logger, 1000.0d, System.UNIT_METRIC, "1.0", "km")
+            && _expectParts(logger, 1200.0d, System.UNIT_METRIC, "1.2", "km")
+            && _expectParts(logger, 1500.0d, System.UNIT_METRIC, "1.5", "km");
     }
 
     (:test)
-    function formatDistanceStatuteOverAMile(logger as Logger) as Boolean {
-        var text = LocationMath.formatDistance(5000.0d, System.UNIT_STATUTE);
-        if (!text.equals("3.1 mi")) {
-            logger.error("expected '3.1 mi', got '" + text + "'");
+    function distancePartsStatuteUnderAThousandFeet(logger as Logger) as Boolean {
+        return _expectParts(logger, 100.0d, System.UNIT_STATUTE, "328", "ft")
+            && _expectParts(logger, 244.0d, System.UNIT_STATUTE, "800", "ft");
+    }
+
+    (:test)
+    function distancePartsStatuteInMiles(logger as Logger) as Boolean {
+        return _expectParts(logger, 482.0d, System.UNIT_STATUTE, "0.3", "mi")
+            && _expectParts(logger, 5000.0d, System.UNIT_STATUTE, "3.1", "mi");
+    }
+
+    // A far-away car must not push the hero into the ring: no decimal from
+    // 100 km/mi on (half the globe is "20015 km", five glyphs).
+    (:test)
+    function distancePartsDropsTheDecimalFromAHundred(logger as Logger) as Boolean {
+        return _expectParts(logger, 99940.0d, System.UNIT_METRIC, "99.9", "km")
+            && _expectParts(logger, 123456.0d, System.UNIT_METRIC, "123", "km")
+            && _expectParts(logger, 20015086.0d, System.UNIT_METRIC, "20015", "km")
+            && _expectParts(logger, 200000.0d, System.UNIT_STATUTE, "124", "mi");
+    }
+
+    // C5: the address chords inside the ring track are the PoC's [158, 186]
+    // at y 46/65 (fēnix 7 Pro xtiny, 19 px), and wider below the centre.
+    (:test)
+    function addressWidthsMatchThePoc(logger as Logger) as Boolean {
+        var top = FindCarLayout.addressWidths(46, 19);
+        var low = FindCarLayout.addressWidths(150, 19);
+        if (top[0] != 158 || top[1] != 186) {
+            logger.error("expected [158, 186] at y 46, got [" + top[0] + ", " + top[1] + "]");
+            return false;
+        }
+        if (low[0] <= top[0] || low[1] <= top[0]) {
+            logger.error("expected wider chords at y 150, got [" + low[0] + ", " + low[1] + "]");
             return false;
         }
         return true;

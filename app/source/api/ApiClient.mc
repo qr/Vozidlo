@@ -60,6 +60,17 @@ module ApiClient {
         };
     }
 
+    // The body of a command Škoda defines without one (stop climate, both
+    // charging commands, ventilation, stop auxiliary heating): an empty JSON
+    // object, never null. Garmin Connect on Android does not send a POST
+    // whose Content-Type is JSON and whose body is null: the watch gets
+    // responseCode 0 and nothing reaches Škoda (measured 2026-10-08 with
+    // adb and the rate-limit counter: start climate, which has a body, went
+    // out; stop climate did not). Škoda answers `{}` with the same 202.
+    function noBody() as Dictionary<Object, Object> {
+        return {} as Dictionary<Object, Object>;
+    }
+
     // The single read endpoint. `include`, when given, is already the
     // comma-joined list of section names, see Endpoints.vehicleWithInclude.
     // Wrapped in its own function, per docs/best-practices "Wrap each request
@@ -82,21 +93,21 @@ module ApiClient {
     }
 
     function stopAirConditioning(vin as String, apiKey as String, callback as ResponseHandler) as Void {
-        Communications.makeWebRequest(Endpoints.stopAirConditioning(vin), null, {
+        Communications.makeWebRequest(Endpoints.stopAirConditioning(vin), noBody(), {
             :method => Communications.HTTP_REQUEST_METHOD_POST,
             :headers => { API_KEY_HEADER => apiKey, "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON }
         }, callback);
     }
 
     function startActiveVentilation(vin as String, apiKey as String, callback as ResponseHandler) as Void {
-        Communications.makeWebRequest(Endpoints.startActiveVentilation(vin), null, {
+        Communications.makeWebRequest(Endpoints.startActiveVentilation(vin), noBody(), {
             :method => Communications.HTTP_REQUEST_METHOD_POST,
             :headers => { API_KEY_HEADER => apiKey, "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON }
         }, callback);
     }
 
     function stopActiveVentilation(vin as String, apiKey as String, callback as ResponseHandler) as Void {
-        Communications.makeWebRequest(Endpoints.stopActiveVentilation(vin), null, {
+        Communications.makeWebRequest(Endpoints.stopActiveVentilation(vin), noBody(), {
             :method => Communications.HTTP_REQUEST_METHOD_POST,
             :headers => { API_KEY_HEADER => apiKey, "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON }
         }, callback);
@@ -110,21 +121,21 @@ module ApiClient {
     }
 
     function stopAuxiliaryHeating(vin as String, apiKey as String, callback as ResponseHandler) as Void {
-        Communications.makeWebRequest(Endpoints.stopAuxiliaryHeating(vin), null, {
+        Communications.makeWebRequest(Endpoints.stopAuxiliaryHeating(vin), noBody(), {
             :method => Communications.HTTP_REQUEST_METHOD_POST,
             :headers => { API_KEY_HEADER => apiKey, "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON }
         }, callback);
     }
 
     function startCharging(vin as String, apiKey as String, callback as ResponseHandler) as Void {
-        Communications.makeWebRequest(Endpoints.startCharging(vin), null, {
+        Communications.makeWebRequest(Endpoints.startCharging(vin), noBody(), {
             :method => Communications.HTTP_REQUEST_METHOD_POST,
             :headers => { API_KEY_HEADER => apiKey, "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON }
         }, callback);
     }
 
     function stopCharging(vin as String, apiKey as String, callback as ResponseHandler) as Void {
-        Communications.makeWebRequest(Endpoints.stopCharging(vin), null, {
+        Communications.makeWebRequest(Endpoints.stopCharging(vin), noBody(), {
             :method => Communications.HTTP_REQUEST_METHOD_POST,
             :headers => { API_KEY_HEADER => apiKey, "Content-Type" => Communications.REQUEST_CONTENT_TYPE_JSON }
         }, callback);

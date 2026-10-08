@@ -2,8 +2,8 @@ import Toybox.Attention;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// US-062, implemented exactly once so every command-sending screen: this
-// task's ControlsView, and whatever task 8 adds for charging: inherits the
+// US-062, implemented exactly once so every command-sending screen: home's
+// rows (Commands.mc), the charging mode and limit menus: inherits the
 // same rule rather than each hand-rolling its own confirm/skip branch.
 //
 // The policy is a fixed table plus one override: a handful of actions

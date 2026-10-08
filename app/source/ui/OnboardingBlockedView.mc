@@ -10,25 +10,32 @@ import Toybox.WatchUi;
 //
 // Blocking, but never automatic: getting past this screen means fixing the
 // key/VIN on the phone and pressing select to retry (US-002: "never retry
-// automatically").
+// automatically"). MENU (hold UP) opens the onboarding menu, shown as the
+// menu glyph at UP instead of the old "Menu for more." (C7).
 class OnboardingBlockedView extends WatchUi.View {
 
-    private var _text as String;
+    private var _screen as OnboardingText;
 
+    // The text arrives as a String already built by OnboardingGate, so
+    // nothing is loaded here or in onUpdate() (A22).
     function initialize(text as String) {
         View.initialize();
-        _text = text;
+        _screen = new OnboardingText();
+        _screen.set(text, :menu);
     }
 
     function onLayout(dc as Dc) as Void {
     }
 
-    // Wrapped by ui/TextBlock.mc rather than laid out with WatchUi.Text,
-    // which does not wrap, see that file's header.
+    // Monochrome flag cached per onShow (A21).
+    function onShow() as Void {
+        Theme.refresh();
+    }
+
+    // Wrapped by OnboardingText rather than laid out with WatchUi.Text,
+    // which does not wrap.
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
-        dc.clear();
-        TextBlock.draw(dc, _text, Graphics.FONT_XTINY, Graphics.COLOR_WHITE);
+        _screen.draw(dc);
     }
 
 }

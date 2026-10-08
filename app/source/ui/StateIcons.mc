@@ -2,9 +2,9 @@ import Toybox.Graphics;
 import Toybox.Lang;
 
 // Task 11 (US-059/US-060): ONE icon per state. Locked, unlocked, open,
-// charging, plugged in, climate active, unknown: used identically on the
-// control tiles' top strip (ControlsView), the detailed status screen
-// (StatusView) and the glance (GlanceView). Complications cannot reuse this
+// charging, plugged in, climate active, unknown: used identically by the
+// chips (Chips.mc, on home and the status pages), the status page heroes
+// (StatusPages.mc) and the glance (GlanceView). Complications cannot reuse this
 // module directly: Complications.Data (the dictionary updateComplication()
 // accepts) has no `:icon` key. Complications.html documents `:shortLabel`,
 // `:value`, `:unit`, `:ranges` only, so a complication's icon is fixed at
@@ -45,8 +45,7 @@ module StateIcons {
 
     // ------------------------------------------------------- state mapping
     //
-    // Pure and side-effect-free, exactly like ui/ControlsView.mc's own
-    // ControlTiles module: testable without a Dc or a live View. Every
+    // Pure and side-effect-free, exactly like ui/ControlTiles.mc: testable without a Dc or a live View. Every
     // raw value comes straight off the API's documented enums (see
     // model/VehicleState.mc and ui/ChargingLogic.mc for the same strings
     // used elsewhere); an unrecognised value always falls through rather
@@ -81,7 +80,7 @@ module StateIcons {
     // doesn't warrant either icon (CONNECT_CABLE/DISCHARGING/anything else
     // unrecognised): a blank icon slot here is a deliberate design choice,
     // not the same thing as UNKNOWN, which this module reserves for "no
-    // data at all" (see forLockStatus above and StatusView's own
+    // data at all" (see forLockStatus above and VehicleState's own
     // KIND_UNKNOWN convention that this mirrors).
     function forChargingStatus(raw as String?) as Symbol? {
         if (raw == null) {
@@ -130,9 +129,9 @@ module StateIcons {
     // bounding radius) so the same functions scale from a ~6px glance glyph
     // to a ~16px status-page glyph without any caller needing to know the
     // per-icon geometry. Every icon draws in `color` alone: never reads
-    // the destination background, so these are safe on the tiles' varying
-    // backgrounds (dark grey / blue / green) as well as StatusView's black
-    // canvas and the glance's own background.
+    // the destination background, so these are safe inside chips and
+    // menu rows as well as on the black (Theme.BG) canvas and the glance's
+    // own background.
 
     function draw(dc as Dc, state as Symbol, cx as Number, cy as Number, r as Number, color as Graphics.ColorType) as Void {
         if (state == LOCKED) {
@@ -266,8 +265,7 @@ module StateIcons {
 
     // Unknown: a plain ring with a horizontal dash through the middle.
     // echoing the EM_DASH already used everywhere in this app's text for
-    // "no data" (see ControlsView/StatusView/GlanceView's own EM_DASH
-    // constants), so the one glyph with no state of its own to show still
+    // "no data" (Labels.DASH), so the one glyph with no state of its own to show still
     // reads as "nothing here yet" rather than a blank.
     function _drawUnknown(dc as Dc, cx as Number, cy as Number, r as Number, color as Graphics.ColorType) as Void {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);

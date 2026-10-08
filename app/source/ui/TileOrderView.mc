@@ -1,46 +1,44 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// US-061: the on-device screen for reordering and hiding control tiles.
-// Reached from the "Settings" tile ControlsView adds (see that file's
-// :openTileOrder branch) rather than via AppBase.getSettingsView(): that
-// hook already belongs to task 7's TargetTemperatureSettingsView, and this
-// task's file-ownership split does not extend to VozidloApp.mc beyond
-// getGlanceView(), see this task's final report for the full reasoning.
-//
-// Menu2, not the legacy Menu (docs/best-practices): well under the ~7-item
-// guidance since there are only ever five categories. Each item's sub-label
-// shows the current value (position, or "Hidden") and selecting it opens a
-// secondary menu for the actual change: exactly the pattern
-// docs/best-practices recommends: "for other choices open a secondary menu
-// while showing the current value as sub-text on the parent item."
-class TileOrderView extends WatchUi.Menu2 {
+// US-061: the on-device screen for reordering and hiding the home rows,
+// reached from the home's Settings row (SettingsScreen.openTileOrder()).
+// A NightMenu (PoC NSet.order): each row shows its category with an icon and
+// the current value as sub-label ("Position 2" or "Hidden"); selecting it
+// opens a second menu for the change, the pattern docs/best-practices
+// recommends ("open a secondary menu while showing the current value as
+// sub-text on the parent item").
+class TileOrderView extends NightMenu {
 
     // Snapshot of what's on screen right now, rebuilt by refreshLabels()
-    // after every change: index i here is always the MenuItem at index i.
+    // after every change: index i here is always the row at index i.
     private var _categories as Array<Symbol>;
 
     function initialize() {
-        var categories = TileOrder.orderableCategories(_supportedCategories());
-        Menu2.initialize({ :title => "Tile order" });
-        _categories = categories;
-        for (var i = 0; i < categories.size(); i += 1) {
-            var category = categories[i] as Symbol;
-            addItem(new WatchUi.MenuItem(TileOrder.label(category), _subLabel(category, i), category, null));
+        NightMenu.initialize("Tile order", 0, null);
+        _categories = TileOrder.orderableCategories(HomeRows.supported());
+        for (var i = 0; i < _categories.size(); i += 1) {
+            var category = _categories[i] as Symbol;
+            addItem(new NightMenuItem(category, TileOrder.label(category), _subLabel(category, i), _icon(category), null));
         }
     }
 
     // Called after every move/hide commit so the sub-labels reflect the
-    // just-saved state without the user backing all the way out and in
-    // again. Recomputes `_categories` first: a move can change which
-    // category sits at which index, and Menu2.updateItem() replaces a
-    // MenuItem wholesale (title included), so the label must be right too.
-    function refreshLabels() as Void {
-        _categories = TileOrder.orderableCategories(_supportedCategories());
+    // just-saved state without backing out and in again. A move changes
+    // which category sits at which index, so whole rows are replaced (the id
+    // goes with the row), then the focus follows the category that moved
+    // (A20), so a second "Move up" is one more press, not a hunt.
+    function refreshLabels(focusOn as Symbol) as Void {
+        _categories = TileOrder.orderableCategories(HomeRows.supported());
+        var focus = 0;
         for (var i = 0; i < _categories.size(); i += 1) {
             var category = _categories[i] as Symbol;
-            updateItem(new WatchUi.MenuItem(TileOrder.label(category), _subLabel(category, i), category, null), i);
+            updateItem(new NightMenuItem(category, TileOrder.label(category), _subLabel(category, i), _icon(category), null), i);
+            if (category == focusOn) {
+                focus = i;
+            }
         }
+        setFocus(focus);
     }
 
     function _subLabel(category as Symbol, position as Number) as String {
@@ -50,133 +48,96 @@ class TileOrderView extends WatchUi.Menu2 {
         return "Position " + (position + 1).toString();
     }
 
-    // Same classification ControlsView._buildTiles() uses for its own
-    // grid, see TileOrder.isChargingOperation()'s own comment on why this
-    // lives in TileOrder rather than being duplicated in both files.
-    function _supportedCategories() as Array<Symbol> {
-        var settings = getApp().getSettings();
-        var operations = Cache.operations() as Array<String>?;
-        var candidates = ControlTiles.visibleCandidates(operations, settings.hasSpin);
-        var hasClimateTile = false;
-        var hasChargingTile = false;
-        for (var i = 0; i < candidates.size(); i += 1) {
-            var candidate = candidates[i] as ControlTiles.Candidate;
-            if (TileOrder.isChargingOperation(candidate.operation)) {
-                hasChargingTile = true;
-            } else {
-                hasClimateTile = true;
-            }
+    // Same icons as the home rows they stand for (PoC NSet.ORDER); the
+    // start/stop charging pair uses the plug so it reads apart from the
+    // Charging detail row's bolt.
+    function _icon(category as Symbol) as Symbol {
+        if (category == TileOrder.CATEGORY_CLIMATE) {
+            return :fan;
         }
-        // Same flag ControlsView._buildTiles() passes for its own grid
-        // (task 9's ParkingFeature.isKnownUnsupported(), see ui/LocationView.mc)
-        //: this screen must offer exactly what the landing screen offers,
-        // never less.
-        return TileOrder.supportedCategories(hasClimateTile, hasChargingTile, !ParkingFeature.isKnownUnsupported());
+        if (category == TileOrder.CATEGORY_CHARGING) {
+            return StateIcons.PLUGGED_IN;
+        }
+        if (category == TileOrder.CATEGORY_CHARGING_DETAIL) {
+            return :bolt;
+        }
+        if (category == TileOrder.CATEGORY_FIND_MY_CAR) {
+            return :pin;
+        }
+        if (category == TileOrder.CATEGORY_STATUS_DETAIL) {
+            return :list;
+        }
+        return :gear;
     }
 
 }
 
-// The secondary menu for one category: move up, move down, hide/show.
-class TileOrderDetailMenu extends WatchUi.Menu2 {
+class TileOrderDelegate extends NightMenuDelegate {
 
-    public var category as Symbol;
-
-    function initialize(forCategory as Symbol) {
-        Menu2.initialize({ :title => TileOrder.label(forCategory) });
-        category = forCategory;
-        addItem(new WatchUi.MenuItem("Move up", null, :moveUp, null));
-        addItem(new WatchUi.MenuItem("Move down", null, :moveDown, null));
-        addItem(new WatchUi.MenuItem(TileOrder.isHidden(forCategory) ? "Show" : "Hide", null, :toggleHidden, null));
-    }
-
-}
-
-class TileOrderDelegate extends WatchUi.Menu2InputDelegate {
-
-    // Weak, per docs/best-practices: this delegate is owned by the view
-    // it acts on, same convention as every other delegate in this app.
+    // Weak, per docs/best-practices: this delegate is owned by the view it
+    // acts on, same convention as every other delegate in this app.
     private var _view as WeakReference;
 
     function initialize(view as TileOrderView) {
-        Menu2InputDelegate.initialize();
+        NightMenuDelegate.initialize(false);
         _view = view.weak();
     }
 
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        var category = item.getId() as Symbol;
-        var detail = new TileOrderDetailMenu(category);
-        WatchUi.pushView(detail, new TileOrderDetailDelegate(detail, self), WatchUi.SLIDE_LEFT);
-    }
-
-    function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
+    function onPick(id as Object?) as Void {
+        var category = id as Symbol;
+        var isHidden = TileOrder.isHidden(category);
+        var detail = new NightMenu(TileOrder.label(category), 0, null);
+        detail.addItem(new NightMenuItem(:moveUp, "Move up", null, null, null));
+        detail.addItem(new NightMenuItem(:moveDown, "Move down", null, null, null));
+        // No Hide for Settings: it is the way back to this screen.
+        if (TileOrder.isHideable(category)) {
+            detail.addItem(new NightMenuItem(:toggleHidden, isHidden ? "Show" : "Hide", null, null, null));
+        }
+        WatchUi.pushView(detail, new TileOrderDetailDelegate(category, self), Theme.SLIDE_IN);
     }
 
     // Called by TileOrderDetailDelegate once a change has been committed.
-    function refreshView() as Void {
-        var view = _resolve();
+    function refreshView(moved as Symbol) as Void {
+        if (!_view.stillAlive()) {
+            return;
+        }
+        var view = _view.get() as TileOrderView?;
         if (view != null) {
-            view.refreshLabels();
+            view.refreshLabels(moved);
             WatchUi.requestUpdate();
         }
     }
 
-    function _resolve() as TileOrderView? {
-        if (!_view.stillAlive()) {
-            return null;
-        }
-        return _view.get() as TileOrderView?;
-    }
-
 }
 
-class TileOrderDetailDelegate extends WatchUi.Menu2InputDelegate {
+// The secondary menu for one category: move up, move down, hide/show. Pops
+// itself before applying the change (NightMenuDelegate(true)), so the list
+// underneath is what the user sees updated.
+class TileOrderDetailDelegate extends NightMenuDelegate {
 
-    private var _view as WeakReference;
+    private var _category as Symbol;
     private var _parent as WeakReference;
 
-    function initialize(view as TileOrderDetailMenu, parent as TileOrderDelegate) {
-        Menu2InputDelegate.initialize();
-        _view = view.weak();
+    function initialize(category as Symbol, parent as TileOrderDelegate) {
+        NightMenuDelegate.initialize(true);
+        _category = category;
         _parent = parent.weak();
     }
 
-    function onSelect(item as WatchUi.MenuItem) as Void {
-        var view = _resolveView();
-        if (view == null) {
-            return;
+    function onPick(id as Object?) as Void {
+        if (id == :moveUp) {
+            TileOrder.moveUp(_category);
+        } else if (id == :moveDown) {
+            TileOrder.moveDown(_category);
+        } else if (id == :toggleHidden) {
+            TileOrder.toggleHidden(_category);
         }
-        var action = item.getId() as Symbol;
-        if (action == :moveUp) {
-            TileOrder.moveUp(view.category);
-        } else if (action == :moveDown) {
-            TileOrder.moveDown(view.category);
-        } else if (action == :toggleHidden) {
-            TileOrder.toggleHidden(view.category);
+        if (_parent.stillAlive()) {
+            var parent = _parent.get() as TileOrderDelegate?;
+            if (parent != null) {
+                parent.refreshView(_category);
+            }
         }
-        var parent = _resolveParent();
-        if (parent != null) {
-            parent.refreshView();
-        }
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
-
-    function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
-
-    function _resolveView() as TileOrderDetailMenu? {
-        if (!_view.stillAlive()) {
-            return null;
-        }
-        return _view.get() as TileOrderDetailMenu?;
-    }
-
-    function _resolveParent() as TileOrderDelegate? {
-        if (!_parent.stillAlive()) {
-            return null;
-        }
-        return _parent.get() as TileOrderDelegate?;
     }
 
 }

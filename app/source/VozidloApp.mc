@@ -75,17 +75,16 @@ class VozidloApp extends Application.AppBase {
     // enough to warrant the 159-day expiry estimate all route through the
     // onboarding gate first; everything else falls through unchanged. See
     // ui/OnboardingGate.mc for the full decision. Once configuration is
-    // valid, task 7's control tiles ARE the app (US-036: "land on the
-    // controls, not on a status page"): this is the only line that
-    // changed when PlaceholderView was replaced.
+    // valid, home (the Night Panel hero list, ui/HomeMenu.mc) IS the app
+    // (US-036: "land on the controls, not on a status page"); it is opened
+    // only through HomeScreen so this file never names its classes.
     (:typecheck(disableGlanceCheck))
     function getInitialView() as [Views] or [Views, InputDelegates] {
         var gate = Onboarding.gateView(getSettings());
         if (gate != null) {
             return [ gate, new OnboardingDelegate(gate) ];
         }
-        var controls = new ControlsView();
-        return [ controls, new ControlsDelegate(controls) ];
+        return HomeScreen.view();
     }
 
     // US-018: the only on-device settings screen this app has, see
@@ -101,9 +100,9 @@ class VozidloApp extends Application.AppBase {
     // reads only from Cache.mc: never makes a request, in any code path
     // (see ui/GlanceView.mc's own header for the full argument and how it
     // was verified). Selecting the glance in the carousel falls through to
-    // the SAME getInitialView() above, which already lands on ControlsView
-    // with the primary tile preselected (US-037): nothing extra to wire
-    // here, only not to break it.
+    // the SAME getInitialView() above, which already lands on home with
+    // the primary action focused (US-037): nothing extra to wire here, only
+    // not to break it.
     (:glance)
     function getGlanceView() as [GlanceView] or [GlanceView, GlanceViewDelegate] or Null {
         return [ new VozidloGlanceView() ];

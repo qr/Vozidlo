@@ -7,7 +7,8 @@
 
     Products: every one is device family round-260x260 with a watch-app budget
     of 786,432 B and a glance budget of 65,536 B, so one set of layouts covers
-    all of them and ControlsView's fixed 260x260 grid needs no rework. This is
+    all of them: text widths follow the chord and the fonts measured at
+    runtime, and the bezel radii and PoC coordinates assume 260x260. This is
     read from each device's own compiler.json, not inferred from model names.
 
       fenix7pro           fēnix® 7 Pro. Per the store's Compatible Devices list
@@ -46,8 +47,9 @@
       the legacy hero
       and saga watches
       7S / 7X Pro and     240x240 and 280x280. A different device family, so
-      the 42/51mm 8, 9    ControlsView's grid would need a real layout pass
-                          before we could honestly claim them.
+      the 42/51mm 8, 9    the bezel radii (Bezel.mc) and the 260x260 page
+                          coordinates would need a real layout pass before
+                          we could honestly claim them.
 -->
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application id="96a4e892-508e-4772-8a91-2c464b118264" type="watch-app" name="@Strings.AppName" entry="VozidloApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="5.2.0">

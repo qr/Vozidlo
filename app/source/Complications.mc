@@ -18,8 +18,8 @@ import Toybox.Lang;
 // PUBLISH ONLY, from Cache.mc, never by making a request: identical
 // contract to GlanceView.mc, and for the identical reason: US-038 promises
 // a watch face can show this WITHOUT the state ever costing a request the
-// user didn't ask for. publish() is called from ControlsView.onShow() (see
-// that file), i.e. whenever the full app is opened or returned to: there
+// user didn't ask for. publish() is called from the home screen's onShow()
+// (HomeScreen), i.e. whenever the full app is opened or returned to: there
 // is no background service in this app (out of scope), so a complication
 // reflects whatever Cache.mc held the last time this app actually ran.
 module VehicleComplications {
@@ -34,7 +34,9 @@ module VehicleComplications {
     const ID_LOCK_STATE = 2;
     const ID_RANGE = 3;
 
-    const _PLACEHOLDER = "—";
+    // The app-wide "no data" dash (Labels.DASH), so a watch face shows the
+    // same placeholder as every screen.
+    const _PLACEHOLDER = Labels.DASH;
 
     // Called once per touch-point (never wired to a timer or to
     // onUpdate()), which keeps this comfortably under any update-rate
@@ -70,8 +72,10 @@ module VehicleComplications {
     function _publishChargingState() as Void {
         var charging = Cache.section("charging");
         var state = (charging != null) ? (charging.get("state") as String?) : null;
+        // Sentence-case words from Labels ("Plugged in", not
+        // READY_FOR_CHARGING): a watch face shows :value as it is (A16).
         Complications.updateComplication(ID_CHARGING_STATE, {
-            :value => (state != null) ? state : _PLACEHOLDER,
+            :value => Labels.charging(state),
             :shortLabel => "Chrg"
         });
     }
@@ -80,7 +84,7 @@ module VehicleComplications {
         var status = Cache.section("status");
         var locked = (status != null) ? (status.get("doorsLocked") as String?) : null;
         Complications.updateComplication(ID_LOCK_STATE, {
-            :value => _lockText(locked),
+            :value => Labels.lock(locked),
             :shortLabel => "Lock"
         });
     }
@@ -100,19 +104,6 @@ module VehicleComplications {
             :shortLabel => "Rng",
             :unit => (km != null) ? "km" : "" // see _publishSoc()'s own comment on why "" not null
         });
-    }
-
-    function _lockText(raw as String?) as String {
-        if (raw == null) {
-            return _PLACEHOLDER;
-        }
-        if (raw.equals("YES")) {
-            return "Locked";
-        }
-        if (raw.equals("NO")) {
-            return "Unlocked";
-        }
-        return raw;
     }
 
     // Complications.Data's :value accepts String, Number, Float, Long,

@@ -47,6 +47,11 @@ class ChargingProfileEntry {
 // VehicleState.KIND_UNSUPPORTED).
 class ChargingProfilesView extends WatchUi.View {
 
+    // xtiny pitch on the profile card (PoC NC.profile) and the lowest line
+    // start that still leaves a usable chord.
+    const LINE_PITCH = 19;
+    const LAST_LINE_Y = 216;
+
     private var _hasFetched as Boolean = false;
     private var _fetching as Boolean = false;
     private var _supported as Boolean = false;
@@ -63,6 +68,7 @@ class ChargingProfilesView extends WatchUi.View {
     }
 
     function onShow() as Void {
+        Theme.refresh();
         if (!_hasFetched) {
             _fetch();
         }
@@ -73,12 +79,12 @@ class ChargingProfilesView extends WatchUi.View {
             return;
         }
         if (!(System.getDeviceSettings().phoneConnected)) {
-            _lastError = "Phone not connected";
+            _lastError = Commands.NO_PHONE;
             WatchUi.requestUpdate();
             return;
         }
         if (!Quota.canSpend()) {
-            _lastError = "Quota spent for this hour";
+            _lastError = Commands.QUOTA_SPENT;
             WatchUi.requestUpdate();
             return;
         }
@@ -119,7 +125,8 @@ class ChargingProfilesView extends WatchUi.View {
             var problemType = (errorBody != null) ? (errorBody.get("type") as String?) : null;
             Quota.recordRateLimited(problemType, null);
         }
-        _lastError = _shorten(ProblemDetail.describe(responseCode, errorBody, Quota.retryAfterUntil()).text);
+        // No character cap: the error line fits by pixels (A5).
+        _lastError = ProblemDetail.describe(responseCode, errorBody, Quota.retryAfterUntil()).text;
         WatchUi.requestUpdate();
     }
 
@@ -174,12 +181,12 @@ class ChargingProfilesView extends WatchUi.View {
                 var recurrence = ChargingLogic.timerRecurrenceLabel(
                     timer.get("type") as String?, timer.get("recurringOn") as Array<String>?, timer.get("oneOffDay") as String?
                 );
-                timerLines.add((time != null ? time : "—") + " " + recurrence);
+                timerLines.add((time != null ? time : Labels.DASH) + " " + recurrence);
             }
         }
 
         return new ChargingProfileEntry(
-            (name != null) ? name : "—", targetSoc, maxCurrent, isCurrent,
+            (name != null) ? name : Labels.DASH, targetSoc, maxCurrent, isCurrent,
             isCurrent ? currentNextChargingTime : null, timerLines
         );
     }
@@ -202,31 +209,40 @@ class ChargingProfilesView extends WatchUi.View {
         WatchUi.requestUpdate();
     }
 
+    // A19: SELECT retries after a failed or blocked fetch. A loaded list is
+    // not re-fetched: profiles are fetched once per visit (class comment).
+    function retry() as Void {
+        if (_fetching || (_hasFetched && _lastError == null)) {
+            return;
+        }
+        _fetch();
+    }
+
     // -------------------------------------------------------- rendering
 
+    // PoC NC.profile / NC.profilesUnsupported: title y 40, then either a
+    // state (loading, error, unsupported, none) or one profile card.
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
+        dc.setColor(Theme.TEXT_1, Theme.BG);
         dc.clear();
-        var centerX = dc.getWidth() / 2;
-
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(centerX, 12, Graphics.FONT_XTINY, "CHARGING PROFILES", Graphics.TEXT_JUSTIFY_CENTER);
+        Ui.title(dc, "Charging profiles", 40);
 
         if (_fetching) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, 120, Graphics.FONT_SMALL, "Loading...", Graphics.TEXT_JUSTIFY_CENTER);
+            _drawState(dc, "Loading" + Labels.ELLIPSIS, null);
             return;
         }
 
-        if (_lastError != null) {
-            dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, 120, Graphics.FONT_XTINY, _lastError as String, Graphics.TEXT_JUSTIFY_CENTER);
+        var error = _lastError;
+        if (error != null) {
+            Ui.drawStatusLine(dc, 112, error, :error);
+            _drawRetryGlyph(dc);
             return;
         }
 
         if (!_hasFetched) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, 120, Graphics.FONT_SMALL, "SELECT to load", Graphics.TEXT_JUSTIFY_CENTER);
+            // Only when the config gate blocked the fetch; START tries again.
+            _drawState(dc, "Not loaded", null);
+            _drawRetryGlyph(dc);
             return;
         }
 
@@ -234,79 +250,91 @@ class ChargingProfilesView extends WatchUi.View {
             // US-026: "the section is absent". This vehicle simply does
             // not have any (the mock's default scenario, and every real
             // vehicle measured so far, see mock/README.md).
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, 120, Graphics.FONT_SMALL, "Not supported\nby this car", Graphics.TEXT_JUSTIFY_CENTER);
+            _drawState(dc, "Not supported", "by this car");
             return;
         }
 
         if (_profiles.size() == 0) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, 120, Graphics.FONT_SMALL, "No profiles saved", Graphics.TEXT_JUSTIFY_CENTER);
+            _drawState(dc, "No profiles saved", null);
             return;
         }
 
-        _drawProfile(dc, centerX, _profiles[_pageIndex] as ChargingProfileEntry);
-
-        TextBlock.drawFittedLine(dc,
-            (_pageIndex + 1).toString() + "/" + _profiles.size().toString() + " - UP/DOWN",
-            Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY, dc.getHeight() - 20);
+        _drawProfile(dc, _profiles[_pageIndex] as ChargingProfileEntry);
+        if (_profiles.size() > 1) {
+            Bezel.pageDots(dc, _pageIndex, _profiles.size());
+        }
     }
 
-    function _drawProfile(dc as Dc, centerX as Number, profile as ChargingProfileEntry) as Void {
-        dc.setColor(profile.isCurrent ? Graphics.COLOR_GREEN : Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        var title = profile.isCurrent ? (profile.name + " (here)") : profile.name;
-        dc.drawText(centerX, 50, Graphics.FONT_SMALL, title, Graphics.TEXT_JUSTIFY_CENTER);
+    // FONT_SMALL at y 104, an optional grey second line at y 136.
+    function _drawState(dc as Dc, line1 as String, line2 as String?) as Void {
+        var font = Graphics.FONT_SMALL;
+        var cx = dc.getWidth() / 2;
+        var h = dc.getFontHeight(font);
+        var measure = Ui.measurer(dc, font);
+        dc.setColor(Theme.c(Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 104, font, Ui.fit(line1, Ui.usable(104, 104 + h, Theme.MARGIN), measure), Graphics.TEXT_JUSTIFY_CENTER);
+        if (line2 != null) {
+            dc.setColor(Theme.c(Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, 136, font, Ui.fit(line2, Ui.usable(136, 136 + h, Theme.MARGIN), measure), Graphics.TEXT_JUSTIFY_CENTER);
+        }
+    }
 
-        var lineY = 80;
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(centerX, lineY, Graphics.FONT_XTINY,
-            "Target: " + _percentText(profile.targetSoc), Graphics.TEXT_JUSTIFY_CENTER);
-        lineY += 18;
-        dc.drawText(centerX, lineY, Graphics.FONT_XTINY,
-            "Max current: " + ChargingLogic.maxCurrentLabel(profile.maxCurrent), Graphics.TEXT_JUSTIFY_CENTER);
-        lineY += 18;
+    // Replaces the old "SELECT to load" text: a glyph at START (B4).
+    function _drawRetryGlyph(dc as Dc) as Void {
+        Bezel.glyph(dc, Bezel.BTN_START, :refresh, Theme.TEXT_1, :accent);
+    }
 
+    // Name as the hero word y 70, a white "Here" chip y 108 for the profile
+    // where the car is parked (A-resolutions: white, not green), facts from
+    // y 136, timers in grey below them, each line fitted to its chord.
+    function _drawProfile(dc as Dc, profile as ChargingProfileEntry) as Void {
+        var cx = dc.getWidth() / 2;
+        var font = Graphics.FONT_MEDIUM;
+        var nameY = 70;
+        var name = Ui.fit(profile.name, Ui.usable(nameY, nameY + dc.getFontHeight(font), Theme.MARGIN), Ui.measurer(dc, font));
+        Ui.drawHeroWord(dc, cx, nameY, name, null, Theme.TEXT_1);
+
+        if (profile.isCurrent) {
+            Chips.draw(dc, cx, 108, new Chips.Chip("Here", :pin, :white));
+        }
+
+        var facts = [
+            "Target " + _percentText(profile.targetSoc),
+            "Max current " + Labels.maxCurrent(profile.maxCurrent).toLower()
+        ] as Array<String>;
         var nextTime = profile.nextChargingTime;
         if (nextTime != null) {
-            dc.drawText(centerX, lineY, Graphics.FONT_XTINY, "Next: " + nextTime, Graphics.TEXT_JUSTIFY_CENTER);
-            lineY += 18;
+            facts.add("Next " + nextTime);
         }
+        var y = ChargingFormat.drawLines(dc, 136, LINE_PITCH, facts, Theme.TEXT_1);
 
+        // Timers start at y 178 (PoC) or right under a third fact line; the
+        // last one must start by y 216, where the chord is still ~130 px.
+        var timerY = y + 4 > 178 ? y + 4 : 178;
         if (profile.timerLines.size() == 0) {
-            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, lineY, Graphics.FONT_XTINY, "No enabled timers", Graphics.TEXT_JUSTIFY_CENTER);
+            ChargingFormat.drawLines(dc, timerY, LINE_PITCH, ["No enabled timers"] as Array<String>, Theme.TEXT_2);
             return;
         }
-
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        var timerCount = profile.timerLines.size();
-        if (timerCount > 3) {
-            timerCount = 3; // fits below the fixed lines above without crowding
+        var room = (LAST_LINE_Y - timerY) / LINE_PITCH + 1;
+        var timers = profile.timerLines;
+        if (timers.size() > room) {
+            timers = timers.slice(0, room) as Array<String>;
         }
-        for (var i = 0; i < timerCount; i += 1) {
-            dc.drawText(centerX, lineY, Graphics.FONT_XTINY, profile.timerLines[i] as String, Graphics.TEXT_JUSTIFY_CENTER);
-            lineY += 16;
-        }
+        ChargingFormat.drawLines(dc, timerY, LINE_PITCH, timers, Theme.TEXT_2);
     }
 
     function _percentText(value as Number?) as String {
         if (value == null) {
-            return "—";
+            return Labels.DASH;
         }
         return value.toString() + "%";
-    }
-
-    function _shorten(text as String) as String {
-        if (text.length() > 36) {
-            return text.substring(0, 36) as String;
-        }
-        return text;
     }
 
 }
 
 // BehaviorDelegate, back untouched: leaving this screen needs nothing
-// beyond the default pop.
+// beyond the default pop. UP/DOWN page through the profiles; SELECT retries
+// a failed fetch (A19), which the old delegate could not do at all.
 class ChargingProfilesDelegate extends WatchUi.BehaviorDelegate {
 
     private var _view as WeakReference;
@@ -328,6 +356,14 @@ class ChargingProfilesDelegate extends WatchUi.BehaviorDelegate {
         var view = _resolve();
         if (view != null) {
             view.previousPage();
+        }
+        return true;
+    }
+
+    function onSelect() as Boolean {
+        var view = _resolve();
+        if (view != null) {
+            view.retry();
         }
         return true;
     }

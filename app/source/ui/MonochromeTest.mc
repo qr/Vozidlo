@@ -19,9 +19,10 @@ import Toybox.Lang;
 // assertion, see this task's final report for the written per-screen audit
 // that stands in for what cannot be automated.
 //
-// Left unannotated (no :glance) like model/Cache.mc and StateIcons.mc: a
-// single Storage.getValue() call, cheap enough to pull into every build
-// variant without a second thought.
+// (:glance) because ui/Theme.mc wraps it and the glance draws through
+// Theme.c(); without the annotation Theme.refresh() would crash the glance
+// (decisions.md, "(:glance) is a linking rule").
+(:glance)
 module MonochromeTest {
 
     const STORAGE_KEY = "monochromeTestEnabled";
@@ -40,9 +41,8 @@ module MonochromeTest {
     // background and the "no fill" sentinel every screen in this app
     // already uses), never a state signal on their own, so leaving them
     // alone does not undermine the test. Every screen in this app draws on
-    // a black background (see ControlsView/StatusView/LocationView/
-    // ChargingDetailView's own `dc.setColor(..., Graphics.COLOR_BLACK);
-    // dc.clear();"), so white-on-black plus icon/text/shape is exactly the
+    // a black background (Theme.BG, cleared by every Night Panel view and
+    // NightMenu.drawTitle), so white-on-black plus icon/text/shape is exactly the
     // "screenshot desaturated" scenario US-060/the task brief describes.
     function color(c as Graphics.ColorType) as Graphics.ColorType {
         if (!isEnabled()) {

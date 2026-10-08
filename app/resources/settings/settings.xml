@@ -43,4 +43,10 @@
         <settingConfig type="numeric" min="0" max="100" errorMessage="@Strings.SettingTargetTemperatureError" />
     </setting>
 
+    <!-- One read of the car 15 s after a command (CommandCheck.mc). On by
+         default; the help text names its quota cost. -->
+    <setting propertyKey="@Properties.CheckAfterCommand" title="@Strings.SettingCheckAfterCommandTitle" prompt="@Strings.SettingCheckAfterCommandHelp">
+        <settingConfig type="boolean" />
+    </setting>
+
 </settings>

@@ -24,6 +24,16 @@ class MapPreviewView extends WatchUi.MapView {
     // is also plotted.
     private const _PREVIEW_RADIUS_METERS = 400.0d;
 
+    // The car's spot, kept for the map's own MENU > "Navigate to car".
+    private var _car as Position.Location;
+
+    // Set once the map menu has been opened, so the onHide() calls that the
+    // menu and its confirmation trigger do not clear the markers the user
+    // returns to; reset when the map itself is left (release()). Not reset
+    // in onShow(): the pop of the menu and the push of the confirmation can
+    // run back to back, and a reset in between would clear anyway.
+    private var _coveredByChild as Boolean = false;
+
     // Everything the map needs is set up HERE, not in onShow(), and that is
     // load-bearing. Setting the markers, the visible area and the screen
     // area from onShow() throws
@@ -66,6 +76,23 @@ class MapPreviewView extends WatchUi.MapView {
         // nothing is obscured.
         var screen = System.getDeviceSettings();
         setScreenVisibleArea(0, 0, screen.screenWidth, screen.screenHeight);
+
+        // After Garmin's sequence on purpose: a plain field, not map state.
+        _car = carLocation;
+    }
+
+    function carLocation() as Position.Location {
+        return _car;
+    }
+
+    // Called by the delegate right before it pushes the map menu.
+    function holdForChild() as Void {
+        _coveredByChild = true;
+    }
+
+    // Called by the delegate right before it pops the map itself.
+    function release() as Void {
+        _coveredByChild = false;
     }
 
     function onLayout(dc as Dc) as Void {
@@ -74,7 +101,14 @@ class MapPreviewView extends WatchUi.MapView {
     // US-030: release this view's own map state. Every MapMarker and any
     // MapPolyline: the moment it stops being shown, per the task's own
     // instruction to load the map only on request and free it on onHide().
+    // Except while the map menu covers it: clear() there would bring the
+    // user back from "No" to a map without its Car and You pins, and setting
+    // markers again from onShow() is the path that crashed 1.0.0 (see the
+    // constructor). The pop out of the map still clears.
     function onHide() as Void {
+        if (_coveredByChild) {
+            return;
+        }
         clear();
     }
 
@@ -111,6 +145,7 @@ class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
         if (view.getMapMode() == WatchUi.MAP_MODE_BROWSE) {
             view.setMapMode(WatchUi.MAP_MODE_PREVIEW);
         } else {
+            view.release();
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
         }
         return true;
@@ -127,11 +162,48 @@ class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
+    // B6/research 2026-10-07: the map had no MENU handler, so navigating
+    // meant backing out to Find my car first. Same confirmation and
+    // CarNavigation path as there (NavigateConfirm).
+    function onMenu() as Boolean {
+        var view = _resolve();
+        if (view == null) {
+            return false;
+        }
+        var car = view.carLocation().toDegrees();
+        var menu = new NightMenu("Map", 0, null);
+        menu.addItem(new NightMenuItem(:navigate, "Navigate to car", null, :pin, null));
+        view.holdForChild();
+        WatchUi.pushView(menu, new MapMenuDelegate(car[0], car[1]), Theme.SLIDE_IN);
+        return true;
+    }
+
     private function _resolve() as MapPreviewView? {
         if (!_view.stillAlive()) {
             return null;
         }
         return _view.get() as MapPreviewView?;
+    }
+
+}
+
+// MENU on the map (PoC NF.MAP_MENU): one item. Pops first, so the
+// confirmation lands on the map and "No" returns to it (A14).
+class MapMenuDelegate extends NightMenuDelegate {
+
+    private var _latitude as Double;
+    private var _longitude as Double;
+
+    function initialize(latitude as Double, longitude as Double) {
+        NightMenuDelegate.initialize(true);
+        _latitude = latitude;
+        _longitude = longitude;
+    }
+
+    function onPick(id as Object?) as Void {
+        if (id == :navigate) {
+            NavigateConfirm.push(_latitude, _longitude);
+        }
     }
 
 }

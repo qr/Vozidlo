@@ -1,14 +1,12 @@
 import Toybox.Lang;
 import Toybox.Test;
 
-// Unit tests for ui/GlanceView.mc's GlanceFormat module (US-034): the "no
-// cached data at all" detection, text formatting, and the age-bucket text
-// that stands in for the exact age StatusView shows. GlanceFormat is pure
-// and side-effect-free (no Storage/Cache access of its own, see that
-// module's own comment) specifically so it can be exercised here without
-// constructing a live WatchUi.GlanceView or a Graphics.Dc, matching this
-// project's existing convention (tests/ControlTilesTests.mc for
-// ui/ControlsView.mc's own ControlTiles module).
+// Unit tests for ui/GlanceView.mc's GlanceFormat module (US-034, C6): the
+// "no cached data at all" detection, text formatting, the short age, the SoC
+// bar and the lock word the glance draws. GlanceFormat is pure and
+// side-effect-free (no Storage/Cache access of its own) specifically so it
+// can be exercised here without constructing a live WatchUi.GlanceView or a
+// Graphics.Dc.
 module GlanceTests {
 
     (:test)
@@ -22,7 +20,7 @@ module GlanceTests {
 
     // US-034: "given no cached data exists, the glance invites me to open
     // the app": any ONE of the three sections being present is enough to
-    // show the summary line instead, matching ControlsView's own top strip
+    // show the summary line instead, matching home's hero (HomeHero.mc),
     // which never insists on all three being present together.
     (:test)
     function anySingleFieldCountsAsData(logger as Logger) as Boolean {
@@ -51,32 +49,33 @@ module GlanceTests {
             logger.error("expected '72%%' for a Float SoC, truncated not rounded-with-decimals");
             return false;
         }
-        if (!GlanceFormat.socText(null).equals(GlanceFormat.EM_DASH)) {
-            logger.error("expected the em dash for a missing SoC, never '0%%'");
+        if (!GlanceFormat.socText(null).equals(Labels.DASH)) {
+            logger.error("expected the dash for a missing SoC, never '0%%'");
             return false;
         }
         return true;
     }
 
+    // C6 row 2: the glance shows the same sentence-case words as the app
+    // (Labels.lock), not the old "LOCKED"/"UNLOCKED" or a raw enum.
     (:test)
-    function lockTextMapsYesNoAndPassesThroughUnknownValues(logger as Logger) as Boolean {
-        if (!GlanceFormat.lockText("YES").equals("LOCKED")) {
-            logger.error("YES must map to LOCKED");
+    function lockWordIsSentenceCaseAndUnknownValuesAreHumanised(logger as Logger) as Boolean {
+        if (!Labels.lock("YES").equals("Locked")) {
+            logger.error("YES must read 'Locked', got: " + Labels.lock("YES"));
             return false;
         }
-        if (!GlanceFormat.lockText("NO").equals("UNLOCKED")) {
-            logger.error("NO must map to UNLOCKED");
+        if (!Labels.lock("NO").equals("Unlocked")) {
+            logger.error("NO must read 'Unlocked'");
             return false;
         }
-        // openapi.json documents that clients "must tolerate values they do
-        // not recognize": same convention ControlsView._lockLabel() and
-        // VehicleState.mc's _statusValues() already follow.
-        if (!GlanceFormat.lockText("PARTIALLY_LOCKED").equals("PARTIALLY_LOCKED")) {
-            logger.error("an unrecognised value must pass through verbatim, not be swallowed");
+        // openapi.json: clients "must tolerate values they do not recognize";
+        // tolerated means humanised, never drawn raw (A16).
+        if (!Labels.lock("PARTIALLY_LOCKED").equals("Partially locked")) {
+            logger.error("an unrecognised value must be humanised, got: " + Labels.lock("PARTIALLY_LOCKED"));
             return false;
         }
-        if (!GlanceFormat.lockText(null).equals(GlanceFormat.EM_DASH)) {
-            logger.error("expected the em dash for a missing lock reading");
+        if (!Labels.lock(null).equals(Labels.DASH)) {
+            logger.error("expected the dash for a missing lock reading");
             return false;
         }
         return true;
@@ -103,35 +102,62 @@ module GlanceTests {
         return true;
     }
 
+    // C6 row 1: the short age form shared with the app (Age.short), no "ago";
+    // stale (US-009, over an hour) gets "! " so it survives monochrome.
     (:test)
-    function ageTextBucketsByElapsedTime(logger as Logger) as Boolean {
+    function ageTextUsesTheShortSharedFormat(logger as Logger) as Boolean {
         var now = 1000000;
+        var cases = [
+            [10, "Just now"],
+            [300, "5 min"],
+            [3600, "1 h"],
+            [7200, "! 2 h"],
+            [172800, "! 2 d"]
+        ] as Array<[Number, String]>;
+        for (var i = 0; i < cases.size(); i += 1) {
+            var c = cases[i];
+            var got = GlanceFormat.ageText(now - c[0], now);
+            if (!got.equals(c[1])) {
+                logger.error(c[0].toString() + " s must read '" + c[1] + "', got: '" + got + "'");
+                return false;
+            }
+        }
         if (!GlanceFormat.ageText(null, now).equals("")) {
-            logger.error("no captured-at time must produce an empty age line, not a bogus one");
+            logger.error("no captured-at time must produce an empty age, not a bogus one");
             return false;
         }
-        if (!GlanceFormat.ageText(now - 10, now).equals("just now")) {
-            logger.error("under a minute must read 'just now'");
-            return false;
-        }
-        if (!GlanceFormat.ageText(now - 300, now).equals("5 min ago")) {
-            logger.error("300 seconds must read '5 min ago', got: " + GlanceFormat.ageText(now - 300, now));
-            return false;
-        }
-        if (!GlanceFormat.ageText(now - 7200, now).equals("2 h ago")) {
-            logger.error("7200 seconds must read '2 h ago'");
-            return false;
-        }
-        if (!GlanceFormat.ageText(now - 172800, now).equals("2 d ago")) {
-            logger.error("172800 seconds must read '2 d ago'");
+        if (!GlanceFormat.ageText(now + 60, now).equals("Just now")) {
+            logger.error("a capture time in the future (clock skew) must read 'Just now'");
             return false;
         }
         return true;
     }
 
+    // C6 row 3: the bar fill is proportional, clamped, and empty without a
+    // numeric reading.
+    (:test)
+    function barFillIsProportionalAndClamped(logger as Logger) as Boolean {
+        if (GlanceFormat.barFill(50, 160) != 80) {
+            logger.error("50% of 160 px must fill 80, got " + GlanceFormat.barFill(50, 160));
+            return false;
+        }
+        if (GlanceFormat.barFill(100.0, 159) != 159) {
+            logger.error("a full Float SoC must fill the whole bar");
+            return false;
+        }
+        if (GlanceFormat.barFill(140, 159) != 159 || GlanceFormat.barFill(-5, 159) != 0) {
+            logger.error("out-of-range SoC must clamp to the bar");
+            return false;
+        }
+        if (GlanceFormat.barFill(null, 159) != 0 || GlanceFormat.barFill("80", 159) != 0) {
+            logger.error("no numeric SoC must leave the bar empty");
+            return false;
+        }
+        return true;
+    }
 
-    // A glance is a narrow band, and the state strings are built from
-    // whatever the API returned: an unrecognised value can be far longer than
+    // A glance is a narrow band, and the lock word is built from whatever the
+    // API returned: an unrecognised value, humanised, can be far longer than
     // anything anticipated. It used to be drawn straight and run off the right
     // edge, which is what "ANOTHER_FUTURE_VALUE" did.
     class FixedWidthFont {
@@ -147,7 +173,7 @@ module GlanceTests {
 
     (:test)
     function shortTextIsLeftAlone(logger as Logger) as Boolean {
-        var text = "72%  CHARGING";
+        var text = "72%";
         if (!GlanceFormat.truncated(text, 600, measurer()).equals(text)) {
             logger.error("text that fits must not be altered");
             return false;
@@ -157,7 +183,7 @@ module GlanceTests {
 
     (:test)
     function overlongTextIsTruncatedWithinTheWidth(logger as Logger) as Boolean {
-        var text = "100%  ANOTHER_FUTURE_VALUE  UNLOCKED  17 hours ago";
+        var text = "Another future value from the API";
         var out = GlanceFormat.truncated(text, 120, measurer());
         if (out.length() * 6 > 120) {
             logger.error("still too wide: " + out.length() * 6 + "px for a 120px band");
@@ -172,7 +198,7 @@ module GlanceTests {
 
     (:test)
     function truncationIsMarked(logger as Logger) as Boolean {
-        var out = GlanceFormat.truncated("ANOTHER_FUTURE_VALUE", 60, measurer());
+        var out = GlanceFormat.truncated("Another future value", 60, measurer());
         if (out.find("…") == null) {
             logger.error("a cut must be visible, got '" + out + "'");
             return false;

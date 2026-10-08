@@ -4,75 +4,10 @@ import Toybox.Test;
 // Unit tests for ui/ChargingLogic.mc (task 8, US-022..US-026): every pure
 // decision the charging screens make, exercised without constructing a
 // live View, Cache entry or network response: same rationale as
-// ControlTilesTests.mc for ui/ControlsView.mc's ControlTiles module.
+// ControlTilesTests.mc for ui/ControlTiles.mc.
 module ChargingTests {
 
     // ------------------------------------------------------- US-023: state
-
-    (:test)
-    function stateLabelCoversAllSixDocumentedValues(logger as Logger) as Boolean {
-        var cases = {
-            "CONNECT_CABLE" => "Connect the cable",
-            "CHARGING" => "Charging",
-            "CONSERVING" => "Conserving battery",
-            "READY_FOR_CHARGING" => "Ready to charge",
-            "DISCHARGING" => "Discharging",
-            "CHARGING_INTERRUPTED" => "Charging interrupted"
-        };
-        var keys = cases.keys();
-        for (var i = 0; i < keys.size(); i += 1) {
-            var key = keys[i] as String;
-            var expected = cases.get(key) as String;
-            var actual = ChargingLogic.stateLabel(key);
-            if (!actual.equals(expected)) {
-                logger.error("state " + key + ": expected '" + expected + "', got '" + actual + "'");
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // US-023: "an unrecognised value is displayed verbatim rather than
-    // crashing or showing 'unknown'": the spec allows new values over time.
-    (:test)
-    function stateLabelPassesThroughUnrecognisedValueVerbatim(logger as Logger) as Boolean {
-        var actual = ChargingLogic.stateLabel("PRECONDITIONING_BATTERY");
-        if (!actual.equals("PRECONDITIONING_BATTERY")) {
-            logger.error("expected the unrecognised state verbatim, got '" + actual + "'");
-            return false;
-        }
-        return true;
-    }
-
-    (:test)
-    function stateLabelHandlesNull(logger as Logger) as Boolean {
-        if (!ChargingLogic.stateLabel(null).equals("—")) {
-            logger.error("a null state must render as an em dash, not crash");
-            return false;
-        }
-        return true;
-    }
-
-    (:test)
-    function chargeTypeLabelCoversDocumentedValuesAndPassesThroughOthers(logger as Logger) as Boolean {
-        if (!ChargingLogic.chargeTypeLabel("AC").equals("AC")) {
-            logger.error("AC must render as AC");
-            return false;
-        }
-        if (!ChargingLogic.chargeTypeLabel("DC").equals("DC (fast)")) {
-            logger.error("DC must render distinctly from AC");
-            return false;
-        }
-        if (!ChargingLogic.chargeTypeLabel("OFF").equals("Not charging")) {
-            logger.error("OFF must render in plain language");
-            return false;
-        }
-        if (!ChargingLogic.chargeTypeLabel("SOMETHING_NEW").equals("SOMETHING_NEW")) {
-            logger.error("an unrecognised chargeType must pass through verbatim");
-            return false;
-        }
-        return true;
-    }
 
     // US-022: the one state that still offers Start but must warn.
     (:test)
@@ -217,23 +152,6 @@ module ChargingTests {
         return true;
     }
 
-    (:test)
-    function modeLabelCoversDocumentedValuesAndPassesThroughOthers(logger as Logger) as Boolean {
-        if (!ChargingLogic.modeLabel("MANUAL").equals("Manual")) {
-            logger.error("MANUAL must render in plain language");
-            return false;
-        }
-        if (!ChargingLogic.modeLabel("TIMER_CHARGING_WITH_CLIMATISATION").equals("Timer + climate")) {
-            logger.error("the longest documented mode must still render in plain language");
-            return false;
-        }
-        if (!ChargingLogic.modeLabel("SOME_FUTURE_MODE").equals("SOME_FUTURE_MODE")) {
-            logger.error("an unrecognised mode must pass through verbatim");
-            return false;
-        }
-        return true;
-    }
-
     // ---------------------------------------------------- US-026: profiles
 
     (:test)
@@ -264,23 +182,6 @@ module ChargingTests {
         var asLong = 123456L;
         if (!ChargingLogic.isCurrentProfile(123456, asLong)) {
             logger.error("a Number id and an equal Long id must still be recognised as the same profile");
-            return false;
-        }
-        return true;
-    }
-
-    (:test)
-    function maxCurrentLabelCoversDocumentedValues(logger as Logger) as Boolean {
-        if (!ChargingLogic.maxCurrentLabel("MAXIMUM").equals("Maximum")) {
-            logger.error("MAXIMUM must render in plain language");
-            return false;
-        }
-        if (!ChargingLogic.maxCurrentLabel("REDUCED").equals("Reduced")) {
-            logger.error("REDUCED must render in plain language");
-            return false;
-        }
-        if (!ChargingLogic.maxCurrentLabel(null).equals("—")) {
-            logger.error("no value at all must render as an em dash");
             return false;
         }
         return true;

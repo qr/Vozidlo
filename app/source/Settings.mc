@@ -25,14 +25,22 @@ module Settings {
         var unit = Properties.getValue("TemperatureUnit") as Number?;
         var spin = Properties.getValue("Spin") as String?;
         var targetTemperature = Properties.getValue("TargetTemperature") as Number?;
+        var checkAfterCommand = Properties.getValue("CheckAfterCommand") as Boolean?;
 
         return new Config(
             apiKey != null ? apiKey : "",
             vin != null ? vin : "",
             resolveTemperatureUnit(unit),
             spin != null ? spin : "",
-            targetTemperature
+            targetTemperature,
+            resolveCheckAfterCommand(checkAfterCommand)
         );
+    }
+
+    // On unless the user switched it off: a watch that has not synced the
+    // new property yet (null) checks, as the default in properties.xml does.
+    function resolveCheckAfterCommand(value as Boolean?) as Boolean {
+        return value != false;
     }
 
     // US-018: 0 is the "never set" sentinel (see properties.xml). 0 degrees,
@@ -80,8 +88,11 @@ module Settings {
         // reported (see Cache's "airConditioning" section), never to a
         // number this module invented.
         public var targetTemperature as Number?;
+        // Read the car once, 15 s after a command (CommandCheck).
+        public var checkAfterCommand as Boolean;
 
-        function initialize(key as String, vinValue as String, unit as String, spinValue as String, targetTemperatureValue as Number?) {
+        function initialize(key as String, vinValue as String, unit as String, spinValue as String,
+                            targetTemperatureValue as Number?, checkAfterCommandValue as Boolean) {
             apiKey = key;
             vin = vinValue;
             vinValid = Settings.isVinValid(vinValue);
@@ -91,6 +102,7 @@ module Settings {
             // S-PIN is set: hasSpin is what tasks 6/7 will branch on.
             hasSpin = spinValue.length() > 0;
             targetTemperature = Settings.isTargetTemperatureSet(targetTemperatureValue) ? targetTemperatureValue : null;
+            checkAfterCommand = checkAfterCommandValue;
         }
 
     }

@@ -218,4 +218,17 @@ module EndpointTests {
         return true;
     }
 
+    // A bodiless command still carries a body: `{}`, not null. Garmin
+    // Connect on Android drops a JSON POST without one (code 0, nothing
+    // sent), so stop climate and both charging commands never left the phone.
+    (:test)
+    function aBodilessCommandSendsAnEmptyJsonObject(logger as Logger) as Boolean {
+        var body = ApiClient.noBody();
+        if (body == null || !(body instanceof Dictionary) || body.size() != 0) {
+            logger.error("noBody() must be an empty dictionary");
+            return false;
+        }
+        return true;
+    }
+
 }

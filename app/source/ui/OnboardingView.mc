@@ -28,37 +28,41 @@ class OnboardingView extends WatchUi.View {
     // construction: nothing here re-fires the request without a select
     // press reaching retry() below.
     private var _transientError as String?;
+    // A validation request is on its way. onShow() fires again whenever
+    // something pushed on top (the action menu, the clear confirmation)
+    // pops, and a second request would spend quota for the same answer.
+    private var _inFlight as Boolean = false;
+    private var _screen as OnboardingText;
 
     function initialize(validating as Boolean) {
         View.initialize();
         _validating = validating;
         _transientError = null;
+        _screen = new OnboardingText();
     }
 
     // No setLayout() here. These messages are whole sentences, and
     // WatchUi.Text does not wrap: :width bounds justification, not layout,
     // so the string was drawn as one line running off both edges of the
-    // round face. ui/TextBlock.mc wraps it to the width actually available
-    // at each line's height instead. Nothing is loaded here that onUpdate()
-    // would otherwise reload, so the best-practices rule about keeping
-    // resource loading out of onUpdate() is not in play: the only per-frame
-    // work is arithmetic over a string we already hold.
+    // round face. OnboardingText wraps it to the chord at each line's height.
     function onLayout(dc as Dc) as Void {
     }
 
+    // The text is loaded here and on every state change, never in onUpdate()
+    // (A22, docs/best-practices "Never load resources inside onUpdate()").
     // The validating request is fired from onShow(), not onLayout() or the
-    // constructor: it is I/O, not resource loading, and must only happen
-    // once this screen is actually the one on top.
+    // constructor: it is I/O and must only happen once this screen is
+    // actually the one on top.
     function onShow() as Void {
-        if (_validating && _transientError == null) {
+        Theme.refresh();
+        _refreshText();
+        if (Onboarding.shouldValidate(_validating, _transientError != null, _inFlight)) {
             _startValidation();
         }
     }
 
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
-        dc.clear();
-        TextBlock.draw(dc, _bodyText(), Graphics.FONT_XTINY, Graphics.COLOR_WHITE);
+        _screen.draw(dc);
     }
 
     // A manual retry only: called by OnboardingDelegate's onSelect() while
@@ -86,19 +90,19 @@ class OnboardingView extends WatchUi.View {
         return _transientError != null;
     }
 
-    function _bodyText() as String {
-        if (_transientError != null) {
-            return _transientError as String;
-        }
-        if (_validating) {
-            return WatchUi.loadResource(Rez.Strings.OnboardingCheckingMessage) as String;
-        }
-        return WatchUi.loadResource(Rez.Strings.OnboardingGuidanceMessage) as String;
-    }
-
-    // onUpdate() reads _bodyText() directly, so changing the state is the
-    // whole of "refresh the text"; this only has to ask for a redraw.
+    // Text and bezel glyph for the current state, loaded once per state
+    // change (A22). The menu glyph at UP replaces the old "Menu for more."
+    // wherever MENU is the way on (guidance, a failed check); the check in
+    // progress shows none, as in the PoC (NO.text "check").
     function _refreshText() as Void {
+        var error = _transientError;
+        if (error != null) {
+            _screen.set(error, :menu);
+        } else if (_validating) {
+            _screen.set(WatchUi.loadResource(Rez.Strings.OnboardingCheckingMessage) as String, null);
+        } else {
+            _screen.set(WatchUi.loadResource(Rez.Strings.OnboardingGuidanceMessage) as String, :menu);
+        }
         WatchUi.requestUpdate();
     }
 
@@ -116,6 +120,7 @@ class OnboardingView extends WatchUi.View {
             return;
         }
         var settings = getApp().getSettings();
+        _inFlight = true;
         // include=status: this call exists to validate the key/VIN pair,
         // not to fetch a screen's worth of data: same quota cost either
         // way (see mock/README.md), less to receive and discard.
@@ -123,6 +128,7 @@ class OnboardingView extends WatchUi.View {
     }
 
     function _onValidationResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null) as Void {
+        _inFlight = false;
         var settings = getApp().getSettings();
 
         if (responseCode >= 200 && responseCode < 300) {
@@ -130,8 +136,7 @@ class OnboardingView extends WatchUi.View {
             // set: the first successful request, exactly as the story
             // asks for.
             KeyLifetime.recordSuccess(settings.apiKey);
-            var controls = new ControlsView();
-            WatchUi.switchToView(controls, new ControlsDelegate(controls), WatchUi.SLIDE_IMMEDIATE);
+            HomeScreen.switchTo();
             return;
         }
 
@@ -149,6 +154,140 @@ class OnboardingView extends WatchUi.View {
         var message = ProblemDetail.describe(responseCode, body, null);
         _transientError = message.text;
         _refreshText();
+    }
+
+}
+
+// C7 text layout, pure (takes the measuring callback, like TextBlock), so the
+// fit is tested without a Dc. Wraps on the chord at each line's height with
+// an extra margin when a bezel glyph is shown, so no line runs into it; the
+// larger font only while the text fits in four lines.
+module OnboardingLayout {
+
+    // Ui.usable() measures on the 260 px round face all six targets share.
+    const CENTER = 130;
+    // Theme.RING_MARGIN without glyphs; 26 keeps lines clear of a glyph at
+    // r 108 (Bezel.GLYPH_R) next to UP or START (PoC NO.text).
+    const MARGIN = 12;
+    const GLYPH_MARGIN = 26;
+    const MAX_SMALL_LINES = 4;
+
+    // Top y of a block of `slots` lines centred on the face.
+    function top(slots as Number, lineHeight as Number) as Number {
+        return CENTER - (slots * lineHeight) / 2;
+    }
+
+    function widths(slots as Number, lineHeight as Number, margin as Number) as Array<Number> {
+        var out = [] as Array<Number>;
+        var t = top(slots, lineHeight);
+        for (var i = 0; i < slots; i += 1) {
+            out.add(Ui.usable(t + i * lineHeight, t + (i + 1) * lineHeight, margin));
+        }
+        return out;
+    }
+
+    // Line count and per-line widths depend on each other (a taller block
+    // narrows its outer lines), so iterate to a fixed point. Returns the lines
+    // and the slot count they were wrapped for: when the last pass came out a
+    // line short, the lines keep the slots they were measured in rather than
+    // being re-centred into slots they were never checked against. Stops
+    // growing past maxLines: slots beyond the face have no chord, and the
+    // caller rejects such a layout anyway.
+    function wrap(text as String, lineHeight as Number, margin as Number, maxLines as Number,
+                  measure as Method(s as String) as Number) as [Array<String>, Number] {
+        var count = 1;
+        var lines = [] as Array<String>;
+        for (var pass = 0; pass < 8; pass += 1) {
+            lines = TextBlock.wrapLines(text, widths(count, lineHeight, margin), measure);
+            if (lines.size() <= count) {
+                break;
+            }
+            count = lines.size();
+            if (count > maxLines) {
+                break;
+            }
+        }
+        if (lines.size() == 0) {
+            count = 0;
+        }
+        return [lines, count];
+    }
+
+    // C7: FONT_SMALL when the text fits in four lines, else FONT_XTINY.
+    function useSmall(smallLineCount as Number) as Boolean {
+        return smallLineCount <= MAX_SMALL_LINES;
+    }
+
+    // The layout a screen draws: [lines, slots, small?]. Small first, xtiny
+    // when small needs more than four lines.
+    function choose(text as String, margin as Number,
+                    smallHeight as Number, smallMeasure as Method(s as String) as Number,
+                    xtinyHeight as Number, xtinyMeasure as Method(s as String) as Number)
+                    as [Array<String>, Number, Boolean] {
+        var small = wrap(text, smallHeight, margin, MAX_SMALL_LINES, smallMeasure);
+        if (useSmall(small[0].size())) {
+            return [small[0], small[1], true];
+        }
+        var xtiny = wrap(text, xtinyHeight, margin, (2 * CENTER) / xtinyHeight, xtinyMeasure);
+        return [xtiny[0], xtiny[1], false];
+    }
+
+}
+
+// The drawing half every onboarding screen shares: black canvas, the wrapped
+// text centred, and at most one bezel glyph (menu at UP, or a check with the
+// accent arc at START). Holds the text it was given and caches the layout
+// until the text changes, so onUpdate() only measures once per text.
+class OnboardingText {
+
+    private var _text as String = "";
+    private var _glyph as Symbol? = null;
+    private var _lines as Array<String>? = null;
+    private var _slots as Number = 0;
+    private var _font as Graphics.FontType = Graphics.FONT_SMALL;
+
+    function initialize() {
+    }
+
+    // glyph: :menu (hold UP opens the onboarding menu), :check (START
+    // continues), or null.
+    function set(text as String, glyph as Symbol?) as Void {
+        if (!text.equals(_text) || glyph != _glyph) {
+            _text = text;
+            _glyph = glyph;
+            _lines = null;
+        }
+    }
+
+    function draw(dc as Dc) as Void {
+        dc.setColor(Theme.TEXT_1, Theme.BG);
+        dc.clear();
+        var lines = _lines;
+        if (lines == null) {
+            lines = _layout(dc);
+        }
+        var lh = dc.getFontHeight(_font);
+        var y = OnboardingLayout.top(_slots, lh);
+        dc.setColor(Theme.c(Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
+        for (var i = 0; i < lines.size(); i += 1) {
+            dc.drawText(dc.getWidth() / 2, y + i * lh, _font, lines[i] as String, Graphics.TEXT_JUSTIFY_CENTER);
+        }
+        if (_glyph == :menu) {
+            Bezel.glyph(dc, Bezel.BTN_UP, :menu, Theme.TEXT_1, null);
+        } else if (_glyph == :check) {
+            Bezel.glyph(dc, Bezel.BTN_START, :check, Theme.ACCENT, :accent);
+        }
+    }
+
+    function _layout(dc as Dc) as Array<String> {
+        var margin = _glyph != null ? OnboardingLayout.GLYPH_MARGIN : OnboardingLayout.MARGIN;
+        var result = OnboardingLayout.choose(_text, margin,
+            dc.getFontHeight(Graphics.FONT_SMALL), Ui.measurer(dc, Graphics.FONT_SMALL),
+            dc.getFontHeight(Graphics.FONT_XTINY), Ui.measurer(dc, Graphics.FONT_XTINY));
+        _font = result[2] ? Graphics.FONT_SMALL : Graphics.FONT_XTINY;
+        _lines = result[0];
+        _slots = result[1];
+        return result[0];
     }
 
 }

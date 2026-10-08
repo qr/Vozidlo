@@ -6,25 +6,30 @@ import Toybox.WatchUi;
 // is estimated (never asserted as fact) to be close to expiring. Unlike
 // OnboardingBlockedView, dismissing this always proceeds into the app:
 // "non-blocking" means exactly that, not merely "not an error screen".
+// START continues: a check glyph with the accent arc at START replaces the
+// old "Select to continue." (C7).
 class OnboardingExpiryNoticeView extends WatchUi.View {
+
+    private var _screen as OnboardingText;
 
     function initialize() {
         View.initialize();
+        _screen = new OnboardingText();
     }
 
     function onLayout(dc as Dc) as Void {
     }
 
-    // Wrapped by ui/TextBlock.mc rather than laid out with WatchUi.Text,
-    // which does not wrap, see that file's header. Note the resource is
-    // loaded here, not referenced as a Rez symbol: the old code passed
-    // Rez.Strings.OnboardingExpiryNoticeMessage straight into a drawable,
-    // which resolves at layout time, but TextBlock.draw() takes a String.
+    // The string is loaded here, not in onUpdate() (A22, docs/best-practices
+    // "Never load resources inside onUpdate()"); OnboardingText keeps the
+    // wrapped layout until the text changes.
+    function onShow() as Void {
+        Theme.refresh();
+        _screen.set(WatchUi.loadResource(Rez.Strings.OnboardingExpiryNoticeMessage) as String, :check);
+    }
+
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
-        dc.clear();
-        var text = WatchUi.loadResource(Rez.Strings.OnboardingExpiryNoticeMessage) as String;
-        TextBlock.draw(dc, text, Graphics.FONT_XTINY, Graphics.COLOR_WHITE);
+        _screen.draw(dc);
     }
 
 }
