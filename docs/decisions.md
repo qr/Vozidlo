@@ -76,13 +76,35 @@ command was sent, and a separate, quota-costing read is the only way to learn
 whether anything happened. Claiming success would be a lie about a car the user
 cannot see.
 
-### Never poll. Not once, not in the background.
+So "Climate on" is only ever said from the car's own report, read after the
+command: see the next entry.
+
+### One check after a command.
+
+Since 1.2.0, 15 seconds after a `202` the app reads the one section the
+command touches, once (`ui/CommandCheck.mc`). It says what the car reported:
+"Climate on" when the car's report, timestamped after the command, shows the
+change; "Car reports: Off" in amber when it shows something else; "the car has
+not reported yet" in grey when nothing newer came back. It is never red: a car
+that has not answered yet has not failed.
+
+- **15 s.** Measured on 2026-10-08: the car reported a new climate state 8 s
+  after stop and 12 s after start.
+- **One read, no retry.** A command costs 2 of the 20 requests per hour with
+  the check, 1 without. Refresh on Status is the second look, on request.
+- **The user's choice.** The setting "Check the car after a command" is on by
+  default and can be switched off on the phone. The check is skipped when the
+  phone is not connected or the quota is spent or nearly spent.
+
+### Never poll. Not in the background.
 
 20 requests per hour per vehicle, shared with everything else the owner runs
 against the same car: Home Assistant, the official app, this. A background
 refresh would spend somebody else's budget. Every request in this app is caused
-by a user action, and `api/Quota.mc` counts them locally because Connect IQ
-exposes no response headers, so `RateLimit-*` is unreadable from a watch app.
+by a user action: a refresh, a command, or the one check that follows a
+command the user just sent (above), which the user can switch off.
+`api/Quota.mc` tracks what it can locally, because Connect IQ exposes no
+response headers, so `RateLimit-*` is unreadable from a watch app.
 
 ### Data is not live, and every section ages separately.
 
@@ -165,18 +187,22 @@ fine:
   side of centre, so it needs a chord of at least 190: `dy <= 88`, tiles only
   between y 42 and 218. That is three rows at a 52 pitch, and seven tiles need
   four. The fourth row sat where the chord is 78 pixels wide and the "More" tile
-  was drawn under the rim. Hence `ui/GridScroll.mc` and a grid that scrolls to
-  keep the focused tile whole.
+  was drawn under the rim. Hence `ui/GridScroll.mc` and a grid that scrolled to
+  keep the focused tile whole, both gone in 1.1.0 with the grid itself (see
+  [Night Panel navigation](#night-panel-navigation)).
 - **Bottom hints.** A single line at `height - 20` had about 84 pixels for text
   needing 150, on four separate screens. Hence
   `TextBlock.drawFittedLine()`, which moves a line up to the lowest point where
-  it fits rather than truncating something the user is meant to read.
+  it fits rather than truncating something the user is meant to read. Since
+  1.1.0 there are no text hints at all; the bezel carries arcs and glyphs.
 - **Paragraphs**, which is `WatchUi.Text` not wrapping, above.
 
 So the rule: **any text or box placed at a constant y must have its width
 checked against the chord at that y.** The arithmetic already exists and is
 tested. Use it rather than guessing a margin: `halfChord()`, `lineWidth()` and
-`fittedLineY()` in `ui/TextBlock.mc`, and `offsetFor()` in `ui/GridScroll.mc`.
+`fittedLineY()` in `ui/TextBlock.mc`, and `fit()`, `usable()` and `wrapFit()`
+in `ui/Ui.mc`, which measure with the fonts the watch actually has (fēnix 8
+and 9 scale them).
 
 A corollary worth stating, because it caught us twice: a screen that looks
 correct in the simulator has not been checked. The simulator draws a generous
@@ -193,6 +219,45 @@ estimate, rather than the exact date the header carries.
 
 Which is why the cache is a projection. Worth knowing before designing anything
 that persists.
+
+---
+
+## Interface
+
+### Night Panel navigation.
+
+Version 1.0 put every action on a fixed 260×260 tile grid, three rows visible,
+with UP and DOWN meant to page to charging and status through
+`onPreviousPage`/`onNextPage`. On the watch (checked 2026-10-07) UP and DOWN
+moved the tile focus instead, so those pages never opened, and charging detail,
+reachable only that way, had become unreachable with buttons. 1.1.0 replaces
+the grid, decided per the options in
+[ui-improvements.md](design/ui-improvements.md):
+
+- **Home is a list with a hero (D1).** A `CustomMenu` whose title area shows
+  state of charge, chips and one status line; every action is a row, so UP
+  and DOWN do what the system list does and the focus stays where it was left.
+- **Charging detail is a separate screen (D2)**, reached from a Charging row
+  on home. **This shipped** in 1.1.0 with a shortcut as well: UP past the
+  first row opened Charging and DOWN past the last opened Status. On the
+  watch that read as a screen opening by itself while scrolling, so since
+  1.1.1 the list wraps at both ends like Garmin's own menus and nothing opens
+  that the user did not choose.
+- **START on status opens an action list (D4)**: refresh and charging details,
+  instead of a hidden press.
+- **Status uses our own page dots (D7)**, drawn in the bezel like the rest,
+  rather than the system pager. `StatusPager` swaps in a fresh page view per
+  page with `WatchUi.switchToView` and a slide (next page up, previous page
+  down), so the page stack stays one deep and BACK returns home. One view
+  that only redraws its page is the fallback, behind the constant
+  `StatusPager.SWITCH_VIEWS`, should switching views misbehave on a watch.
+- **All menus are `CustomMenu`s in the accent.** `Menu2` cannot be recoloured
+  on these watches, so a native menu would have drawn the system colour next
+  to our green. Only confirmations and toasts stay native.
+- **Stale data is amber**, `! 17 h ago`, not red. This amends US-009: red is
+  kept for errors, so an old reading no longer looks like a failure.
+
+The round-display chord rule above applies to all of it.
 
 ---
 
@@ -215,12 +280,13 @@ run.
 
 ### One device family, so one set of layouts.
 
-Every supported device is `round-260x260`. `ui/ControlsView.mc` therefore holds
-a fixed grid as plain constants rather than computing geometry at layout time.
-Supporting a 240×240 or 280×280 device means making that adapt: real work, but
-bounded and welcome. Supporting a Venu additionally means an input redesign:
-those have two or three buttons and no UP/DOWN, and five views here depend on
-`onPreviousPage`/`onNextPage`.
+Every supported device is `round-260x260`. Text geometry already follows the
+chord and the font metrics measured at runtime, but the bezel (`ui/Bezel.mc`:
+ring, glyphs, page dots) and a few page coordinates from the design PoC are
+plain constants for 260×260. Supporting a 240×240 or 280×280 device means
+making those adapt: real work, but bounded and welcome. Supporting a Venu
+additionally means an input redesign: those have two or three buttons and no
+UP/DOWN, and three views here depend on `onPreviousPage`/`onNextPage`.
 
 ---
 
@@ -275,9 +341,14 @@ EUTMR art. 14. The Court of Justice's *Audi* ruling found that reproducing the
 *logo shape* creates a false impression of authorisation, which is a different
 act.
 
-Hence: an original icon, no Škoda brand green, no Škoda typeface, the name used
-as a plain word, and the disclaimer carried verbatim. If you fork and publish,
-this constraint travels with you.
+Hence: an original icon, no Škoda typeface, the name used as a plain word, and
+the disclaimer carried verbatim. If you fork and publish, this constraint
+travels with you.
+
+The colour is the owner's decision of 2026-10-07: Škoda Electric Green
+(`#78FAAE` on skoda-auto.com, `0x55FFAA` on the 64-colour panel) is the app's
+single accent colour. The logo, the Škoda typeface and the plain-word name rule
+above are unchanged.
 
 ### Colour is never the only signal.
 

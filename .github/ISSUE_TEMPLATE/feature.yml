@@ -18,8 +18,9 @@ body:
           fire-and-forget; only a separate, quota-costing read can tell you
         - **A watch face**: deliberately out of scope; the app publishes
           complications so you can use the face you already have
-        - **The Škoda logo or brand colours**: no trademark licence exists for
-          third-party developers
+        - **The Škoda logo or typeface**: no trademark licence exists for
+          third-party developers; the one accent colour, Škoda Electric
+          Green, is already decided
 
   - type: textarea
     id: problem

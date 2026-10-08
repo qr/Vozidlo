@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Vozidlo screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Roboto:wght@700&family=Roboto+Condensed:wght@700&display=swap">
+<style>
+/* Layout: a design-review board. Toolbar and findings on top, then one section per
+   app area, each a wrap-grid of watch renders with button map + notes under them. */
+:root {
+  --bg: #eceae6;          /* brushed-titanium paper */
+  --surface: #f7f6f3;
+  --ink: #1d1f22;
+  --ink-2: #565a60;
+  --rule: #d3d0ca;
+  --accent: #0077b6;      /* the app's own tile-highlight blue, darkened for paper */
+  --flag: #b45309;        /* design finding */
+  --flag-bg: #fbecd9;
+  --chip: #e2dfd9;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+    --accent: #3db8ff; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+  --accent: #3db8ff; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+header h1 { font: 700 2.4rem/1.05 var(--font-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+header .meta { font: 500 .8rem/1.4 var(--font-mono); color: var(--ink-2); margin-top: .5rem; }
+header p { max-width: 70ch; margin: .9rem 0 0; color: var(--ink-2); }
+.toolbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; margin-top: 1.25rem; padding: .6rem 0;
+  background: var(--bg); border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; }
+.toolbar .grp { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
+.toolbar .lbl { font: 600 .72rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-right: .25rem; }
+.toolbar button, .toolbar label { font: 500 .85rem/1 var(--font-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; padding: .45rem .65rem; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center; }
+.toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.toolbar input { accent-color: var(--accent); margin: 0; }
+.toolbar nav { display: flex; gap: .25rem .9rem; flex-wrap: wrap; margin-left: auto; }
+.toolbar nav a { color: var(--ink-2); text-decoration: none; font: 600 .8rem/1.6 var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
+.toolbar nav a:hover { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.findings { margin-top: 1.75rem; border: 1px solid var(--rule); border-left: 4px solid var(--flag); background: var(--surface); border-radius: 4px; padding: 1rem 1.25rem; }
+.findings h2 { font: 700 1.1rem/1.2 var(--font-display); margin: 0 0 .5rem; letter-spacing: .02em; }
+.findings ol { margin: 0; padding-left: 1.2rem; display: grid; gap: .45rem; max-width: 95ch; }
+.findings li::marker { color: var(--flag); font-weight: 600; }
+.findings a { color: var(--accent); }
+code { font: .85em var(--font-mono); background: var(--chip); padding: .05em .3em; border-radius: 3px; }
+
+.flow { margin-top: 1.75rem; }
+.flow details { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: .75rem 1rem; }
+.flow summary { cursor: pointer; font: 700 1.1rem/1.2 var(--font-display); letter-spacing: .02em; }
+.flow .mermaid-box { overflow-x: auto; margin-top: .75rem; }
+
+section.area { margin-top: 2.75rem; }
+section.area > h2 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
+section.area > h2 small { font: 500 .78rem/1 var(--font-mono); color: var(--ink-2); }
+section.area > p { color: var(--ink-2); margin: .4rem 0 0; max-width: 80ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-w, 340px)), 1fr)); gap: 1.75rem 1.5rem; margin-top: 1.25rem; align-items: start; }
+.card { min-width: 0; display: flex; flex-direction: column; gap: .6rem; scroll-margin-top: 70px; }
+.card .stage { display: flex; justify-content: center; }
+.card h3 { font: 700 1.05rem/1.2 var(--font-display); margin: 0; letter-spacing: .01em; display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.card h3 a { color: inherit; text-decoration: none; }
+.tag { font: 600 .66rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .28rem .45rem; border-radius: 3px; background: var(--chip); color: var(--ink-2); }
+.tag.mock { color: var(--accent); }
+.tag.sys { font-style: italic; }
+.tag.ex { color: var(--flag); }
+.src { font: .74rem/1.3 var(--font-mono); color: var(--ink-2); word-break: break-all; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: .15rem .7rem; font-size: .86rem; margin: 0; }
+.keys dt { font: 600 .7rem/1.7 var(--font-mono); color: var(--ink-2); }
+.keys dd { margin: 0; }
+.notes { margin: 0; padding-left: 1.05rem; font-size: .88rem; color: var(--ink); display: grid; gap: .25rem; }
+.notes li.flag { color: var(--flag); }
+.notes li.flag::marker { content: "▲ "; font-size: .7em; }
+
+/* the watch */
+.watch { position: relative; flex: none; }
+.watch svg.bezel { position: absolute; inset: 0; width: 100%; height: 100%; }
+.watch canvas { position: absolute; border-radius: 50%; image-rendering: pixelated; background: #000; }
+.watch.flat canvas { position: static; display: block; }
+@media (prefers-reduced-motion: no-preference) { .watch canvas { transition: width .15s, height .15s; } }
+footer { margin-top: 3rem; color: var(--ink-2); font-size: .85rem; border-top: 1px solid var(--rule); padding-top: 1rem; max-width: 90ch; }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Vozidlo screens</h1>
+  <div class="meta">fēnix 7 Pro · 260 × 260 round MIP · 64 colours · redrawn from app/source/ui at 3c4d005 · 2026-10-07</div>
+  <p>Every app screen, redrawn from its <code>onUpdate()</code> code: same coordinates, colours and the watch's own font widths (read from the fēnix 7 Pro font files in the Connect IQ SDK). Values come from the mock vehicle in <code>mock/vehicle_data.py</code> unless a card says <em>example</em>. Garmin's own UI (menus, confirmations, toasts, the map, the glance list) is drawn as a close approximation; the app does not control how those look.</p>
+</header>
+
+<div class="toolbar" role="toolbar" aria-label="View options">
+  <div class="grp"><span class="lbl">Scale</span>
+    <button type="button" data-scale="1" id="sc1">1×</button>
+    <button type="button" data-scale="1.5" id="sc15">1.5×</button>
+    <button type="button" data-scale="2" id="sc2">2×</button>
+  </div>
+  <div class="grp"><span class="lbl">Show</span>
+    <label for="optBezel"><input type="checkbox" id="optBezel" checked> Bezel</label>
+    <label for="optGaps"><input type="checkbox" id="optGaps"> Font gaps</label>
+    <label for="optGuides"><input type="checkbox" id="optGuides"> Guides</label>
+  </div>
+  <nav aria-label="Sections">
+    <a href="#entry">Entry</a><a href="#home">Home</a><a href="#status">Status</a><a href="#charging">Charging</a><a href="#findcar">Find my car</a><a href="#settings">Settings</a><a href="#onboarding">Onboarding</a>
+  </nav>
+</div>
+
+<div class="findings" id="findings">
+  <h2>Starting points for the design session</h2>
+  <ol>
+    <li><strong>The big number font has no letters.</strong> On the fēnix 7 Pro, <code>FONT_NUMBER_MEDIUM</code> only holds digits, space and <code># % + - . / : °</code>. The Status pages (<em>LOCKED</em>, <em>OFF</em>, the <em>km</em> unit, the <em>—</em> placeholder), the Find my car distance unit and the <em>°C</em> of the target temperature all use it. Switch on <em>Font gaps</em> to see which characters fall outside the font. What the watch draws for them needs a check on the device. <a href="#st-lock">Status</a> · <a href="#fc-parked">Find my car</a> · <a href="#set-temp">Target temp</a></li>
+    <li><strong>Hint lines run off the round edge.</strong> Bottom hints drawn with plain <code>drawText</code> at <code>y = height − 20/22</code> only have about 55 px of visible width there. <a href="#st-lock">Status</a>, <a href="#ch-detail">Charging</a> and <a href="#fc-parked">Find my car</a> lose most of their hint.</li>
+    <li><strong>The home screen's hint is pushed up into the grid.</strong> <code>TextBlock.drawFittedLine</code> moves "UP charging - DOWN status" up until it fits the circle, which lands it at y ≈ 208, on the scroll arrow and the partly visible fourth tile row. It is the same dark grey as the tiles, so where it crosses one it disappears. <a href="#home-mock">Home</a></li>
+    <li><strong>The status strip on top of home is too wide for the circle</strong> and shows the raw enum (<em>READY_FOR_CHARGING</em>). <a href="#home-mock">Home</a> · <a href="#glance-data">Glance</a></li>
+    <li><strong>Scrolling the tile grid draws over the strip.</strong> The grid does not clip, so a scrolled row sits on top of the battery/lock strip and a fourth row peeks out at the bottom. <a href="#home-scrolled">Home, scrolled</a></li>
+    <li><strong>The map has no route to navigation.</strong> MENU on the map does nothing; "Navigate to car" lives on the bearing screen only (see research note of today). <a href="#fc-map">Map</a></li>
+  </ol>
+</div>
+
+<div class="flow">
+  <details>
+    <summary>Navigation map</summary>
+    <div class="mermaid-box">
+<pre class="mermaid">
+flowchart LR
+  G[Glance] -->|START| H
+  L[Launch] --> GATE{Configured and key OK?}
+  GATE -->|no key or VIN| OB[Onboarding guidance]
+  GATE -->|key never validated| OC[Checking key]
+  GATE -->|key near expiry| OE[Expiry notice]
+  GATE -->|yes| H[Home: control tiles]
+  OB -->|MENU| OM[Onboarding menu]
+  H -.->|swipe down, not confirmed| CD[Charging detail]
+  H -->|swipe up| SD[Status pages 1..5]
+  H -->|UP/DOWN| H
+  H -->|START on tile| CF{Confirm?}
+  CF -->|stop charging, aux heat, low quota| CONF[Confirmation] --> T[Toast + status line]
+  CF -->|otherwise| T
+  H -->|More tile| MM[More menu]
+  H -->|Find my car tile| FC[Find my car]
+  H -->|Status tile| SD
+  H -->|Settings tile| TO[Tile order menu] --> TD[Move up / down / hide]
+  CD -->|MENU| CM[Charging menu]
+  CM --> CL[Charge limit]
+  CM --> CMo[Charge mode]
+  CM --> CP[Charging profiles]
+  FC -->|START| MAP[Map preview]
+  FC -->|MENU| FM[Find my car menu] -->|Navigate to car| NC[Confirm, exit to native nav]
+  SYS[Garmin app settings] --> TT[Target temperature]
+</pre>
+    </div>
+  </details>
+</div>
+
+<main id="board"></main>
+
+<footer>
+  Drawn in the browser from a JavaScript port of each view's <code>onUpdate()</code>. Letter shapes use Roboto / Roboto Condensed at the size where their digits match the watch font; every character is placed on the watch font's own advance width, so line lengths, wrapping and clipping match the device. Guides show the 8 px round-margin that <code>TextBlock</code> keeps and the 52 px tile rows.
+</footer>
+</div>
+
+<script>
+// ---------------------------------------------------------------- watch font metrics
+// Advance widths, line height and ascent per Connect IQ font, read from the fēnix 7 Pro
+// "ww" font set: xtiny=CDPG_ROBOTO_13B, tiny=18B, small=20B, medium=24B,
+// numMed=BIONIC_COND_BOLD_NUMBER_36.
+const FM = {"xtiny":{"h":19,"asc":15,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[4,4,5,8,8,10,9,3,5,5,7,8,4,6,5,5,8,8,8,8,8,8,8,8,8,8,4,4,7,8,7,7,12,9,9,9,9,8,8,9,10,4,8,9,8,12,10,10,9,10,9,9,9,9,9,12,9,9,8,4,6,4,6,6,5,7,8,7,8,8,5,8,8,4,4,8,4,12,8,8,8,8,5,7,5,8,7,10,7,7,7,5,4,5,9,6,10,11,9,5]},"tiny":{"h":29,"asc":23,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[5,6,7,12,12,15,14,4,8,8,11,11,6,9,7,8,12,12,12,12,12,12,12,12,12,12,6,6,10,12,11,10,18,14,13,13,13,11,11,14,14,6,11,13,11,18,14,14,13,14,13,13,13,13,14,18,13,13,12,6,9,6,9,9,8,11,12,11,12,11,8,12,12,6,6,11,6,17,12,12,12,12,8,11,7,12,11,15,11,10,11,7,6,7,13,9,15,16,13,7]},"small":{"h":32,"asc":25,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[6,7,8,13,13,17,15,4,8,8,12,12,6,9,8,9,13,13,13,13,13,13,13,13,13,13,7,7,12,13,12,12,20,16,15,15,15,13,12,15,16,7,13,14,12,20,16,16,15,16,14,14,14,15,15,20,15,14,14,7,10,7,10,10,9,12,13,12,13,12,9,13,13,7,6,12,7,19,13,13,13,13,9,12,8,13,12,17,12,12,12,8,7,8,15,10,17,17,14,7]},"medium":{"h":37,"asc":30,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[7,8,10,16,15,20,18,5,10,10,14,15,8,11,9,10,15,15,15,15,15,15,15,15,15,15,8,8,14,15,14,14,23,18,17,17,17,15,15,18,19,8,15,17,15,23,19,18,17,18,17,17,17,17,18,23,17,17,16,8,12,8,12,12,10,14,15,14,15,15,10,15,15,8,8,15,8,23,15,15,15,15,10,14,9,15,14,19,14,14,14,9,8,9,17,12,20,20,17,9]},"numMed":{"h":74,"asc":54,"w":" #%+-./0123456789:°","a":[14,38,42,31,18,11,23,27,27,27,27,27,27,27,27,27,27,11,20]}};
+const FAMILY = { xtiny: "Roboto", tiny: "Roboto", small: "Roboto", medium: "Roboto", numMed: "'Roboto Condensed'" };
+for (const k in FM) { const m = FM[k]; m.adv = new Map(); [...m.w].forEach((ch, i) => m.adv.set(ch, m.a[i])); }
+
+// Connect IQ Graphics.COLOR_* values
+const COL = { WHITE: "#FFFFFF", LT_GRAY: "#AAAAAA", DK_GRAY: "#555555", BLACK: "#000000", RED: "#FF0000", DK_RED: "#AA0000",
+  ORANGE: "#FF5500", YELLOW: "#FFAA00", GREEN: "#00FF00", DK_GREEN: "#00AA00", BLUE: "#00AAFF", DK_BLUE: "#0000FF" };
+
+const OPT = { scale: 1, bezel: true, gaps: false, guides: false };
+try { const s = JSON.parse(localStorage.getItem("vozidlo-screens-opt") || "null"); if (s) Object.assign(OPT, s); } catch (e) {}
+
+let PX = {};  // calibrated CSS font size per watch font
+function calibrate() {
+  const c = document.createElement("canvas").getContext("2d");
+  for (const k in FM) {
+    c.font = `700 100px ${FAMILY[k]}, sans-serif`;
+    PX[k] = 100 * FM[k].adv.get("0") / c.measureText("0").width;
+  }
+}
+
+// ---------------------------------------------------------------- a tiny Dc
+const J = { CENTER: 1, LEFT: 2, RIGHT: 0, VCENTER: 4 };
+class Dc {
+  constructor(ctx, w, h) { this.c = ctx; this.w = w; this.h = h; this.fg = COL.WHITE; this.bg = COL.BLACK; this.pen = 1; }
+  getWidth() { return this.w; } getHeight() { return this.h; }
+  setColor(fg, bg) { this.fg = fg; if (bg && bg !== "T") this.bg = bg; }
+  setPenWidth(p) { this.pen = p; }
+  clear() { this.c.fillStyle = this.bg; this.c.fillRect(0, 0, this.w, this.h); }
+  fillRectangle(x, y, w, h) { this.c.fillStyle = this.fg; this.c.fillRect(x, y, w, h); }
+  fillRoundedRectangle(x, y, w, h, r) { const c = this.c; c.fillStyle = this.fg; c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); }
+  drawRoundedRectangle(x, y, w, h, r) { const c = this.c, p = this.pen; c.strokeStyle = this.fg; c.lineWidth = p; c.beginPath(); c.roundRect(x + p / 2, y + p / 2, w - p, h - p, r); c.stroke(); }
+  drawCircle(cx, cy, r) { const c = this.c; c.strokeStyle = this.fg; c.lineWidth = this.pen; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke(); }
+  fillCircle(cx, cy, r) { const c = this.c; c.fillStyle = this.fg; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill(); }
+  drawLine(x1, y1, x2, y2) { const c = this.c; c.strokeStyle = this.fg; c.lineWidth = this.pen; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
+  fillPolygon(pts) { const c = this.c; c.fillStyle = this.fg; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill(); }
+  getFontHeight(f) { return FM[f].h; }
+  charAdv(f, ch) { const a = FM[f].adv.get(ch); if (a !== undefined) return a; const c = this.c; c.font = `700 ${PX[f]}px ${FAMILY[f]}, sans-serif`; return Math.round(c.measureText(ch).width) || Math.round(FM[f].h * 0.35); }
+  getTextWidthInPixels(s, f) { let w = 0; for (const ch of s) w += this.charAdv(f, ch); return w; }
+  drawText(x, y, f, text, just = J.LEFT) {
+    const m = FM[f], c = this.c, lines = String(text).split("\n");
+    let top = (just & J.VCENTER) ? y - Math.floor(lines.length * m.h / 2) : y;
+    c.font = `700 ${PX[f]}px ${FAMILY[f]}, sans-serif`; c.textBaseline = "alphabetic";
+    for (const line of lines) {
+      const w = this.getTextWidthInPixels(line, f);
+      const hj = just & 3; let cx = hj === J.CENTER ? x - Math.floor(w / 2) : hj === J.LEFT ? x : x - w;
+      for (const ch of line) {
+        const adv = this.charAdv(f, ch), known = m.adv.has(ch);
+        if (!known && OPT.gaps) {
+          c.save(); c.strokeStyle = "#FF00FF"; c.lineWidth = 1.5; c.setLineDash([3, 2]);
+          c.strokeRect(cx + 1.5, top + m.asc * 0.35, adv - 3, m.asc * 0.65); c.restore();
+        } else {
+          c.fillStyle = this.fg; const gw = c.measureText(ch).width;
+          c.fillText(ch, cx + (adv - gw) / 2, top + m.asc);
+        }
+        cx += adv;
+      }
+      top += m.h;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- ports of shared helpers
+const R = 130;
+const TB = {
+  MARGIN: 8,
+  halfChord(r, dy) { const r2 = r * r, d2 = dy * dy; return d2 >= r2 ? 0 : Math.floor(Math.sqrt(r2 - d2)); },
+  lineWidth(r, cy, top, bottom) { const dy = Math.max(Math.abs(top - cy), Math.abs(bottom - cy)); const u = 2 * this.halfChord(r, dy) - 2 * this.MARGIN; return u > 0 ? u : 0; },
+  wrap(text, widths, measure) {
+    const lines = [], words = text.split(/\s+/).filter(Boolean); let cur = "";
+    const wf = i => widths.length === 0 ? 0 : widths[Math.min(i, widths.length - 1)];
+    for (const word of words) {
+      let limit = wf(lines.length); const cand = cur ? cur + " " + word : word;
+      if (measure(cand) <= limit) { cur = cand; continue; }
+      if (cur) { lines.push(cur); cur = ""; limit = wf(lines.length); }
+      if (measure(word) <= limit) { cur = word; continue; }
+      let rest = word;
+      while (measure(rest) > limit && rest.length > 1) { let n = 1; while (n < rest.length && measure(rest.slice(0, n + 1)) <= limit) n++; lines.push(rest.slice(0, n)); rest = rest.slice(n); limit = wf(lines.length); }
+      cur = rest;
+    }
+    if (cur) lines.push(cur); return lines;
+  },
+  // TextBlock.draw: wraps into the circle's chord widths, centred vertically
+  draw(dc, text, f, color) {
+    const lh = FM[f].h, cy = dc.getHeight() / 2, measure = s => dc.getTextWidthInPixels(s, f);
+    let lines = [], count = 1;
+    for (let pass = 0; pass < 6; pass++) {
+      const top = cy - Math.floor(count * lh / 2), widths = [];
+      for (let i = 0; i < count; i++) widths.push(this.lineWidth(R, cy, top + i * lh, top + i * lh + lh));
+      lines = this.wrap(text, widths, measure);
+      if (lines.length === count || lines.length === 0) break; count = lines.length;
+    }
+    const maxLines = Math.floor(dc.getHeight() / lh);
+    if (lines.length > maxLines) { lines = lines.slice(0, maxLines); lines[lines.length - 1] += "…"; }
+    dc.setColor(color); const top = cy - Math.floor(lines.length * lh / 2);
+    lines.forEach((l, i) => dc.drawText(130, top + i * lh, f, l, J.CENTER));
+  },
+  // TextBlock.drawFittedLine: moves the line up until it fits the circle
+  fitted(dc, text, f, color, preferredY) {
+    const lh = FM[f].h, half = Math.floor(lh / 2), cy = 130; let y = preferredY, found = cy;
+    const tw = dc.getTextWidthInPixels(text, f);
+    while (y > cy) { if (this.lineWidth(R, cy, y - half, y + half) >= tw) { found = y; break; } y -= 2; }
+    if (y <= cy) found = cy;
+    dc.setColor(color); dc.drawText(130, found, f, text, J.CENTER); return found;
+  }
+};
+
+const Icons = {
+  sw(r) { const w = Math.trunc(r / 4); return w < 2 ? 2 : w; },
+  draw(dc, s, cx, cy, r, color) {
+    const t = Math.trunc; dc.setColor(color); dc.setPenWidth(this.sw(r));
+    if (s === "locked" || s === "unlocked") {
+      const bw = t(r * 1.5), bh = t(r * 1.05), bx = t(cx - bw / 2), by = t(cy - r * 0.1), sw = t(r * 0.9), sh = t(r * 1.05);
+      const sx = s === "locked" ? t(cx - sw / 2) : t(bx - r * 0.05), sy = s === "locked" ? t(cy - r * 1.05) : t(cy - r * 1.35);
+      dc.drawRoundedRectangle(sx, sy, sw, sh, t(sw / 2)); dc.fillRoundedRectangle(bx, by, bw, bh, t(r * 0.25));
+    } else if (s === "open") {
+      const px = t(cx - r * 0.5); dc.drawLine(px, t(cy - r), px, t(cy + r));
+      dc.fillPolygon([[px, t(cy - r * 0.6)], [px, t(cy - r * 0.05)], [t(cx + r * 0.7), t(cy - r * 0.35)]]);
+    } else if (s === "charging") {
+      const k = r / 7; dc.fillPolygon([[1, -7], [-5, 1], [-0.5, 1], [-1.5, 7], [5, -1.5], [0.5, -1.5]].map(([a, b]) => [t(cx + a * k), t(cy + b * k)]));
+    } else if (s === "pluggedIn") {
+      dc.fillRoundedRectangle(t(cx - r * 0.5), t(cy - r * 0.1), t(r), t(r * 0.9), t(r * 0.2));
+      dc.fillRoundedRectangle(t(cx - r * 0.32), t(cy - r * 0.7), t(r * 0.18), t(r * 0.6), t(r * 0.06));
+      dc.fillRoundedRectangle(t(cx + r * 0.12), t(cy - r * 0.7), t(r * 0.18), t(r * 0.6), t(r * 0.06));
+    } else if (s === "climate") {
+      dc.drawLine(t(cx - r), cy, t(cx + r), cy); dc.drawLine(cx, t(cy - r), cx, t(cy + r));
+      dc.drawLine(t(cx - r * .7), t(cy - r * .7), t(cx + r * .7), t(cy + r * .7)); dc.drawLine(t(cx - r * .7), t(cy + r * .7), t(cx + r * .7), t(cy - r * .7));
+    } else { dc.drawCircle(cx, cy, r); dc.drawLine(t(cx - r * .5), cy, t(cx + r * .5), cy); }
+    dc.setPenWidth(1);
+  },
+  forLock(raw) { return raw == null ? "unknown" : raw === "YES" ? "locked" : raw === "NO" ? "unlocked" : (raw === "OPENED" || raw === "TRUNK_OPENED") ? "open" : "unknown"; },
+  forCharging(raw) { return raw === "CHARGING" ? "charging" : ["READY_FOR_CHARGING", "CONSERVING", "CHARGING_INTERRUPTED"].includes(raw) ? "pluggedIn" : null; },
+  forClimate(raw) { return ["HEATING", "COOLING", "VENTILATION", "HEATING_AUXILIARY"].includes(raw) ? "climate" : null; }
+};
+const DASH = "—";
+
+// ---------------------------------------------------------------- mock vehicle (mock/vehicle_data.py)
+const MOCK = { soc: 100, chargingState: "READY_FOR_CHARGING", lock: "YES", climate: "OFF",
+  address: "Testlaan 1, 1000 AA Teststad, Netherlands", odometer: 123456, range: 436 };
+const lockLabel = r => r == null ? DASH : r === "YES" ? "LOCKED" : r === "NO" ? "UNLOCKED" : r === "OPENED" ? "OPEN" : r === "TRUNK_OPENED" ? "TRUNK OPEN" : r;
+
+// ---------------------------------------------------------------- views
+function controls(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  const strip = o.strip || { soc: MOCK.soc + "%", charging: MOCK.chargingState, lockRaw: MOCK.lock, chargingRaw: MOCK.chargingState, climateRaw: MOCK.climate };
+  dc.setColor(COL.WHITE);
+  dc.drawText(130, 18, "xtiny", strip.soc + "  " + strip.charging + "  " + (strip.lockRaw == null ? DASH : lockLabel(strip.lockRaw)), J.CENTER);
+  Icons.draw(dc, Icons.forLock(strip.lockRaw), 130, 38, 9, COL.WHITE);
+  const ci = Icons.forCharging(strip.chargingRaw); if (ci) Icons.draw(dc, ci, 90, 38, 9, COL.WHITE);
+  const cl = Icons.forClimate(strip.climateRaw); if (cl) Icons.draw(dc, cl, 170, 38, 9, COL.WHITE);
+  const tiles = o.tiles, scroll = o.scroll || 0, total = Math.ceil(tiles.length / 2);
+  tiles.forEach((label, i) => {
+    const col = i % 2, row = Math.floor(i / 2), x = col ? 135 : 35, y = 52 + (row - scroll) * 52;
+    const st = i === o.hi ? "hi" : "def";
+    dc.setColor(st === "hi" ? COL.BLUE : COL.DK_GRAY); dc.fillRoundedRectangle(x, y, 90, 46, 8);
+    if (st === "hi") { dc.setPenWidth(2); dc.setColor(COL.WHITE); dc.drawRoundedRectangle(x, y, 90, 46, 8); dc.setPenWidth(1); }
+    dc.setColor(COL.WHITE); dc.drawText(x + 45, y + 23, "xtiny", label, J.CENTER | J.VCENTER);
+  });
+  dc.setColor(COL.LT_GRAY);
+  if (scroll > 0) dc.fillPolygon([[124, 50], [136, 50], [130, 44]]);
+  if (scroll + 3 < total) dc.fillPolygon([[124, 206], [136, 206], [130, 212]]);
+  if (o.msg) { dc.setColor(o.msg.err ? COL.ORANGE : COL.GREEN); dc.drawText(130, 216, "xtiny", o.msg.text, J.CENTER); }
+  TB.fitted(dc, "UP charging - DOWN status", "xtiny", COL.DK_GRAY, 240);
+}
+const TILES_MOCK = ["Start\nclimate", "Stop\nclimate", "Start\ncharging", "Stop\ncharging", "Find\nmy car", "Status", "Settings"];
+const TILES_UNKNOWN = ["Start\nclimate", "Stop\nclimate", "Start\nventilation", "Stop\nventilation", "Start\ncharging", "Stop\ncharging", "More"];
+
+function ageText(min) { if (min < 1) return "Updated just now"; if (min < 60) return min + " min ago"; const h = Math.floor(min / 60); if (h < 24) return h + "h " + (min - h * 60) + "m ago"; return Math.floor(h / 24) + "d ago"; }
+
+function statusPage(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 12, "xtiny", o.page + "/5", J.CENTER);
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 28, "xtiny", "SELECT to refresh", J.CENTER);
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 56, "small", o.title, J.CENTER);
+  if (o.kind) {
+    dc.setColor(COL.WHITE); dc.drawText(130, 100, "numMed", DASH, J.CENTER);
+    dc.setColor(o.kind === "DISABLED" ? COL.LT_GRAY : COL.YELLOW); dc.drawText(130, 150, "small", o.kindLabel, J.CENTER);
+  } else {
+    const vc = o.emph ? COL.ORANGE : COL.WHITE;
+    dc.setColor(vc); dc.drawText(130, 100, "numMed", o.value, J.CENTER);
+    if (o.icon) { const vw = dc.getTextWidthInPixels(o.value, "numMed"); const ix = Math.min(130 + Math.floor(vw / 2) + 20, 242); Icons.draw(dc, o.icon, ix, 100 + 37, 12, vc); }
+    dc.setColor(COL.WHITE); let y = 152;
+    o.sub.slice(0, 3).forEach(s => { dc.drawText(130, y, "xtiny", s, J.CENTER); y += 16; });
+    const stale = o.age > 60;
+    dc.setColor(stale ? COL.RED : COL.DK_GRAY); dc.drawText(130, 210, stale ? "tiny" : "xtiny", (stale ? "! " : "") + ageText(o.age), J.CENTER);
+  }
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 260 - 22, "xtiny", "UP/DOWN pages - SELECT refresh", J.CENTER);
+}
+
+function chargingDetail(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 12, "xtiny", "CHARGING", J.CENTER);
+  dc.setColor(COL.WHITE); dc.drawText(130, 60, "medium", o.state, J.CENTER);
+  if (o.cable) { dc.setColor(COL.ORANGE); dc.drawText(130, 84, "xtiny", "No cable appears to be connected", J.CENTER); }
+  dc.setColor(COL.WHITE); let y = 110;
+  ["Type: " + o.type, "Power: " + o.power, "Rate: " + o.rate, "Remaining: " + o.remaining, "Full by: " + o.full].forEach(s => { dc.drawText(130, y, "xtiny", s, J.CENTER); y += 18; });
+  if (o.msg) { dc.setColor(o.msg.err ? COL.ORANGE : COL.GREEN); dc.drawText(130, 196, "xtiny", o.msg.text, J.CENTER); }
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 214, "xtiny", ageText(o.age), J.CENTER);
+  dc.drawText(130, 240, "xtiny", "SELECT refresh - MENU actions", J.CENTER);
+}
+
+function chargeLimit(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.WHITE); dc.drawText(130, 110, "numMed", o.value + "%", J.CENTER);
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 50, "small", "Charge limit", J.CENTER);
+  if (o.recommended) { dc.setColor(COL.GREEN); dc.drawText(130, 150, "xtiny", "Recommended (battery care)", J.CENTER); }
+  TB.fitted(dc, "UP/DOWN adjust - SELECT set", "xtiny", COL.DK_GRAY, 236);
+}
+
+function profiles(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 12, "xtiny", "CHARGING PROFILES", J.CENTER);
+  if (o.unsupported) { dc.drawText(130, 120, "small", "Not supported\nby this car", J.CENTER); return; }
+  const p = o.p;
+  dc.setColor(p.current ? COL.GREEN : COL.WHITE); dc.drawText(130, 50, "small", p.current ? p.name + " (here)" : p.name, J.CENTER);
+  dc.setColor(COL.WHITE); let y = 80;
+  dc.drawText(130, y, "xtiny", "Target: " + p.target + "%", J.CENTER); y += 18;
+  dc.drawText(130, y, "xtiny", "Max current: " + p.maxCurrent, J.CENTER); y += 18;
+  dc.setColor(COL.LT_GRAY); p.timers.forEach(t => { dc.drawText(130, y, "xtiny", t, J.CENTER); y += 16; });
+  TB.fitted(dc, o.idx + "/" + o.count + " - UP/DOWN", "xtiny", COL.DK_GRAY, 240);
+}
+
+function findCar(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 12, "small", "FIND MY CAR", J.CENTER);
+  const addr = MOCK.address.length > 40 ? MOCK.address.slice(0, 40) : MOCK.address;
+  if (o.mode === "moving") {
+    dc.setColor(COL.YELLOW); dc.drawText(130, 110, "small", "Car is moving", J.CENTER);
+    dc.setColor(COL.LT_GRAY); dc.drawText(130, 150, "xtiny", "Last parked:", J.CENTER); dc.drawText(130, 168, "xtiny", addr, J.CENTER);
+    dc.setColor(COL.DK_GRAY); dc.drawText(130, 210, "xtiny", ageText(o.age), J.CENTER);
+  } else {
+    dc.setColor(COL.WHITE); dc.drawText(130, 56, "xtiny", addr, J.CENTER);
+    if (o.mode === "gps") { dc.setColor(COL.LT_GRAY); dc.drawText(130, 120, "small", "Acquiring GPS\nposition...", J.CENTER); }
+    else {
+      dc.setColor(COL.WHITE); dc.drawText(130, 108, "numMed", o.distance, J.CENTER);
+      const a = o.angle * Math.PI / 180, cx = 130, cy = 172, r = 28, br = r * 0.45, sp = 2.5;
+      dc.setColor(COL.DK_GRAY); dc.drawCircle(cx, cy, r + 4);
+      dc.setColor(COL.GREEN); dc.fillPolygon([[Math.trunc(cx + r * Math.sin(a)), Math.trunc(cy - r * Math.cos(a))], [Math.trunc(cx + br * Math.sin(a + sp)), Math.trunc(cy - br * Math.cos(a + sp))], [cx, cy], [Math.trunc(cx + br * Math.sin(a - sp)), Math.trunc(cy - br * Math.cos(a - sp))]]);
+    }
+    dc.setColor(COL.DK_GRAY); dc.drawText(130, 210, "xtiny", ageText(o.age), J.CENTER);
+  }
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 240, "xtiny", o.mode === "parked" ? "SELECT map - MENU navigate" : "MENU for options", J.CENTER);
+}
+
+function targetTemp(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.WHITE); dc.drawText(130, 130, "numMed", o.value + "°C", J.CENTER | J.VCENTER);
+  TB.fitted(dc, "UP/DOWN to adjust", "xtiny", COL.DK_GRAY, 230);
+}
+
+function textScreen(dc, text) { dc.setColor(COL.WHITE, COL.BLACK); dc.clear(); TB.draw(dc, text, "xtiny", COL.WHITE); }
+
+// --- Garmin system UI, approximated
+function menu2(dc, title, items, focus = 0) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.DK_GRAY); dc.fillRectangle(0, 0, 260, 62);
+  dc.setColor(COL.WHITE); dc.drawText(130, 30, "small", title, J.CENTER);
+  const drawItem = (it, y, focused) => {
+    const label = it.label.replace(/\n/g, " ");
+    if (focused) {
+      dc.setColor(COL.WHITE); dc.drawText(130, it.sub ? y - 10 : y, "medium", label, J.CENTER | J.VCENTER);
+      if (it.sub) { dc.setColor(COL.LT_GRAY); dc.drawText(130, y + 16, "xtiny", it.sub, J.CENTER | J.VCENTER); }
+    } else {
+      dc.setColor(COL.LT_GRAY); dc.drawText(130, it.sub ? y - 8 : y, "small", label, J.CENTER | J.VCENTER);
+      if (it.sub) { dc.setColor(COL.DK_GRAY); dc.drawText(130, y + 14, "xtiny", it.sub, J.CENTER | J.VCENTER); }
+    }
+  };
+  dc.setColor(COL.BLUE); dc.fillRectangle(0, 104, 6, 52);
+  dc.setColor(COL.DK_GRAY); dc.drawLine(30, 103, 230, 103); dc.drawLine(30, 157, 230, 157);
+  if (focus > 0) drawItem(items[focus - 1], 82, false);
+  drawItem(items[focus], 130, true);
+  if (items[focus + 1]) drawItem(items[focus + 1], 182, false);
+  if (items[focus + 2]) drawItem(items[focus + 2], 226, false);
+}
+function confirmation(dc, text) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  TB.draw(dc, text, "small", COL.WHITE);
+  // hints next to START (yes) and BACK (no)
+  dc.setColor(COL.GREEN); dc.fillCircle(224, 76, 13); dc.setColor(COL.BLACK); dc.setPenWidth(3); dc.drawLine(217, 76, 222, 82); dc.drawLine(222, 82, 231, 70);
+  dc.setColor(COL.RED); dc.fillCircle(224, 184, 13); dc.setColor(COL.WHITE); dc.setPenWidth(3); dc.drawLine(218, 178, 230, 190); dc.drawLine(230, 178, 218, 190); dc.setPenWidth(1);
+}
+function toastOver(dc, under, text) {
+  under(dc);
+  dc.c.fillStyle = "rgba(0,0,0,.55)"; dc.c.fillRect(0, 0, 260, 260);
+  const w = dc.getTextWidthInPixels(text, "tiny") + 32;
+  dc.setColor(COL.WHITE); dc.fillRoundedRectangle(130 - w / 2, 30, w, 38, 19);
+  dc.setColor(COL.BLACK); dc.drawText(130, 49, "tiny", text, J.CENTER | J.VCENTER);
+}
+function mapPreview(dc) {
+  const c = dc.c; c.fillStyle = "#FFFFAA"; c.fillRect(0, 0, 260, 260);
+  c.fillStyle = "#AAFFAA"; c.beginPath(); c.moveTo(20, 30); c.lineTo(110, 18); c.lineTo(120, 92); c.lineTo(36, 110); c.closePath(); c.fill();
+  c.fillStyle = "#AAFFFF"; c.beginPath(); c.ellipse(205, 210, 60, 26, -0.4, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 9; c.beginPath(); c.moveTo(-10, 150); c.lineTo(270, 120); c.moveTo(150, -10); c.lineTo(170, 270); c.stroke();
+  c.strokeStyle = "#AAAAAA"; c.lineWidth = 1; c.beginPath(); c.moveTo(-10, 150); c.lineTo(270, 120); c.moveTo(150, -10); c.lineTo(170, 270); c.stroke();
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 4; c.beginPath(); c.moveTo(60, 270); c.lineTo(120, 140); c.moveTo(165, 60); c.lineTo(260, 70); c.stroke();
+  const pin = (x, y, label) => { dc.setColor(COL.RED); dc.fillCircle(x, y - 14, 8); dc.fillPolygon([[x - 6, y - 10], [x + 6, y - 10], [x, y]]); dc.setColor(COL.WHITE); dc.fillCircle(x, y - 14, 3); dc.setColor(COL.BLACK); dc.drawText(x, y + 2, "xtiny", label, J.CENTER); };
+  pin(130, 136, "Car"); pin(96, 196, "You");
+}
+function glance(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  const c = dc.c;
+  // neighbouring glances, dimmed
+  c.globalAlpha = .35; dc.setColor(COL.DK_GRAY); dc.fillCircle(45, 40, 18); dc.fillCircle(45, 222, 18);
+  dc.setColor(COL.LT_GRAY); dc.drawText(76, 30, "xtiny", "Body Battery", J.LEFT); dc.drawText(76, 212, "xtiny", "Weather", J.LEFT); c.globalAlpha = 1;
+  dc.setColor(COL.DK_GRAY); dc.drawLine(20, 84, 240, 84); dc.drawLine(20, 176, 240, 176);
+  // launcher icon in the icon area
+  const ix = 25, iy = 110;
+  dc.setColor("#2B2F36"); dc.fillRoundedRectangle(ix, iy, 40, 40, 8);
+  dc.setColor("#C7CDD6"); dc.fillPolygon([[5, 31], [5, 25], [9, 25], [14, 16], [26, 16], [31, 25], [35, 25], [35, 31]].map(([x, y]) => [ix + x, iy + y]));
+  dc.setColor("#2B2F36"); dc.fillCircle(ix + 12.5, iy + 31.5, 4.5); dc.fillCircle(ix + 27.5, iy + 31.5, 4.5);
+  dc.setColor("#C7CDD6"); dc.setPenWidth(3); dc.drawCircle(ix + 29, iy + 10, 6.5); dc.setColor("#2B2F36"); dc.fillRectangle(ix + 27.5, iy + 1.5, 3, 5.5);
+  dc.setColor("#C7CDD6"); dc.drawLine(ix + 29, iy + 3, ix + 29, iy + 10); dc.setPenWidth(1);
+  // content area 171 x 63 at x 70, centred on the row
+  c.save(); c.translate(70, 99); c.beginPath(); c.rect(0, 0, 171, 63); c.clip();
+  const midY = 31;
+  dc.setColor(COL.WHITE); dc.drawText(8, midY - 10, "xtiny", "Vozidlo", J.LEFT | J.VCENTER);
+  const measure = s => dc.getTextWidthInPixels(s, "xtiny");
+  const trunc = (t, mw) => { if (measure(t) <= mw) return t; let s = t; while (s.length > 1 && measure(s + "…") > mw) s = s.slice(0, -1); return s + "…"; };
+  if (o.data) {
+    Icons.draw(dc, "locked", 8, midY + 10, 7, COL.WHITE);
+    dc.setColor(COL.WHITE); dc.drawText(18, midY + 10, "xtiny", trunc("100%  READY_FOR_CHARGING  LOCKED  12 min ago", 171 - 18 - 4), J.LEFT | J.VCENTER);
+  } else { dc.setColor(COL.LT_GRAY); dc.drawText(8, midY + 10, "xtiny", trunc("Open for your car", 171 - 12), J.LEFT | J.VCENTER); }
+  c.restore();
+}
+
+// ---------------------------------------------------------------- the board
+const GUIDE = "Open for your car";
+const OB_GUIDANCE = "A key is created in the MyŠkoda app (v8.16+), not here. It only works for the vehicles you selected when you created it. Enter it in this app's phone settings. Menu for more.";
+const KEYS = (o) => Object.entries(o);
+
+const SECTIONS = [
+ { id: "entry", title: "Entry", src: "ui/GlanceView.mc", blurb: "The glance in the widget loop. It only reads the cache and never makes a request. START opens the app on the home tiles.", screens: [
+  { id: "glance-data", name: "Glance, with cached data", tags: ["mock", "sys"], src: "ui/GlanceView.mc · onUpdate", draw: dc => glance(dc, { data: true }),
+    keys: { START: "Open app (home)", "UP/DOWN": "Next glance" },
+    notes: ["Neighbouring glances and separators are the watch's own; only the 171 × 63 content area is ours.", { flag: "The summary repeats the raw enum READY_FOR_CHARGING and is cut off with …; the age never fits." }, "Lock icon sits on the second line's centre, left of the text."] },
+  { id: "glance-empty", name: "Glance, nothing cached", tags: ["sys"], src: "ui/GlanceView.mc · onUpdate", draw: dc => glance(dc, { data: false }),
+    keys: { START: "Open app" }, notes: ["Shown before the first successful request."] },
+ ]},
+ { id: "home", title: "Home: control tiles", src: "ui/ControlsView.mc", blurb: "The app lands here (US-036). Status strip on top, a 2-column grid of 90 × 46 tiles with 3 rows visible, a status line and a fitted hint at the bottom.", screens: [
+  { id: "home-mock", name: "Home", tags: ["mock"], src: "ui/ControlsView.mc · onUpdate", draw: dc => controls(dc, { tiles: TILES_MOCK, hi: 0 }),
+    keys: { START: "Activate focused tile", "UP/DOWN": "Move tile focus (checked on the watch)", BACK: "Exit app", "Swipe down": "Charging detail (not confirmed)", "Swipe up": "Status pages", "Touch": "Tap = run tile (SDK; verify on watch)" },
+    notes: [{ flag: "UP/DOWN move the tile focus on the watch, so the hint is wrong and Charging detail (with limit, mode, profiles) cannot be reached with buttons." }, "Mock vehicle: climate + charging operations only, so 7 tiles and no More.", { flag: "Strip text is about 250 px wide where the circle allows about 130 px." }, { flag: "Fitted hint lands at y ≈ 208, on the scroll arrow and the fourth row (Settings) that peeks out under row 3." }] },
+  { id: "home-scrolled", name: "Home, scrolled to Settings", tags: ["mock"], src: "ui/ControlsView.mc · ensureTileVisible", draw: dc => controls(dc, { tiles: TILES_MOCK, hi: 6, scroll: 1 }),
+    keys: { START: "Open Tile order" },
+    notes: [{ flag: "Row 1 moves to y = 0 and covers the strip; the tiles are not clipped to the grid area." }] },
+  { id: "home-unknown", name: "Home, first launch (no operations cached)", tags: [], src: "ui/ControlsView.mc · ControlTiles.capped", draw: dc => controls(dc, { tiles: TILES_UNKNOWN, hi: 0, strip: { soc: DASH, charging: DASH, lockRaw: null } }),
+    keys: { START: "Activate tile" },
+    notes: ["Unknown operations means every action is offered: 9 tiles, capped at 7 with More.", "Find my car, Status and Settings end up behind More.", "This is the layout in the current store screenshots."] },
+  { id: "home-sent", name: "Home, after a command", tags: ["mock"], src: "ui/ControlsView.mc · _announceSent", draw: dc => controls(dc, { tiles: TILES_MOCK, hi: 0, msg: { text: "Command sent", err: false } }),
+    keys: {}, notes: ["Status line at y = 216, green; orange for errors such as \"Not sent: …\" or \"Quota spent for this hour\".", "Same text also goes to a toast."] },
+  { id: "home-toast", name: "Toast", tags: ["sys"], src: "WatchUi.showToast", draw: dc => toastOver(dc, d => controls(d, { tiles: TILES_MOCK, hi: 0 }), "Command sent"),
+    keys: {}, notes: ["Garmin draws the toast; position and style are approximated.", "A 200 ms vibration goes with every sent command."] },
+  { id: "home-confirm", name: "Confirmation", tags: ["sys"], src: "api/ConfirmationPolicy.mc", draw: dc => confirmation(dc, "Stop charging?"),
+    keys: { START: "Yes, send", BACK: "No" },
+    notes: ["Always asked for: stop charging, aux heater start/stop, clear data.", "Asked for everything else only when the quota estimate is low."] },
+  { id: "home-more", name: "More menu", tags: ["sys"], src: "ui/ControlsView.mc · openMoreActions", draw: dc => menu2(dc, "More", [{ label: "Find\nmy car" }, { label: "Status" }, { label: "Settings" }]),
+    keys: { START: "Open", BACK: "Back to tiles" },
+    notes: [{ flag: "Reuses the tile label, so \"Find\\nmy car\" carries a line break into the menu." }] },
+ ]},
+ { id: "status", title: "Status pages", src: "ui/StatusView.mc", blurb: "DOWN from home. Five pages, one per API section, looped with UP/DOWN. Each page: counter, quota line, title, one big value, up to three sub-lines and that section's own age.", screens: [
+  { id: "st-lock", name: "1 · Lock & doors", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 1, title: "LOCK & DOORS", value: "LOCKED", icon: "locked", sub: ["Doors CLOSED", "Windows CLOSED", "Lights OFF"], age: 13 }),
+    keys: { "UP/DOWN": "Previous / next page", START: "Refresh (1 request)", BACK: "Home" },
+    notes: [{ flag: "LOCKED is drawn in the number font, which has no letters." }, "Bonnet and Trunk do not fit: only three sub-lines are shown.", { flag: "Bottom hint is clipped by the bezel." }] },
+  { id: "st-fuel", name: "2 · Fuel / range", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 2, title: "FUEL / RANGE", value: "436 km", sub: ["GASOLINE 62%", "ELECTRIC 100%"], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: [{ flag: "The km unit is outside the number font." }, "Engine types are shown as raw enums."] },
+  { id: "st-charging", name: "3 · Charging", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 3, title: "CHARGING", value: "100%", icon: "pluggedIn", sub: ["READY_FOR_CHARGING", "36 km range"], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: ["The one value that fits the number font as is."] },
+  { id: "st-odo", name: "4 · Odometer", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 4, title: "ODOMETER", value: "123456 km", sub: [], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: ["Digits plus unit nearly fill the circle at that height; a six-digit odometer is common."] },
+  { id: "st-ac", name: "5 · Air conditioning", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 5, title: "AIR CONDITIONING", value: "OFF", sub: ["Front window heat OFF", "Rear window heat OFF"], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: ["No icon when climate is off."] },
+  { id: "st-ac-stale", name: "5 · Air conditioning, 17 h old", tags: ["mock"], src: "mock scenario stale-airconditioning-17h", draw: dc => statusPage(dc, { page: 5, title: "AIR CONDITIONING", value: "OFF", sub: ["Front window heat OFF", "Rear window heat OFF"], age: 17 * 60 }),
+    keys: {}, notes: ["Older than an hour: age turns red, larger, with \"!\" (US-009)."] },
+  { id: "st-nodata", name: "Section without data", tags: [], src: "ui/StatusView.mc · _kindLabel", draw: dc => statusPage(dc, { page: 5, title: "AIR CONDITIONING", kind: "UNKNOWN", kindLabel: "No data yet - refresh to fetch" }),
+    keys: { START: "Refresh" }, notes: [{ flag: "Yellow label is about 255 px wide in the small font at y = 150." }, "Other states: Temporarily unavailable, Switched off for this car (grey)."] },
+ ]},
+ { id: "charging", title: "Charging", src: "ui/ChargingDetailView.mc", blurb: "UP from home. State, five detail lines, MENU for limit, mode and profiles.", screens: [
+  { id: "ch-detail", name: "Charging detail", tags: ["mock"], src: "ui/ChargingDetailView.mc · onUpdate", draw: dc => chargingDetail(dc, { state: "Ready to charge", type: "Not charging", power: DASH, rate: DASH, remaining: DASH, full: DASH, age: 12 }),
+    keys: { START: "Refresh", MENU: "Charging menu (hold UP)", BACK: "Home" },
+    notes: ["Mock car is plugged in but not charging.", { flag: "Bottom hint is clipped by the bezel." }] },
+  { id: "ch-active", name: "Charging detail, while charging", tags: ["ex"], src: "ui/ChargingDetailView.mc · onUpdate", draw: dc => chargingDetail(dc, { state: "Charging", type: "AC", power: "7.2 kW", rate: "38.0 km/h", remaining: "95 min", full: "18:40", age: 3 }),
+    keys: {}, notes: ["Example values, not from the mock."] },
+  { id: "ch-cable", name: "Cable warning", tags: ["ex"], src: "ChargingLogic.needsCableWarning", draw: dc => chargingDetail(dc, { state: "Connect the cable", cable: true, type: "Not charging", power: DASH, rate: DASH, remaining: DASH, full: DASH, age: 5 }),
+    keys: {}, notes: ["The orange warning line fits the circle at y = 84 (measured)."] },
+  { id: "ch-menu", name: "Charging menu", tags: ["sys", "mock"], src: "ui/ChargingDetailView.mc · openMenu", draw: dc => menu2(dc, "Charging", [{ label: "Refresh" }, { label: "Set charge limit" }, { label: "Charging profiles" }]),
+    keys: { START: "Open", BACK: "Charging detail" }, notes: ["Set charge mode is hidden: the mock reports no available modes."] },
+  { id: "ch-limit", name: "Charge limit", tags: ["mock"], src: "ui/ChargingLimitView.mc · onUpdate", draw: dc => chargeLimit(dc, { value: 80 }),
+    keys: { "UP/DOWN": "50 · 60 · 70 · 80 · 90 · 100", START: "Set (asks when quota is low)" }, notes: ["Starts at 80% when the car reports no limit."] },
+  { id: "ch-limit-care", name: "Charge limit, battery-care match", tags: ["ex"], src: "ui/ChargingLimitView.mc · onUpdate", draw: dc => chargeLimit(dc, { value: 80, recommended: true }),
+    keys: {}, notes: ["Green line when the value equals the car's battery-care target."] },
+  { id: "ch-mode", name: "Charge mode", tags: ["sys", "ex"], src: "ui/ChargingModeView.mc", draw: dc => menu2(dc, "Charge mode", [{ label: "Manual", sub: "Current" }, { label: "Timer" }, { label: "Preferred times" }]),
+    keys: { START: "Set mode" }, notes: ["Example modes; only shown when the car lists any."] },
+  { id: "ch-profiles", name: "Charging profiles", tags: ["mock"], src: "ui/ChargingProfilesView.mc · onUpdate", draw: dc => profiles(dc, { unsupported: true }),
+    keys: { "UP/DOWN": "Profiles", START: "Load" }, notes: ["The mock car has no profiles."] },
+  { id: "ch-profile-ex", name: "Charging profile page", tags: ["ex"], src: "ui/ChargingProfilesView.mc · _drawProfile", draw: dc => profiles(dc, { idx: 1, count: 2, p: { name: "Home", current: true, target: 80, maxCurrent: "Reduced", timers: ["22:00 Mon,Tue,Wed,Thu,Fri", "07:30 Sat,Sun"] } }),
+    keys: { "UP/DOWN": "Next profile" }, notes: ["Example profile. Green name means the car is at this profile's location."] },
+ ]},
+ { id: "findcar", title: "Find my car", src: "ui/LocationView.mc", blurb: "From the Find my car tile. Distance and a bearing arrow that follows the watch heading; START for the map, MENU to navigate.", screens: [
+  { id: "fc-parked", name: "Parked", tags: ["mock", "ex"], src: "ui/LocationView.mc · _drawParked", draw: dc => findCar(dc, { mode: "parked", distance: "240 m", angle: 35, age: 12 }),
+    keys: { START: "Map", MENU: "Navigate / Refresh", BACK: "Home" },
+    notes: ["Mock address; distance and bearing are example values.", { flag: "The m unit is outside the number font." }, "Address is cut at 40 characters, not at a word."] },
+  { id: "fc-gps", name: "Waiting for GPS", tags: ["mock"], src: "ui/LocationView.mc · _drawParked", draw: dc => findCar(dc, { mode: "gps", age: 12 }),
+    keys: { MENU: "Options" }, notes: [] },
+  { id: "fc-moving", name: "Car is moving", tags: ["mock"], src: "ui/LocationView.mc · onUpdate", draw: dc => findCar(dc, { mode: "moving", age: 12 }),
+    keys: { MENU: "Options" }, notes: ["Shows the last parked address from storage."] },
+  { id: "fc-menu", name: "Find my car menu", tags: ["sys"], src: "LocationActionMenu.push", draw: dc => menu2(dc, "Find my car", [{ label: "Navigate to car" }, { label: "Refresh" }]),
+    keys: { START: "Open" }, notes: [] },
+  { id: "fc-nav", name: "Navigate confirmation", tags: ["sys"], src: "ui/LocationView.mc · confirmNavigate", draw: dc => confirmation(dc, "Navigate to the car? This closes this app - starting navigation always exits to the system."),
+    keys: { START: "Save waypoint, exit to navigation" }, notes: ["The system then asks again (exitTo). Known Garmin bug: activity may start without the route."] },
+  { id: "fc-map", name: "Map preview", tags: ["sys"], src: "ui/MapPreviewView.mc", draw: dc => mapPreview(dc),
+    keys: { START: "Browse mode (pan / zoom)", BACK: "Back (browse, then preview, then out)" },
+    notes: ["Native MapView, 400 m around the car; drawn here as a stand-in.", { flag: "No MENU handler, so no way to navigate from the map." }] },
+ ]},
+ { id: "settings", title: "Settings", src: "ui/TileOrderView.mc", blurb: "Tile order from the Settings tile; target temperature from Garmin's app-settings entry.", screens: [
+  { id: "set-order", name: "Tile order", tags: ["sys"], src: "ui/TileOrderView.mc", draw: dc => menu2(dc, "Tile order", [{ label: "Climate", sub: "Position 1" }, { label: "Charging", sub: "Position 2" }, { label: "Find my car", sub: "Position 3" }, { label: "Status detail", sub: "Position 4" }], 0),
+    keys: { START: "Edit item" }, notes: ["Hidden categories show \"Hidden\" as sub-label."] },
+  { id: "set-order-item", name: "Tile order item", tags: ["sys"], src: "ui/TileOrderView.mc · TileOrderDetailMenu", draw: dc => menu2(dc, "Climate", [{ label: "Move up" }, { label: "Move down" }, { label: "Hide" }], 1),
+    keys: { START: "Apply" }, notes: [] },
+  { id: "set-temp", name: "Target temperature", tags: ["mock"], src: "ui/TargetTemperatureSettingsView.mc", draw: dc => targetTemp(dc, { value: 21 }),
+    keys: { "UP/DOWN": "± 1 degree, saved right away" }, notes: [{ flag: "°C: the C is outside the number font." }, "No title on screen."] },
+ ]},
+ { id: "onboarding", title: "Onboarding", src: "ui/OnboardingGate.mc", blurb: "Before home, when the key or VIN is missing, never validated, near its estimated expiry, or rejected. All text screens use TextBlock: wrapped to the circle and centred.", screens: [
+  { id: "ob-guide", name: "No key yet", tags: [], src: "ui/OnboardingView.mc", draw: dc => textScreen(dc, OB_GUIDANCE),
+    keys: { MENU: "Onboarding menu", START: "Retry" }, notes: [] },
+  { id: "ob-check", name: "Checking the key", tags: [], src: "ui/OnboardingView.mc", draw: dc => textScreen(dc, "Checking your key against your car…"), keys: {}, notes: [] },
+  { id: "ob-expiry", name: "Key near expiry", tags: [], src: "ui/OnboardingExpiryNoticeView.mc", draw: dc => textScreen(dc, "Your key is probably close to expiring: this is an estimate, not a fact. If you would rather not be caught out, create a new one soon in the MyŠkoda app. Select to continue."),
+    keys: { START: "Continue to home" }, notes: [] },
+  { id: "ob-expired", name: "Key expired", tags: [], src: "ui/OnboardingGate.mc · _expiredText", draw: dc => textScreen(dc, "Your API key has expired. " + OB_GUIDANCE),
+    keys: { MENU: "Onboarding menu" }, notes: [{ flag: "Long text: check whether the last lines are cut." }] },
+  { id: "ob-menu", name: "Onboarding menu", tags: ["sys"], src: "ui/OnboardingActionMenu.mc", draw: dc => menu2(dc, "Onboarding", [{ label: "Get a key" }, { label: "Clear stored data" }]),
+    keys: { START: "Open" }, notes: ["Clear stored data always asks for confirmation."] },
+ ]},
+];
+
+const TAGS = { mock: ["mock", "Mock data"], ex: ["ex", "Example data"], sys: ["sys", "Garmin UI, approx."] };
+
+function bezelSvg(d) {
+  // d = screen diameter in CSS px; ring and buttons scale with it
+  const ring = d * 0.14, size = d + ring * 2, c = size / 2, ro = d / 2 + ring * 0.9;
+  const btn = (deg) => {
+    const a = (deg - 90) * Math.PI / 180, x = c + (ro + d * 0.035) * Math.cos(a), y = c + (ro + d * 0.035) * Math.sin(a);
+    return `<rect x="${x - d * .035}" y="${y - d * .075}" width="${d * .07}" height="${d * .15}" rx="${d * .02}" fill="#8b8f94" stroke="#55595e" transform="rotate(${deg + 90} ${x} ${y})"/>`;
+  };
+  return `<svg class="bezel" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+    ${btn(300)}${btn(270)}${btn(240)}${btn(60)}${btn(120)}
+    <circle cx="${c}" cy="${c}" r="${ro}" fill="#6e7378"/>
+    <circle cx="${c}" cy="${c}" r="${ro - ring * .08}" fill="#4a4e53"/>
+    <circle cx="${c}" cy="${c}" r="${d / 2 + ring * 0.62}" fill="#2a2c2f"/>
+    <circle cx="${c}" cy="${c}" r="${d / 2 + 2}" fill="#000"/>
+    ${[300, 270, 240, 60, 120].map((deg, i) => { const L = ["LIGHT", "UP · MENU", "DOWN", "START", "BACK"][i]; const a = (deg - 90) * Math.PI / 180, lx = c + (d / 2 + ring * 0.42) * Math.cos(a), ly = c + (d / 2 + ring * 0.42) * Math.sin(a);
+      return `<text x="${lx}" y="${ly}" fill="#c9ccd0" font-family="Barlow Semi Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="${Math.max(7, d * 0.03)}" text-anchor="middle" dominant-baseline="middle" letter-spacing=".05em" transform="rotate(${deg > 180 ? deg - 270 : deg - 90} ${lx} ${ly})">${L}</text>`; }).join("")}
+  </svg>`;
+}
+
+function guides(dc) {
+  const c = dc.c; c.save(); c.strokeStyle = "rgba(255,0,255,.65)"; c.lineWidth = 1; c.setLineDash([4, 3]);
+  c.beginPath(); c.arc(130, 130, 122, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.moveTo(130, 0); c.lineTo(130, 260); c.moveTo(0, 130); c.lineTo(260, 130); c.stroke();
+  c.strokeStyle = "rgba(0,170,255,.5)"; c.setLineDash([2, 4]);
+  for (let y = 52; y < 260; y += 52) { c.beginPath(); c.moveTo(0, y); c.lineTo(260, y); c.stroke(); }
+  c.restore();
+}
+
+function renderCard(s) {
+  const d = 260 * OPT.scale;
+  const fig = document.createElement("div"); fig.className = "watch" + (OPT.bezel ? "" : " flat");
+  const ring = d * 0.14, size = OPT.bezel ? d + ring * 2 : d;
+  fig.style.width = fig.style.height = size + "px"; fig.style.maxWidth = "100%";
+  if (OPT.bezel) fig.innerHTML = bezelSvg(d);
+  const cv = document.createElement("canvas"); cv.width = 260; cv.height = 260;
+  cv.style.width = cv.style.height = d + "px"; cv.style.left = cv.style.top = (OPT.bezel ? ring : 0) + "px";
+  cv.setAttribute("role", "img"); cv.setAttribute("aria-label", s.name + " on a 260 by 260 round watch screen");
+  const dc = new Dc(cv.getContext("2d"), 260, 260); s.draw(dc); if (OPT.guides) guides(dc);
+  fig.appendChild(cv); return fig;
+}
+
+function build() {
+  const board = document.getElementById("board"); board.innerHTML = "";
+  const d = 260 * OPT.scale; document.documentElement.style.setProperty("--card-w", Math.max(300, (OPT.bezel ? d * 1.28 : d) + 16) + "px");
+  for (const sec of SECTIONS) {
+    const el = document.createElement("section"); el.className = "area"; el.id = sec.id;
+    el.innerHTML = `<h2>${sec.title} <small>${sec.src}</small></h2><p>${sec.blurb}</p><div class="grid"></div>`;
+    const grid = el.querySelector(".grid");
+    for (const s of sec.screens) {
+      const card = document.createElement("article"); card.className = "card"; card.id = s.id;
+      const stage = document.createElement("div"); stage.className = "stage"; stage.appendChild(renderCard(s)); card.appendChild(stage);
+      const tags = s.tags.map(t => `<span class="tag ${TAGS[t][0]}">${TAGS[t][1]}</span>`).join("");
+      const keys = KEYS(s.keys).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+      const notes = s.notes.map(n => typeof n === "string" ? `<li>${n}</li>` : `<li class="flag">${n.flag}</li>`).join("");
+      card.insertAdjacentHTML("beforeend", `<h3><a href="#${s.id}">${s.name}</a>${tags}</h3><div class="src">${s.src}</div>` + (keys ? `<dl class="keys">${keys}</dl>` : "") + (notes ? `<ul class="notes">${notes}</ul>` : ""));
+      grid.appendChild(card);
+    }
+    board.appendChild(el);
+  }
+}
+
+function syncControls() {
+  document.querySelectorAll("[data-scale]").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.scale === OPT.scale)));
+  document.getElementById("optBezel").checked = OPT.bezel; document.getElementById("optGaps").checked = OPT.gaps; document.getElementById("optGuides").checked = OPT.guides;
+}
+function save() { try { localStorage.setItem("vozidlo-screens-opt", JSON.stringify(OPT)); } catch (e) {} }
+document.querySelectorAll("[data-scale]").forEach(b => b.addEventListener("click", () => { OPT.scale = +b.dataset.scale; save(); syncControls(); build(); }));
+[["optBezel", "bezel"], ["optGaps", "gaps"], ["optGuides", "guides"]].forEach(([id, k]) => document.getElementById(id).addEventListener("change", e => { OPT[k] = e.target.checked; save(); build(); }));
+
+function start() { calibrate(); syncControls(); build(); if (location.hash) { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); } }
+Promise.all([
+  document.fonts.load("700 20px Roboto"), document.fonts.load("700 20px 'Roboto Condensed'"),
+  document.fonts.load("700 20px 'Barlow Semi Condensed'")
+]).catch(() => {}).finally(() => document.fonts.ready.then(start));
+</script>
+</body>
+</html>

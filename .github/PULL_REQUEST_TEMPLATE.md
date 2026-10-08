@@ -22,6 +22,7 @@ would otherwise have to ask you about. Delete any section that does not apply.
 - [ ] `mock/.venv/bin/python -m pytest mock/tests`: if anything under `mock/` changed
 - [ ] `python3 tools/checks.py`: links, device list, no personal data
 - [ ] Ran it in the simulator and looked at the screens I touched
+- [ ] Screens follow docs/design/style-guide.md (fit, monochrome, labels)
 - [ ] Ran it on real hardware: **which watch?**
 
 ## AI assistance

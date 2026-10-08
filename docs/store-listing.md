@@ -1,7 +1,8 @@
 # Connect IQ Store listing
 
-Draft text for the store submission. Kept here so it is reviewed like any other
-deliverable rather than typed into a web form and forgotten.
+The text of the app's Connect IQ Store listing. Kept here so it is reviewed
+like any other deliverable rather than typed into a web form and forgotten; a
+change to the listing is made here first and then copied to the store.
 
 ---
 
@@ -49,12 +50,17 @@ Nor can it do anything if your phone is out of range. Connect IQ sends every
 request through the Garmin Connect app on your phone, so no phone means no data.
 The app keeps showing what it last saw, with the age next to it.
 
+The API is fire-and-forget: a command is only confirmed by reading the car
+afterwards. The app does that once, about 15 seconds later ("Climate on"), for
+one extra request. You can switch it off in the settings.
+
 ### You need your own API key
 
 Škoda's API is free and open to anyone, but each user creates their own key. In
-the MyŠkoda app (version 8.16 or later), open the API key management screen,
-create a key, and select the vehicle it may access. Then enter that key and your
-VIN in this app's settings in Garmin Connect.
+the MyŠkoda app (version 8.16 or later), open the API key management screen at
+https://go.skoda.eu/api-keys, create a key, and select the vehicle it may
+access. Then enter that key and your VIN in this app's settings in Garmin
+Connect.
 
 Keys are valid for about six months. There is no automatic renewal, so twice a
 year you will need to create a new one and type it in again.
@@ -86,6 +92,7 @@ complications you can put on your own watch face.
   fēnix 9 Pro Solar 47mm or Forerunner 955, with Connect IQ 5.2 or later
 - A Škoda with connected services active
 - The MyŠkoda app, version 8.16 or later, to create an API key
+  (https://go.skoda.eu/api-keys)
 - Your phone within Bluetooth range
 
 ## Permissions

@@ -80,10 +80,10 @@ what ships: say so in an issue and it will get fixed in one place or the other.
 - **US-040**: Track and respect the request quota
 - **US-041**: Keep the last known state
 - **US-042**: Get the request options right
-- **US-043**: Understand what happened after sending a command
+- **US-043**: Understand what happened after sending a command (since 1.2.0 one check of the car 15 s after it, see decisions.md "One check after a command")
 - **US-044**: Read errors in plain language
 - **US-045**: Know when my phone is the problem
-- **US-046**: Never poll
+- **US-046**: Never poll (the one check after a command is caused by the user's command and can be switched off)
 - **US-062**: Confirm only what deserves confirming
 
 ## Developer experience

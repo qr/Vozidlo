@@ -15,8 +15,9 @@ are trademarks of their respective owners. They appear here only as words, to
 say what this software is compatible with. No trademark licence is granted by
 the Apache License (see its section 6) and none is claimed here.
 
-The application deliberately uses no Škoda logo, no Škoda brand colour and no
-Škoda typeface. Its icon is original. If you fork this project and publish it,
+The application deliberately uses no Škoda logo and no Škoda typeface. Its
+single accent colour is Škoda Electric Green, used as a plain colour on its
+own. Its icon is original. If you fork this project and publish it,
 that constraint travels with you: no third-party trademark licence exists for
 this API, and reproducing a logo is a different act in law from naming a brand
 in text.

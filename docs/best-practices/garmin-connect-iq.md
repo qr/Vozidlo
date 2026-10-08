@@ -174,6 +174,11 @@ current value as sub-text on the parent item.
 → [Menus](https://developer.garmin.com/connect-iq/user-experience-guidelines/menus/),
 [Native controls](https://developer.garmin.com/connect-iq/core-topics/native-controls/)
 
+*In this app (1.1.0):* every menu is a `CustomMenu` (a `Menu2` subclass, so
+the advice above still holds), because a plain `Menu2` cannot be recoloured
+on these watches and would show the system colour next to the accent. See
+[decisions.md](../decisions.md#night-panel-navigation).
+
 **Confirm only when the friction is warranted.** A confirmation dialog
 interrupts; use it for actions with real consequences, not for everything. Phrase
 it as an explicit yes/no question.
@@ -333,8 +338,10 @@ you have a right to use their intellectual property." Garmin explicitly refuses
 to adjudicate: "Ask the IP owner, not us." The Developer Agreement makes you
 warrant you hold the rights and indemnify Garmin.
 
-For this project that settles it: **no Škoda logo, no Škoda colours or
-typeface.** See [decisions.md](../decisions.md#branding) and [NOTICE](../../NOTICE).
+For this project that settles it: **no Škoda logo and no Škoda typeface.**
+The one exception is the accent colour, Škoda Electric Green, by the owner's
+decision of 2026-10-07. See [decisions.md](../decisions.md#branding) and
+[NOTICE](../../NOTICE).
 → [App review guidelines](https://developer.garmin.com/connect-iq/app-review-guidelines/)
 
 **Do not claim compatibility you have not certified**, and never imply a
@@ -377,4 +384,4 @@ Use this at the end of every task.
 - [ ] Every new URL is covered by a unit test
 - [ ] The mock rejects what the real API rejects
 - [ ] Failure states designed, not just the happy path
-- [ ] Nothing in the UI, icon or store text uses Škoda's marks beyond the plain word
+- [ ] Nothing in the UI, icon or store text uses Škoda's marks beyond the plain word and the accent colour

@@ -1,6 +1,6 @@
 # Vozidlo
 
-<img src="store-assets/cover-500.png" alt="Vozidlo" width="120" align="right">
+<img src="app/resources/drawables/launcher_icon.svg" alt="Vozidlo: a steering wheel in Electric Green" width="96" align="right">
 
 A Connect IQ watch app that reads and controls a Škoda from the wrist, through
 the official MyŠkoda Public API. Charge, climate, lock status, and where the car
@@ -20,6 +20,11 @@ verified in the simulator and against the included mock server, and nothing
 more. They are claimed on the strength of identical device family, memory
 budgets and API implementations rather than on anyone having worn one.
 
+1.1.0 redraws every screen, and 1.2.0 checks the car once after a command.
+Both are covered by the unit tests and the design checks in `tools/ui/`, and
+were used on the fēnix 7 Pro with a real car: the home list, commands sent
+through an Android phone, and the check that follows them.
+
 It is a spare-time project. Issues get answered in days, not hours.
 
 ## What it does, and does not
@@ -29,22 +34,29 @@ It is a spare-time project. Issues get answered in days, not hours.
 | See the vehicle's state | Yes, charge, range, lock status, doors, odometer |
 | Start and stop the air conditioning | Yes, with a target temperature |
 | Start and stop charging | Yes, plus charge limit and mode |
+| Check that a command took effect | Yes, one read of the car 15 s later (a setting, on by default) |
 | Find where the car is parked | Yes, address, bearing, map, navigation |
 | Glance and complications | Yes, on an existing watch face |
 | **Lock or unlock the car** | **No.** The API has no such endpoint |
 
 <p align="center">
-  <img src="store-assets/screen-controls.png" width="240"
-       alt="The control tiles: start and stop climate, ventilation and charging, with the first tile focused">
-  &nbsp;&nbsp;
-  <img src="store-assets/screen-more.png" width="240"
-       alt="The same screen scrolled by one row, with the More tile fully visible and focused">
+  <img src="docs/design/style/screen-home.png" width="200"
+       alt="Home: a ring showing 100 percent charge, Locked and Plugged in chips, and the actions as a list with Start climate focused">
+  <img src="docs/design/style/screen-status.png" width="200"
+       alt="Status, Lock and doors: page dots on the left, Locked, and a grid of doors, windows, bonnet, trunk and lights">
+  <img src="docs/design/style/screen-charging.png" width="200"
+       alt="Charging detail: 100 percent inside a ring, a Plugged in chip and the range">
+  <img src="docs/design/style/screen-findcar.png" width="200"
+       alt="Find my car: the address, 240 m to the car and a pointer on the ring towards it">
 </p>
 
-The controls, and the same screen scrolled one row so the overflow tile is
-whole. Only three rows of tiles fit on a round face, so the grid moves rather
-than letting the bottom one disappear under the bezel; the small carets show
-what is off screen. Both captures are from the simulator.
+Home is a list. The state of charge, lock and charging state and the age of
+the data sit at the top, every action is a row below, and START runs the
+focused one. Status has a page per part of the car, with dots showing where you
+are; charging detail and find my car are one row away. One accent colour,
+words instead of raw API values, and every line fits the round screen. These
+pictures are drawn from the design reference in [docs/design](docs/design/style-guide.md);
+captures from the watch replace them once 1.1.0 is signed off.
 
 ## How it reaches the car
 
@@ -98,10 +110,13 @@ guide.
 
 ## Installing
 
-See [INSTALL.md](INSTALL.md). In short: build it, upload it to your own Garmin
-developer account as a beta app, install from the link. App settings only reach
-a watch through the store, so a plain sideload gives you an app with nowhere to
-type an API key.
+Install Vozidlo from the [Connect IQ Store](https://apps.garmin.com/apps/b34f661a-306c-47df-9781-cf88b4fe2b32),
+then enter your API key and VIN in its settings in Garmin Connect.
+
+To run a build of your own, see [INSTALL.md](INSTALL.md): upload it to your own
+Garmin developer account as a beta app and install from the link. App settings
+only reach a watch through the store, so a plain sideload gives you an app with
+nowhere to type an API key.
 
 ## Developing
 
@@ -114,11 +129,13 @@ cd tools && docker build \
 
 tools/ciq sdkmanager     # once: sign in, download the device files
 tools/ciq run            # build and launch in the simulator
-tools/ciq test           # 155 unit tests
+tools/ciq test           # 276 unit tests
 tools/ciq build --all    # every supported device
 tools/ciq                # no arguments: prints the commands and device list
 
 mock/run.sh              # the mock server to develop against
+
+tools/ui/build.sh --check && node tools/ui/fitcheck.mjs   # the screens fit the round display
 ```
 
 The toolchain runs in a container because the Connect IQ SDK Manager and
@@ -154,6 +171,8 @@ rather than reasoned about:
 |---|---|
 | [docs/adding-a-watch.md](docs/adding-a-watch.md) | How to support another device |
 | [docs/decisions.md](docs/decisions.md) | Why the code is shaped this way, including the bugs that shipped |
+| [docs/design/style-guide.md](docs/design/style-guide.md) | How screens look, read and behave: colours, type, components, copy |
+| [tools/ui/](tools/ui/README.md) | The design reference and the checks that keep screens on the round display |
 | [docs/best-practices/garmin-connect-iq.md](docs/best-practices/garmin-connect-iq.md) | Connect IQ rules, from official Garmin sources |
 | [docs/requirements.md](docs/requirements.md) | What the `US-nnn` ids in the comments mean |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to help |
@@ -171,6 +190,7 @@ them is fine: say so, and make sure the change makes sense.
 
 Section 6 of that licence grants no trademark rights, and none are available
 here: no third-party licence exists for the Škoda marks. The name is used as a
-plain word to describe compatibility, the icon is original, and no Škoda logo,
-brand colour or typeface appears anywhere. Anyone forking and publishing this
-inherits that constraint, see [NOTICE](NOTICE).
+plain word to describe compatibility, the icon is original, and no Škoda logo
+or typeface appears anywhere. The one accent colour is Škoda Electric Green, a
+decision recorded in [docs/decisions.md](docs/decisions.md#branding). Anyone
+forking and publishing this inherits that constraint, see [NOTICE](NOTICE).

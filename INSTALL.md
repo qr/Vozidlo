@@ -1,8 +1,15 @@
 # Installing it on a watch
 
-There is no public Connect IQ Store listing. To put this on a watch you build it
-yourself and upload it as your own **beta app**, which takes about ten minutes
-and needs a free Garmin developer account.
+Vozidlo is in the Connect IQ Store: <https://apps.garmin.com/apps/b34f661a-306c-47df-9781-cf88b4fe2b32>.
+Install it from there with the Connect IQ app on your phone, then enter your API
+key and VIN in the app's settings in Garmin Connect. The README explains where
+the key comes from.
+
+## Running your own build
+
+To run a build of your own, for example to try a change on your watch, you
+upload it as your own **beta app**, which takes about ten minutes and needs a
+free Garmin developer account.
 
 That sounds like a detour and is not: **app settings only reach a watch through
 the store.** A sideloaded app has no entry in Garmin Connect, so there is

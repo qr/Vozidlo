@@ -113,6 +113,13 @@ passed in as a callback are the pattern used throughout, see
 `ui/TextBlock.mc` and its tests for the clearest example. It is what lets the
 geometry be tested without a `Dc`.
 
+**Screens follow the style guide.** [docs/design/style-guide.md](docs/design/style-guide.md)
+has the colours, fonts, components and wording every screen uses, and a
+checklist for a new or changed screen. Draw through `Ui`, `Chips`, `Bezel` and
+`NightMenu` rather than with raw `dc` calls, and the chord, monochrome and
+number-font rules mostly hold by themselves. Section 11 of the guide lists the
+tools that check a screen, in the app and in the design reference.
+
 **Requirement ids** like `US-036` appear in comments; they resolve in
 [docs/requirements.md](docs/requirements.md).
 
@@ -150,8 +157,10 @@ Not to discourage the PR, but to save you writing it:
   every other client on the same car.
 - **Claim a command succeeded.** The API is fire-and-forget; the app can
   honestly say "sent" and nothing more.
-- **Use the Škoda logo, brand colour or typeface.** No trademark licence exists
-  for third parties. [decisions.md](docs/decisions.md#branding) has the
-  reasoning and the case law.
+- **Use the Škoda logo or typeface.** No trademark licence exists for third
+  parties, so the name stays a plain word. Škoda Electric Green is the app's
+  one accent colour by decision, not an opening for more of the brand.
+  [decisions.md](docs/decisions.md#branding) has the reasoning and the case
+  law.
 - **Ship a watch face.** Out of scope by choice. The app publishes
   complications so you can put its data on the watch face you already use.

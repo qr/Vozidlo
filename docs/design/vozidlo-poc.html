@@ -1,0 +1,2606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Vozidlo redesign PoC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Roboto:wght@700&family=Roboto+Condensed:wght@700&display=swap">
+<style>
+/* Layout: a review board. Header, sticky toolbar, "What changes" box, the interactive pair,
+   then one section per app area with one full-width row per screen: Today | Proposal (1 or 2). */
+:root {
+  --bg: #eceae6;          /* brushed-titanium paper */
+  --surface: #f7f6f3;
+  --ink: #1d1f22;
+  --ink-2: #565a60;
+  --rule: #d3d0ca;
+  --accent: #0077b6;      /* the one UI accent, darkened for paper */
+  --accent-bg: #e0eef6;
+  --flag: #b45309;        /* design finding */
+  --flag-bg: #fbecd9;
+  --chip: #e2dfd9;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tb-h: 64px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+    --accent: #3db8ff; --accent-bg: #13283a; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+  --accent: #3db8ff; --accent-bg: #13283a; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); overflow-x: hidden; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code { font: .85em var(--font-mono); background: var(--chip); padding: .05em .3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+header h1 { font: 700 2.4rem/1.05 var(--font-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+header .meta { font: 500 .8rem/1.5 var(--font-mono); color: var(--ink-2); margin-top: .5rem; }
+header p { max-width: 72ch; margin: .9rem 0 0; color: var(--ink-2); }
+
+/* toolbar */
+.toolbar { position: sticky; top: 0; z-index: 5; margin-top: 1.25rem; padding: .6rem 0;
+  background: var(--bg); border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; }
+.toolbar .grp { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
+.toolbar .lbl { font: 600 .72rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-right: .25rem; }
+.toolbar button, .toolbar label { font: 500 .85rem/1 var(--font-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; padding: .45rem .65rem; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center; }
+.toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.toolbar label:has(input:checked) { border-color: var(--accent); }
+.toolbar label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toolbar input { accent-color: var(--accent); margin: 0; }
+.toolbar input:focus-visible { outline: none; }
+.toolbar nav { display: flex; gap: .25rem .9rem; flex-wrap: wrap; margin-left: auto; }
+.toolbar nav a { color: var(--ink-2); text-decoration: none; font: 600 .8rem/1.6 var(--font-display); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.toolbar nav a:hover { color: var(--accent); }
+
+/* what changes */
+.changes { margin-top: 1.75rem; border: 1px solid var(--rule); border-left: 4px solid var(--accent); background: var(--surface); border-radius: 4px; padding: 1rem 1.25rem;
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1rem 2.5rem; }
+.changes h2 { font: 700 1.1rem/1.2 var(--font-display); margin: 0 0 .5rem; letter-spacing: .02em; }
+.changes h3 { font: 700 .95rem/1.2 var(--font-display); margin: 0 0 .4rem; letter-spacing: .02em; }
+.changes ul, .changes ol { margin: 0; padding-left: 1.2rem; display: grid; gap: .4rem; }
+.changes li::marker { color: var(--accent); }
+.changes .side { display: grid; gap: 1.1rem; align-content: start; }
+.changes .fact { border-left: 3px solid var(--flag); background: var(--flag-bg); padding: .55rem .8rem; border-radius: 0 4px 4px 0; font-size: .92rem; }
+.changes .fact strong { color: var(--flag); }
+.dec { font: 600 .7rem/1 var(--font-mono); color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: .15rem .3rem; margin-right: .35rem; white-space: nowrap; vertical-align: .1em; }
+
+/* try it */
+#try { margin-top: 2.75rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+#try > h2, section.area > h2 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
+#try > p { color: var(--ink-2); margin: .4rem 0 0; max-width: 85ch; }
+#sim { margin-top: 1rem; max-width: 100%; }
+
+/* board */
+section.area { margin-top: 2.75rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+section.area > h2 small { font: 500 .78rem/1 var(--font-mono); color: var(--ink-2); }
+section.area > p { color: var(--ink-2); margin: .4rem 0 0; max-width: 85ch; }
+section.area > p.neu { color: var(--ink); }
+section.area > .empty { color: var(--ink-2); font-style: italic; margin-top: 1rem; }
+.cards { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
+.card { min-width: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1rem 1.1rem 1.1rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+.card:target { border-color: var(--accent); }
+.card > h3 { font: 700 1.15rem/1.2 var(--font-display); margin: 0; letter-spacing: .01em; display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: baseline; }
+.card > h3 a { color: inherit; text-decoration: none; }
+.card > h3 a:hover { color: var(--accent); }
+.card > h3 .id { font: 500 .72rem/1 var(--font-mono); color: var(--ink-2); }
+.pair { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin-top: .9rem; align-items: flex-start; }
+.pair .neus { display: flex; flex-wrap: wrap; gap: 1rem 2rem; flex: 1 1 0; min-width: min(100%, 300px); }
+.pair figure { margin: 0; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: .45rem; }
+.pair figure.old { padding-right: 2rem; border-right: 1px solid var(--rule); }
+.pair figcaption { display: flex; flex-wrap: wrap; gap: .3rem .4rem; align-items: center; min-height: 1.4rem; }
+.pair figcaption .who { font: 700 .78rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.pair figure.neu figcaption .who { color: var(--accent); }
+.pair figcaption .vl { font: 600 .9rem/1.2 var(--font-body); }
+.pair .src { font: .72rem/1.3 var(--font-mono); color: var(--ink-2); overflow-wrap: anywhere; max-width: 333px; }
+.tag { font: 600 .66rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .28rem .45rem; border-radius: 3px; background: var(--chip); color: var(--ink-2); white-space: nowrap; }
+.tag.mock { color: var(--accent); }
+.tag.sys { font-style: italic; }
+.tag.ex { color: var(--flag); }
+.fix { font: 500 .72rem/1 var(--font-mono); padding: .25rem .4rem; border-radius: 3px; background: var(--chip); color: var(--ink); white-space: nowrap; }
+
+.info { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem 2rem; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--rule); }
+.info h4 { font: 700 .74rem/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin: 0 0 .4rem; }
+.info h4 + h4, .info dl + h4, .info ul + h4 { margin-top: .8rem; }
+.info .fixes { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .6rem; }
+.info ul { margin: 0; padding-left: 1.05rem; font-size: .9rem; display: grid; gap: .25rem; }
+.notes li.flag { color: var(--flag); }
+.notes li.flag::marker { content: "▲ "; font-size: .7em; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: .15rem .7rem; font-size: .88rem; margin: 0; }
+.keys dt { font: 600 .7rem/1.75 var(--font-mono); color: var(--ink-2); }
+.keys dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.keys .vh { grid-column: 1 / -1; font: 600 .8rem/1.4 var(--font-body); color: var(--ink-2); margin-top: .2rem; }
+
+/* the watch: sizes in % of the figure so it shrinks to the column on narrow screens */
+.watch { position: relative; flex: none; aspect-ratio: 1; max-width: 100%; }
+.watch svg.bezel { position: absolute; inset: 0; width: 100%; height: 100%; }
+.watch canvas { position: absolute; border-radius: 50%; image-rendering: pixelated; background: #000; }
+.watch.flat canvas { position: static; display: block; width: 100%; height: 100%; }
+.watch.none { border: 1.5px dashed var(--rule); border-radius: 50%; display: grid; place-items: center; text-align: center; color: var(--ink-2);
+  font: 600 .95rem/1.3 var(--font-display); letter-spacing: .02em; padding: 18%; }
+.watch.none small { display: block; font: 400 .82rem/1.35 var(--font-body); margin-top: .3rem; }
+
+footer { margin-top: 3rem; color: var(--ink-2); font-size: .88rem; border-top: 1px solid var(--rule); padding-top: 1rem; max-width: 90ch; display: grid; gap: .6rem; }
+footer p { margin: 0; }
+.bootfail { margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--flag); background: var(--flag-bg); color: var(--ink); border-radius: 4px; }
+
+@media (max-width: 900px) {
+  .changes { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .watch.none { aspect-ratio: auto; border-radius: 6px; padding: 1.25rem 1rem; width: 100% !important; }
+  .wrap { padding-inline: 16px; padding-block: 20px 48px; }
+  header h1 { font-size: 1.9rem; }
+  .toolbar { gap: .4rem .8rem; }
+  .toolbar nav { margin-left: 0; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding-bottom: .15rem; scrollbar-width: thin; }
+  .changes { padding: .9rem 1rem; }
+  .card { padding: .8rem .75rem .9rem; }
+  .pair, .pair .neus { gap: 1rem; }
+  .pair figure { width: 100%; }
+  .pair figure.old { padding-right: 0; border-right: 0; padding-bottom: 1rem; border-bottom: 1px solid var(--rule); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+<script>
+// Count JS errors from the very start, so a throw in any part still shows up in data-js-errors.
+window.__jsErrors = 0;
+window.addEventListener("error", function () { window.__jsErrors++; if (document.body) document.body.dataset.jsErrors = window.__jsErrors; });
+window.addEventListener("unhandledrejection", function () { window.__jsErrors++; if (document.body) document.body.dataset.jsErrors = window.__jsErrors; });
+</script>
+
+<div class="wrap">
+<header>
+  <h1>Vozidlo redesign</h1>
+  <div class="meta">fēnix 7 Pro · 260 × 260 round MIP · OLD = app at 3c4d005 · NEW = "Night Panel" proposal · 2026-10-07</div>
+  <p>Each row shows one screen twice. The left watch is the app today, redrawn from its code. The right watch is the proposal. Garmin's own UI (menus, confirmations, toasts) is drawn from the device files. Values come from the mock car unless a card says Example.</p>
+</header>
+
+<div class="toolbar" role="toolbar" aria-label="View options" id="toolbar">
+  <div class="grp"><span class="lbl">Scale</span>
+    <button type="button" data-scale="1">1×</button>
+    <button type="button" data-scale="1.5">1.5×</button>
+    <button type="button" data-scale="2">2×</button>
+  </div>
+  <div class="grp"><span class="lbl">Show</span>
+    <label for="optBezel"><input type="checkbox" id="optBezel" data-opt="bezel"> Bezel</label>
+    <label for="optGaps"><input type="checkbox" id="optGaps" data-opt="gaps"> Font gaps</label>
+    <label for="optGuides"><input type="checkbox" id="optGuides" data-opt="guides"> Guides</label>
+    <label for="optMono" title="Draws the proposal in black and white only"><input type="checkbox" id="optMono" data-opt="mono"> Monochrome (NEW)</label>
+  </div>
+  <nav aria-label="Sections">
+    <a href="#try">Try it</a><a href="#entry">Entry</a><a href="#home">Home</a><a href="#status">Status</a><a href="#charging">Charging</a><a href="#findcar">Find my car</a><a href="#settings">Settings</a><a href="#onboarding">Onboarding</a><a href="#garmin">Garmin UI</a>
+  </nav>
+</div>
+
+<div class="changes" id="changes">
+  <div>
+    <h2>What changes</h2>
+    <ul>
+      <li><strong>One accent colour: Škoda green.</strong> Electric Green (#78FAAE on skoda-auto.com, #55FFAA on the watch's 64-colour screen) for titles, focus and progress. Amber only for warnings, always with "!". Red only for failures. No orange.</li>
+      <li><strong>One hero value per screen,</strong> at the widest part of the circle. Digits and % in the number font, words in a text font, so no screen relies on glyphs the number font lacks.</li>
+      <li><strong>Status as chips.</strong> Closed things are outline chips with a check; things that need attention are amber chips ("! Plug in", "! Trunk").</li>
+      <li><strong>No text hints.</strong> The bottom hint lines are gone. Where a button does something you cannot guess, a short arc or glyph sits next to that button.</li>
+      <li><strong>Everything fits the circle.</strong> Every proposal text line is checked against the width of the circle at its height. Dynamic text is cut with "…" or wrapped.</li>
+      <li><strong>Charging is reachable again.</strong> Home gets a Charging tile (grid) or row (list), so it no longer depends on a swipe.</li>
+      <li><strong>Focus survives.</strong> After a command the focus stays on the tile you used. The grid scrolls under a fixed band and never covers it.</li>
+      <li><strong>Plain labels.</strong> Sentence case, no raw API values ("Plugged in", not READY_FOR_CHARGING), one age format ("12 min ago").</li>
+    </ul>
+  </div>
+  <div class="side">
+    <p class="fact"><strong>Checked on the watch:</strong> on home, UP and DOWN move the tile focus. The hint "UP charging - DOWN status" is wrong. So today Charging detail, charge limit, mode and profiles cannot be reached with buttons; only an unconfirmed swipe down might get there.</p>
+    <div>
+      <h3>Open decisions, shown as variants</h3>
+      <ul>
+        <li><span class="dec">D1</span>Home: grid with fixes, or hero value with an action list. <a href="#home-mock">Home</a></li>
+        <li><span class="dec">D2</span>Charging: its own view, or a page inside the Status loop. <a href="#ch-detail">Charging</a></li>
+        <li><span class="dec">D4</span>START on Status: refresh directly, or open an action menu. <a href="#st-lock">Status</a></li>
+        <li><span class="dec">D7</span>Page indicator: Garmin's own arc, or dots. <a href="#st-lock">Status</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Still to check on the watch</h3>
+      <ul>
+        <li>What the number font draws for letters it does not have.</li>
+        <li>Whether a single tap runs a tile.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<section id="try" aria-labelledby="try-h">
+  <h2 id="try-h">Try it</h2>
+  <p>Click the buttons on the bezel; hold UP for MENU. After clicking the area you can also use the arrow keys, Enter, Esc and M. Drag up or down on a screen to swipe.</p>
+  <div id="sim"></div>
+</section>
+
+<main id="board" aria-label="Screens, today and proposed"></main>
+
+<footer>
+  <p><strong>How it is drawn.</strong> Each screen of today is a JavaScript port of the view's <code>onUpdate()</code> at 3c4d005, with the same coordinates and colours. The proposal uses the same drawing calls. Every character sits on the advance width of the fēnix 7 Pro font files from the Connect IQ SDK, so line lengths, wrapping and clipping match the device. Every proposal text line is checked against the circle by an automated fit check.</p>
+  <p><strong>Source.</strong> The proposal and the fix ids (A1 to A23, C1a to C8) are in <code>docs/design/ui-improvements.md</code>. The board of today's screens alone is <code>docs/design/vozidlo-screens.html</code>.</p>
+</footer>
+</div>
+<script>
+// ================================================================ CORE (shared by OLD and NEW)
+// Font metrics from the fēnix 7 Pro "ww" font set (SDK .cft files): xtiny=ROBOTO_13B, tiny=18B, small=20B,
+// medium=24B, large=25B, numMild=BIONIC_COND_30, numMed=BIONIC_COND_36, numHot=BIONIC_BOLD_50.
+const FM = {"xtiny":{"h":19,"asc":15,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[4,4,5,8,8,10,9,3,5,5,7,8,4,6,5,5,8,8,8,8,8,8,8,8,8,8,4,4,7,8,7,7,12,9,9,9,9,8,8,9,10,4,8,9,8,12,10,10,9,10,9,9,9,9,9,12,9,9,8,4,6,4,6,6,5,7,8,7,8,8,5,8,8,4,4,8,4,12,8,8,8,8,5,7,5,8,7,10,7,7,7,5,4,5,9,6,10,11,9,5]},"tiny":{"h":29,"asc":23,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[5,6,7,12,12,15,14,4,8,8,11,11,6,9,7,8,12,12,12,12,12,12,12,12,12,12,6,6,10,12,11,10,18,14,13,13,13,11,11,14,14,6,11,13,11,18,14,14,13,14,13,13,13,13,14,18,13,13,12,6,9,6,9,9,8,11,12,11,12,11,8,12,12,6,6,11,6,17,12,12,12,12,8,11,7,12,11,15,11,10,11,7,6,7,13,9,15,16,13,7]},"small":{"h":32,"asc":25,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[6,7,8,13,13,17,15,4,8,8,12,12,6,9,8,9,13,13,13,13,13,13,13,13,13,13,7,7,12,13,12,12,20,16,15,15,15,13,12,15,16,7,13,14,12,20,16,16,15,16,14,14,14,15,15,20,15,14,14,7,10,7,10,10,9,12,13,12,13,12,9,13,13,7,6,12,7,19,13,13,13,13,9,12,8,13,12,17,12,12,12,8,7,8,15,10,17,17,14,7]},"medium":{"h":37,"asc":30,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[7,8,10,16,15,20,18,5,10,10,14,15,8,11,9,10,15,15,15,15,15,15,15,15,15,15,8,8,14,15,14,14,23,18,17,17,17,15,15,18,19,8,15,17,15,23,19,18,17,18,17,17,17,17,18,23,17,17,16,8,12,8,12,12,10,14,15,14,15,15,10,15,15,8,8,15,8,23,15,15,15,15,10,14,9,15,14,19,14,14,14,9,8,9,17,12,20,20,17,9]},"numMed":{"h":74,"asc":54,"w":" #%+-./0123456789:°","a":[14,38,42,31,18,11,23,27,27,27,27,27,27,27,27,27,27,11,20]}};
+Object.assign(FM, {"large":{"h":40,"asc":32,"w":" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°—…Š·","a":[8,9,11,17,17,21,19,5,11,11,15,16,8,12,10,11,17,17,17,17,17,17,17,17,17,17,9,8,15,17,15,15,25,20,19,19,19,16,16,19,20,9,16,18,16,25,20,20,19,20,18,18,18,19,19,25,19,18,18,9,13,9,13,13,11,16,16,15,16,16,11,17,16,8,8,16,8,25,16,17,16,17,11,15,10,16,15,21,15,15,15,10,8,10,19,13,22,22,18,9]},"numMild":{"h":60,"asc":44,"w":" #%+-./0123456789:°","a":[11,32,34,26,15,9,19,23,23,23,23,23,23,23,23,23,23,9,16]},"numHot":{"h":100,"asc":73,"w":" #%+-./0123456789:°","a":[17,52,57,40,24,16,31,40,40,40,40,40,40,40,40,40,40,16,29]}});
+const FAMILY = { xtiny: "Roboto", tiny: "Roboto", small: "Roboto", medium: "Roboto", large: "Roboto", numMild: "'Roboto Condensed'", numMed: "'Roboto Condensed'", numHot: "'Roboto Condensed'" };
+for (const k in FM) { const m = FM[k]; m.adv = new Map(); [...m.w].forEach((ch, i) => m.adv.set(ch, m.a[i])); }
+
+// Connect IQ Graphics.COLOR_* values
+const COL = { WHITE: "#FFFFFF", LT_GRAY: "#AAAAAA", DK_GRAY: "#555555", BLACK: "#000000", RED: "#FF0000", DK_RED: "#AA0000",
+  ORANGE: "#FF5500", YELLOW: "#FFAA00", GREEN: "#00FF00", DK_GREEN: "#00AA00", BLUE: "#00AAFF", DK_BLUE: "#0000FF" };
+
+const OPT = { scale: 1, bezel: true, gaps: false, guides: false, mono: false };
+try { const s = JSON.parse(localStorage.getItem("vozidlo-poc-opt") || "null"); if (s) Object.assign(OPT, s); } catch (e) {}
+
+let PX = {};  // calibrated CSS font size per watch font
+function calibrate() {
+  const c = document.createElement("canvas").getContext("2d");
+  for (const k in FM) {
+    c.font = `700 100px ${FAMILY[k]}, sans-serif`;
+    PX[k] = 100 * FM[k].adv.get("0") / c.measureText("0").width;
+  }
+}
+
+// ---------------------------------------------------------------- a tiny Dc
+// Port of the Connect IQ drawing calls the app uses, plus a few the NEW design needs
+// (drawArc, arcBand, setClip). Angles are CANVAS degrees: 0 = 3 o'clock, clockwise.
+const J = { CENTER: 1, LEFT: 2, RIGHT: 0, VCENTER: 4 };
+class Dc {
+  constructor(ctx, w, h) { this.c = ctx; this.w = w; this.h = h; this.fg = COL.WHITE; this.rawFg = COL.WHITE; this.bg = COL.BLACK; this.pen = 1; this.mono = false; this.clip = null; this.tx = 0; this.ty = 0; }
+  getWidth() { return this.w; } getHeight() { return this.h; }
+  _m(col) { return this.mono && col && col.toUpperCase() !== "#000000" ? "#FFFFFF" : col; }
+  setColor(fg, bg) { this.rawFg = fg; this.fg = this._m(fg); if (bg && bg !== "T") this.bg = this._m(bg); }
+  setPenWidth(p) { this.pen = p; }
+  translate(x, y) { this.tx += x; this.ty += y; this.c.translate(x, y); }
+  setClip(x, y, w, h) { this.c.save(); this.c.beginPath(); this.c.rect(x, y, w, h); this.c.clip(); this.clip = { x: x + this.tx, y: y + this.ty, w, h }; }
+  clearClip() { if (this.clip) { this.c.restore(); this.clip = null; } }
+  _fill(l, t, r, b) { if (Dc.onDraw) Dc.onDraw({ op: "fill", left: l + this.tx, top: t + this.ty, right: r + this.tx, bottom: b + this.ty, color: this.rawFg, clip: this.clip, mono: this.mono }); }
+  clear() { this.c.fillStyle = this.bg; this.c.fillRect(0, 0, this.w, this.h); }
+  fillRectangle(x, y, w, h) { this.c.fillStyle = this.fg; this.c.fillRect(x, y, w, h); this._fill(x, y, x + w, y + h); }
+  fillRoundedRectangle(x, y, w, h, r) { const c = this.c; c.fillStyle = this.fg; c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); this._fill(x, y, x + w, y + h); }
+  drawRoundedRectangle(x, y, w, h, r) { const c = this.c, p = this.pen; c.strokeStyle = this.fg; c.lineWidth = p; c.beginPath(); c.roundRect(x + p / 2, y + p / 2, w - p, h - p, r); c.stroke(); }
+  drawRectangle(x, y, w, h) { const c = this.c, p = this.pen; c.strokeStyle = this.fg; c.lineWidth = p; c.strokeRect(x + p / 2, y + p / 2, w - p, h - p); }
+  drawCircle(cx, cy, r) { const c = this.c; c.strokeStyle = this.fg; c.lineWidth = this.pen; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke(); }
+  fillCircle(cx, cy, r) { const c = this.c; c.fillStyle = this.fg; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill(); this._fill(cx - r, cy - r, cx + r, cy + r); }
+  drawLine(x1, y1, x2, y2) { const c = this.c; c.strokeStyle = this.fg; c.lineWidth = this.pen; c.lineCap = "butt"; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
+  fillPolygon(pts) { const c = this.c; c.fillStyle = this.fg; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill();
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); this._fill(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)); }
+  drawArc(cx, cy, r, a0, a1) { const c = this.c; c.strokeStyle = this.fg; c.lineWidth = this.pen; c.lineCap = "butt"; c.beginPath(); c.arc(cx, cy, r, a0 * Math.PI / 180, a1 * Math.PI / 180); c.stroke(); }
+  arcBand(cx, cy, r0, r1, a0, a1) { const c = this.c, A0 = a0 * Math.PI / 180, A1 = a1 * Math.PI / 180; c.fillStyle = this.fg; c.beginPath(); c.arc(cx, cy, r1, A0, A1); c.arc(cx, cy, r0, A1, A0, true); c.closePath(); c.fill(); }
+  getFontHeight(f) { return FM[f].h; }
+  charAdv(f, ch) { const a = FM[f].adv.get(ch); if (a !== undefined) return a; const c = this.c; c.font = `700 ${PX[f]}px ${FAMILY[f]}, sans-serif`; return Math.round(c.measureText(ch).width) || Math.round(FM[f].h * 0.35); }
+  getTextWidthInPixels(s, f) { let w = 0; for (const ch of String(s)) w += this.charAdv(f, ch); return w; }
+  drawText(x, y, f, text, just = J.LEFT) {
+    const m = FM[f], c = this.c, lines = String(text).split("\n");
+    let top = (just & J.VCENTER) ? y - Math.floor(lines.length * m.h / 2) : y;
+    c.font = `700 ${PX[f]}px ${FAMILY[f]}, sans-serif`; c.textBaseline = "alphabetic";
+    for (const line of lines) {
+      const w = this.getTextWidthInPixels(line, f);
+      const hj = just & 3; let cx = hj === J.CENTER ? x - Math.floor(w / 2) : hj === J.LEFT ? x : x - w;
+      if (Dc.onDraw) Dc.onDraw({ op: "text", font: f, text: line, top: top + this.ty, bottom: top + m.h + this.ty, asc: m.asc, left: cx + this.tx, right: cx + w + this.tx, color: this.rawFg, clip: this.clip, mono: this.mono });
+      for (const ch of line) {
+        const adv = this.charAdv(f, ch), known = m.adv.has(ch);
+        if (!known && OPT.gaps) {
+          c.save(); c.strokeStyle = "#FF00FF"; c.lineWidth = 1.5; c.setLineDash([3, 2]);
+          c.strokeRect(cx + 1.5, top + m.asc * 0.35, adv - 3, m.asc * 0.65); c.restore();
+        } else {
+          c.fillStyle = this.fg; const gw = c.measureText(ch).width;
+          c.fillText(ch, cx + (adv - gw) / 2, top + m.asc);
+        }
+        cx += adv;
+      }
+      top += m.h;
+    }
+  }
+}
+Dc.onDraw = null;   // fitcheck hook: receives {op:"text"|"fill", ...absolute coordinates}
+
+
+// ---------------------------------------------------------------- ports of shared helpers
+const R = 130;
+const TB = {
+  MARGIN: 8,
+  halfChord(r, dy) { const r2 = r * r, d2 = dy * dy; return d2 >= r2 ? 0 : Math.floor(Math.sqrt(r2 - d2)); },
+  lineWidth(r, cy, top, bottom) { const dy = Math.max(Math.abs(top - cy), Math.abs(bottom - cy)); const u = 2 * this.halfChord(r, dy) - 2 * this.MARGIN; return u > 0 ? u : 0; },
+  wrap(text, widths, measure) {
+    const lines = [], words = text.split(/\s+/).filter(Boolean); let cur = "";
+    const wf = i => widths.length === 0 ? 0 : widths[Math.min(i, widths.length - 1)];
+    for (const word of words) {
+      let limit = wf(lines.length); const cand = cur ? cur + " " + word : word;
+      if (measure(cand) <= limit) { cur = cand; continue; }
+      if (cur) { lines.push(cur); cur = ""; limit = wf(lines.length); }
+      if (measure(word) <= limit) { cur = word; continue; }
+      let rest = word;
+      while (measure(rest) > limit && rest.length > 1) { let n = 1; while (n < rest.length && measure(rest.slice(0, n + 1)) <= limit) n++; lines.push(rest.slice(0, n)); rest = rest.slice(n); limit = wf(lines.length); }
+      cur = rest;
+    }
+    if (cur) lines.push(cur); return lines;
+  },
+  // TextBlock.draw: wraps into the circle's chord widths, centred vertically
+  draw(dc, text, f, color) {
+    const lh = FM[f].h, cy = dc.getHeight() / 2, measure = s => dc.getTextWidthInPixels(s, f);
+    let lines = [], count = 1;
+    for (let pass = 0; pass < 6; pass++) {
+      const top = cy - Math.floor(count * lh / 2), widths = [];
+      for (let i = 0; i < count; i++) widths.push(this.lineWidth(R, cy, top + i * lh, top + i * lh + lh));
+      lines = this.wrap(text, widths, measure);
+      if (lines.length === count || lines.length === 0) break; count = lines.length;
+    }
+    const maxLines = Math.floor(dc.getHeight() / lh);
+    if (lines.length > maxLines) { lines = lines.slice(0, maxLines); lines[lines.length - 1] += "…"; }
+    dc.setColor(color); const top = cy - Math.floor(lines.length * lh / 2);
+    lines.forEach((l, i) => dc.drawText(130, top + i * lh, f, l, J.CENTER));
+  },
+  // TextBlock.drawFittedLine: moves the line up until it fits the circle
+  fitted(dc, text, f, color, preferredY) {
+    const lh = FM[f].h, half = Math.floor(lh / 2), cy = 130; let y = preferredY, found = cy;
+    const tw = dc.getTextWidthInPixels(text, f);
+    while (y > cy) { if (this.lineWidth(R, cy, y - half, y + half) >= tw) { found = y; break; } y -= 2; }
+    if (y <= cy) found = cy;
+    dc.setColor(color); dc.drawText(130, found, f, text, J.CENTER); return found;
+  }
+};
+
+const Icons = {
+  sw(r) { const w = Math.trunc(r / 4); return w < 2 ? 2 : w; },
+  draw(dc, s, cx, cy, r, color) {
+    const t = Math.trunc; dc.setColor(color); dc.setPenWidth(this.sw(r));
+    if (s === "locked" || s === "unlocked") {
+      const bw = t(r * 1.5), bh = t(r * 1.05), bx = t(cx - bw / 2), by = t(cy - r * 0.1), sw = t(r * 0.9), sh = t(r * 1.05);
+      const sx = s === "locked" ? t(cx - sw / 2) : t(bx - r * 0.05), sy = s === "locked" ? t(cy - r * 1.05) : t(cy - r * 1.35);
+      dc.drawRoundedRectangle(sx, sy, sw, sh, t(sw / 2)); dc.fillRoundedRectangle(bx, by, bw, bh, t(r * 0.25));
+    } else if (s === "open") {
+      const px = t(cx - r * 0.5); dc.drawLine(px, t(cy - r), px, t(cy + r));
+      dc.fillPolygon([[px, t(cy - r * 0.6)], [px, t(cy - r * 0.05)], [t(cx + r * 0.7), t(cy - r * 0.35)]]);
+    } else if (s === "charging") {
+      const k = r / 7; dc.fillPolygon([[1, -7], [-5, 1], [-0.5, 1], [-1.5, 7], [5, -1.5], [0.5, -1.5]].map(([a, b]) => [t(cx + a * k), t(cy + b * k)]));
+    } else if (s === "pluggedIn") {
+      dc.fillRoundedRectangle(t(cx - r * 0.5), t(cy - r * 0.1), t(r), t(r * 0.9), t(r * 0.2));
+      dc.fillRoundedRectangle(t(cx - r * 0.32), t(cy - r * 0.7), t(r * 0.18), t(r * 0.6), t(r * 0.06));
+      dc.fillRoundedRectangle(t(cx + r * 0.12), t(cy - r * 0.7), t(r * 0.18), t(r * 0.6), t(r * 0.06));
+    } else if (s === "climate") {
+      dc.drawLine(t(cx - r), cy, t(cx + r), cy); dc.drawLine(cx, t(cy - r), cx, t(cy + r));
+      dc.drawLine(t(cx - r * .7), t(cy - r * .7), t(cx + r * .7), t(cy + r * .7)); dc.drawLine(t(cx - r * .7), t(cy + r * .7), t(cx + r * .7), t(cy - r * .7));
+    } else { dc.drawCircle(cx, cy, r); dc.drawLine(t(cx - r * .5), cy, t(cx + r * .5), cy); }
+    dc.setPenWidth(1);
+  },
+  forLock(raw) { return raw == null ? "unknown" : raw === "YES" ? "locked" : raw === "NO" ? "unlocked" : (raw === "OPENED" || raw === "TRUNK_OPENED") ? "open" : "unknown"; },
+  forCharging(raw) { return raw === "CHARGING" ? "charging" : ["READY_FOR_CHARGING", "CONSERVING", "CHARGING_INTERRUPTED"].includes(raw) ? "pluggedIn" : null; },
+  forClimate(raw) { return ["HEATING", "COOLING", "VENTILATION", "HEATING_AUXILIARY"].includes(raw) ? "climate" : null; }
+};
+const DASH = "—";
+
+// ---------------------------------------------------------------- mock vehicle (mock/vehicle_data.py)
+const MOCK = { soc: 100, chargingState: "READY_FOR_CHARGING", lock: "YES", climate: "OFF",
+  address: "Testlaan 1, 1000 AA Teststad, Netherlands", odometer: 123456, range: 436 };
+const lockLabel = r => r == null ? DASH : r === "YES" ? "LOCKED" : r === "NO" ? "UNLOCKED" : r === "OPENED" ? "OPEN" : r === "TRUNK_OPENED" ? "TRUNK OPEN" : r;
+
+function bezelSvg(d) {
+  // d = screen diameter in CSS px; ring and buttons scale with it
+  const ring = d * 0.14, size = d + ring * 2, c = size / 2, ro = d / 2 + ring * 0.9;
+  const btn = (deg) => {
+    const a = (deg - 90) * Math.PI / 180, x = c + (ro + d * 0.035) * Math.cos(a), y = c + (ro + d * 0.035) * Math.sin(a);
+    return `<rect x="${x - d * .035}" y="${y - d * .075}" width="${d * .07}" height="${d * .15}" rx="${d * .02}" fill="#8b8f94" stroke="#55595e" transform="rotate(${deg + 90} ${x} ${y})"/>`;
+  };
+  return `<svg class="bezel" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+    ${btn(300)}${btn(270)}${btn(240)}${btn(60)}${btn(120)}
+    <circle cx="${c}" cy="${c}" r="${ro}" fill="#6e7378"/>
+    <circle cx="${c}" cy="${c}" r="${ro - ring * .08}" fill="#4a4e53"/>
+    <circle cx="${c}" cy="${c}" r="${d / 2 + ring * 0.62}" fill="#2a2c2f"/>
+    <circle cx="${c}" cy="${c}" r="${d / 2 + 2}" fill="#000"/>
+    ${[300, 270, 240, 60, 120].map((deg, i) => { const L = ["LIGHT", "UP · MENU", "DOWN", "START", "BACK"][i]; const a = (deg - 90) * Math.PI / 180, lx = c + (d / 2 + ring * 0.42) * Math.cos(a), ly = c + (d / 2 + ring * 0.42) * Math.sin(a);
+      return `<text x="${lx}" y="${ly}" fill="#c9ccd0" font-family="Barlow Semi Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="${Math.max(7, d * 0.03)}" text-anchor="middle" dominant-baseline="middle" letter-spacing=".05em" transform="rotate(${deg > 180 ? deg - 270 : deg - 90} ${lx} ${ly})">${L}</text>`; }).join("")}
+  </svg>`;
+}
+
+function guides(dc) {
+  const c = dc.c; c.save(); c.strokeStyle = "rgba(255,0,255,.65)"; c.lineWidth = 1; c.setLineDash([4, 3]);
+  c.beginPath(); c.arc(130, 130, 122, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.moveTo(130, 0); c.lineTo(130, 260); c.moveTo(0, 130); c.lineTo(260, 130); c.stroke();
+  c.strokeStyle = "rgba(0,170,255,.5)"; c.setLineDash([2, 4]);
+  for (let y = 52; y < 260; y += 52) { c.beginPath(); c.moveTo(0, y); c.lineTo(260, y); c.stroke(); }
+  c.restore();
+}
+
+
+// ================================================================ NEW DESIGN CORE ("Night Panel")
+// Theme tokens, label/age helpers, icon set, drawing helpers and Garmin's native UI.
+// Every NEW screen is built from these; agents do not draw colours or fonts by hand
+// except through T.* and the font names in FM.
+// ACCENT = Škoda Electric Green #78FAAE (read from skoda-auto.com, 2026-10-07) as the fēnix 7 Pro's
+// 64-colour palette shows it; Emerald #0E3A2F becomes #005555 there (too dark for an accent on black).
+const T = { BG: "#000000", RULE: "#555555", TEXT_1: "#FFFFFF", TEXT_2: "#AAAAAA", ACCENT: "#55FFAA", EMERALD: "#005555",
+  POSITIVE: "#00FF00", WARNING: "#FFAA00", DESTRUCTIVE: "#FF0000", BLACK: "#000000" };
+// Retired colours (orange meant both "error" and "unlocked" in the app today).
+const BANNED = ["#FF5500"];
+// Canvas angle (deg) of each physical button on the fēnix 7 Pro bezel.
+const BTN = { start: -30, back: 30, down: 150, up: 180, light: 210 };
+
+const Age = {
+  // NEW age format (B4): "Just now", "5 min ago", "2 h ago", "3 d ago"
+  short(min) { if (min < 1) return "Just now"; if (min < 60) return min + " min"; if (min < 1440) return Math.floor(min / 60) + " h"; return Math.floor(min / 1440) + " d"; },
+  text(min) { const s = Age.short(min); return s === "Just now" ? s : s + " ago"; },
+  stale(min) { return min > 60; }
+};
+
+const Labels = {
+  human(raw) { if (raw == null) return "—"; const s = String(raw).toLowerCase().replace(/_/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); },
+  charging(raw) { return ({ CHARGING: "Charging", READY_FOR_CHARGING: "Plugged in", CONNECT_CABLE: "Plug in", CHARGING_INTERRUPTED: "Paused", CONSERVING: "Conserving", DISCHARGING: "Discharging" })[raw] || Labels.human(raw); },
+  lock(raw) { return ({ YES: "Locked", NO: "Unlocked", OPENED: "Open", TRUNK_OPENED: "Trunk open", UNKNOWN: "Unknown" })[raw] || Labels.human(raw); },
+  state(raw) { return ({ CLOSED: "Closed", OPEN: "Open", ON: "On", OFF: "Off" })[raw] || Labels.human(raw); },
+  engine(raw) { return ({ GASOLINE: "Petrol", ELECTRIC: "Electric", DIESEL: "Diesel", CNG: "Gas" })[raw] || Labels.human(raw); },
+  climate(raw) { return ({ OFF: "Off", HEATING: "Heating", COOLING: "Cooling", VENTILATION: "Ventilating", HEATING_AUXILIARY: "Aux heating" })[raw] || Labels.human(raw); },
+  chargeType(raw) { return ({ AC: "AC", DC: "DC fast", OFF: "Not charging" })[raw] || Labels.human(raw); }
+};
+
+// NEW mock: same car as mock/vehicle_data.py, plus the fields the new screens show.
+const NMOCK = { soc: 100, rangeKm: 36, limit: null, totalRange: 436, odometer: 123456,
+  lock: "YES", doors: "CLOSED", windows: "CLOSED", bonnet: "CLOSED", trunk: "CLOSED", lights: "OFF", sunroof: "UNSUPPORTED",
+  charging: "READY_FOR_CHARGING", climate: "OFF", targetTemp: 21, heatFront: "OFF", heatRear: "OFF",
+  primary: { engine: "GASOLINE", pct: 62 }, secondary: { engine: "ELECTRIC", pct: 100 },
+  address: "Testlaan 1, 1000 AA Teststad, Netherlands", ageMin: 12, statusAgeMin: 13 };
+
+// ---------------------------------------------------------------- icons
+// Solid silhouettes (B4). Old StateIcons names keep working; new names are added.
+const NIcons = {
+  draw(dc, name, cx, cy, r, color) {
+    const t = Math.trunc;
+    if (["locked", "unlocked", "open", "charging", "pluggedIn", "climate", "unknown"].includes(name)) { Icons.draw(dc, name, cx, cy, r, color); return; }
+    dc.setColor(color); dc.setPenWidth(Math.max(2, t(r / 3)));
+    switch (name) {
+      case "bolt": Icons.draw(dc, "charging", cx, cy, r, color); break;
+      case "battery": dc.drawRoundedRectangle(t(cx - r), t(cy - r * .55), t(r * 1.8), t(r * 1.1), 2); dc.fillRectangle(t(cx + r * .8), t(cy - r * .25), t(r * .25), t(r * .5)); dc.fillRectangle(t(cx - r * .7), t(cy - r * .3), t(r * 1.2), t(r * .6)); break;
+      case "range": dc.fillPolygon([[t(cx - r), cy], [t(cx + r * .2), t(cy - r * .8)], [t(cx + r * .2), t(cy - r * .3)], [t(cx + r), t(cy - r * .3)], [t(cx + r), t(cy + r * .3)], [t(cx + r * .2), t(cy + r * .3)], [t(cx + r * .2), t(cy + r * .8)]]); break;
+      case "fan": for (let i = 0; i < 3; i++) { const a = i * 2.094; dc.fillCircle(t(cx + Math.cos(a) * r * .5), t(cy + Math.sin(a) * r * .5), t(r * .45)); } dc.setColor(T.BLACK); dc.fillCircle(cx, cy, Math.max(1, t(r * .18))); break;
+      case "pin": dc.fillCircle(cx, t(cy - r * .25), t(r * .65)); dc.fillPolygon([[t(cx - r * .55), t(cy - r * .05)], [t(cx + r * .55), t(cy - r * .05)], [cx, t(cy + r)]]); dc.setColor(T.BLACK); dc.fillCircle(cx, t(cy - r * .25), Math.max(1, t(r * .25))); break;
+      case "list": for (let i = -1; i <= 1; i++) dc.fillRectangle(t(cx - r), t(cy + i * r * .65 - r * .15), t(r * 2), Math.max(2, t(r * .3))); break;
+      case "gear": dc.fillCircle(cx, cy, t(r * .7)); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; dc.fillCircle(t(cx + Math.cos(a) * r * .8), t(cy + Math.sin(a) * r * .8), Math.max(1, t(r * .25))); } dc.setColor(T.BLACK); dc.fillCircle(cx, cy, Math.max(1, t(r * .3))); break;
+      case "stop": dc.fillRoundedRectangle(t(cx - r * .75), t(cy - r * .75), t(r * 1.5), t(r * 1.5), 2); break;
+      case "refresh": dc.drawArc(cx, cy, t(r * .75), -60, 240); dc.fillPolygon([[t(cx + r * .2), t(cy - r * 1.05)], [t(cx + r * .95), t(cy - r * .65)], [t(cx + r * .2), t(cy - r * .2)]]); break;
+      case "check": dc.setPenWidth(Math.max(2, t(r / 2.5))); dc.drawLine(t(cx - r * .8), t(cy), t(cx - r * .2), t(cy + r * .6)); dc.drawLine(t(cx - r * .2), t(cy + r * .6), t(cx + r * .85), t(cy - r * .6)); break;
+      case "cross": dc.setPenWidth(Math.max(2, t(r / 2.5))); dc.drawLine(t(cx - r * .7), t(cy - r * .7), t(cx + r * .7), t(cy + r * .7)); dc.drawLine(t(cx + r * .7), t(cy - r * .7), t(cx - r * .7), t(cy + r * .7)); break;
+      case "bang": dc.fillRectangle(t(cx - r * .17), t(cy - r), Math.max(2, t(r * .34)), t(r * 1.25)); dc.fillRectangle(t(cx - r * .17), t(cy + r * .55), Math.max(2, t(r * .34)), Math.max(2, t(r * .38))); break;
+      case "plus": dc.fillRectangle(t(cx - r), t(cy - r * .18), t(r * 2), Math.max(2, t(r * .36))); dc.fillRectangle(t(cx - r * .18), t(cy - r), Math.max(2, t(r * .36)), t(r * 2)); break;
+      case "minus": dc.fillRectangle(t(cx - r), t(cy - r * .18), t(r * 2), Math.max(2, t(r * .36))); break;
+      case "menu": for (let i = -1; i <= 1; i++) dc.fillCircle(cx, t(cy + i * r * .7), Math.max(1, t(r * .22))); break;
+      case "map": dc.fillPolygon([[t(cx - r), t(cy - r * .7)], [t(cx - r * .33), t(cy - r)], [t(cx + r * .33), t(cy - r * .7)], [t(cx + r), t(cy - r)], [t(cx + r), t(cy + r * .7)], [t(cx + r * .33), t(cy + r)], [t(cx - r * .33), t(cy + r * .7)], [t(cx - r), t(cy + r)]]); dc.setColor(T.BLACK); dc.setPenWidth(1); dc.drawLine(t(cx - r * .33), t(cy - r), t(cx - r * .33), t(cy + r * .7)); dc.drawLine(t(cx + r * .33), t(cy - r * .7), t(cx + r * .33), t(cy + r)); break;
+      case "thermo": dc.fillRoundedRectangle(t(cx - r * .22), t(cy - r), t(r * .44), t(r * 1.3), t(r * .22)); dc.fillCircle(cx, t(cy + r * .55), t(r * .45)); break;
+      default: Icons.draw(dc, "unknown", cx, cy, r, color);
+    }
+    dc.setPenWidth(1);
+  }
+};
+
+// ---------------------------------------------------------------- Ui helpers (NEW only)
+const NUMBER_GLYPHS = " #%+-./0123456789:°";
+const Ui = {
+  isNumberGlyphs(s) { return [...String(s)].every(ch => NUMBER_GLYPHS.includes(ch)); },
+  usable(top, bottom, margin = 8) { return Math.max(0, TB.lineWidth(R, 130, top, bottom) - 2 * (margin - 8)); },
+  fit(dc, text, font, maxW) { let s = String(text); if (dc.getTextWidthInPixels(s, font) <= maxW) return s; while (s.length > 1 && dc.getTextWidthInPixels(s + "…", font) > maxW) s = s.slice(0, -1); return s.replace(/\s+$/, "") + "…"; },
+  wrap(dc, text, font, widths, maxLines = widths.length) {
+    let lines = TB.wrap(String(text), widths, s => dc.getTextWidthInPixels(s, font));
+    if (lines.length > maxLines) { lines = lines.slice(0, maxLines); const i = maxLines - 1; lines[i] = Ui.fit(dc, lines[i] + "…", font, widths[Math.min(i, widths.length - 1)]); }
+    return lines;
+  },
+  // Accent title, tiny font, top at y; fitted to the chord at that height.
+  title(dc, text, y = 34) { const h = FM.tiny.h; const s = Ui.fit(dc, text, "tiny", Ui.usable(y, y + h)); dc.setColor(T.ACCENT); dc.drawText(130, y, "tiny", s, J.CENTER); const w = dc.getTextWidthInPixels(s, "tiny"); return { x: 130 - w / 2, y, w, h }; },
+  // Digits (and % °) in a number font, unit in a text font, baselines aligned. y = top of the number box.
+  drawValueWithUnit(dc, cx, y, value, unit, o = {}) {
+    const num = o.num || "numMed", uf = o.unitFont || "medium", gap = o.gap == null ? 4 : o.gap;
+    if (!Ui.isNumberGlyphs(value)) throw new Error("drawValueWithUnit: '" + value + "' has characters the number font lacks");
+    const wv = dc.getTextWidthInPixels(value, num), wu = unit ? dc.getTextWidthInPixels(unit, uf) : 0, total = wv + (unit ? gap + wu : 0);
+    const x0 = Math.round(cx - total / 2);
+    dc.setColor(o.color || T.TEXT_1); dc.drawText(x0, y, num, value, J.LEFT);
+    if (unit) { dc.setColor(o.unitColor || T.TEXT_2); dc.drawText(x0 + wv + gap, y + FM[num].asc - FM[uf].asc, uf, unit, J.LEFT); }
+    return { x: x0, y, w: total, h: FM[num].h };
+  },
+  // Hero: either a word (FONT_MEDIUM, white) with an optional icon in front, or a number with unit.
+  drawHero(dc, o) {
+    const cx = o.cx || 130;
+    if (o.word != null) {
+      const f = o.font || "medium", w = dc.getTextWidthInPixels(o.word, f), iw = o.icon ? 2 * (o.iconR || 12) + 8 : 0, x0 = Math.round(cx - (w + iw) / 2);
+      if (o.icon) NIcons.draw(dc, o.icon, x0 + (o.iconR || 12), o.y + Math.round(FM[f].h / 2), o.iconR || 12, o.color || T.TEXT_1);
+      dc.setColor(o.color || T.TEXT_1); dc.drawText(x0 + iw, o.y, f, o.word, J.LEFT);
+      return { x: x0, y: o.y, w: w + iw, h: FM[f].h };
+    }
+    return Ui.drawValueWithUnit(dc, cx, o.y, o.value, o.unit, o);
+  },
+  chipWidth(dc, c) { const f = c.font || "xtiny"; const icon = c.icon || (c.kind === "warn" || c.kind === "error" ? "bang" : null); return 16 + (icon ? 14 : 0) + dc.getTextWidthInPixels(c.text, f); },
+  // Chip: pill with icon + one word. y = top. kinds: outline | warn | error | accent | white
+  drawChip(dc, cx, y, c) {
+    const h = c.h || 20, f = c.font || "xtiny", kind = c.kind || "outline", w = Ui.chipWidth(dc, c), x = Math.round(cx - w / 2);
+    const icon = c.icon || (kind === "warn" || kind === "error" ? "bang" : null);
+    const fill = { warn: T.WARNING, error: T.DESTRUCTIVE, accent: T.ACCENT, white: T.TEXT_1 }[kind];
+    let fg = T.TEXT_1;
+    if (fill) { dc.setColor(fill); dc.fillRoundedRectangle(x, y, w, h, h / 2); fg = T.BLACK; }
+    else { dc.setColor(T.RULE); dc.setPenWidth(1); dc.drawRoundedRectangle(x, y, w, h, h / 2); }
+    let tx = x + 8;
+    if (icon) { NIcons.draw(dc, icon, tx + 6, y + h / 2, 6, fg); tx += 14; }
+    dc.setColor(fg); dc.drawText(tx, y + Math.round(h / 2), f, c.text, J.LEFT | J.VCENTER);
+    return { x, y, w, h };
+  },
+  drawChipRow(dc, y, chips, gap = 6) {
+    const ws = chips.map(c => Ui.chipWidth(dc, c)), total = ws.reduce((a, b) => a + b, 0) + gap * (chips.length - 1);
+    let x = 130 - total / 2; chips.forEach((c, i) => { Ui.drawChip(dc, x + ws[i] / 2, y, c); x += ws[i] + gap; });
+    return { x: 130 - total / 2, y, w: total, h: chips[0] && chips[0].h || 20 };
+  },
+  // Focused row: accent pill, black label; falls back to small when the label is too wide.
+  focusPill(dc, x, y, w, h, label, font = "medium") {
+    dc.setColor(dc.mono ? T.TEXT_1 : T.ACCENT); dc.fillRoundedRectangle(x, y, w, h, h / 2);
+    let f = font; if (dc.getTextWidthInPixels(label, f) > w - 16) f = "small"; if (dc.getTextWidthInPixels(label, f) > w - 16) f = "tiny";
+    dc.setColor(T.BLACK); dc.drawText(x + w / 2, y + Math.round(h / 2), f, Ui.fit(dc, label, f, w - 16), J.CENTER | J.VCENTER);
+    return { x, y, w, h };
+  },
+  // Ring around the bezel from 12 o'clock clockwise.
+  drawRing(dc, frac, o = {}) {
+    const r = o.r || 126, pen = o.pen || 4;
+    dc.setPenWidth(pen); dc.setColor(o.track || T.RULE); dc.drawArc(130, 130, r, 0, 360);
+    if (frac > 0) { dc.setColor(o.fill || T.TEXT_1); dc.drawArc(130, 130, r, -90, -90 + 360 * Math.min(1, frac)); }
+    if (o.tick != null) { const a = (-90 + 360 * o.tick) * Math.PI / 180; dc.setPenWidth(2); dc.setColor(o.tickColor || T.TEXT_1); dc.drawLine(130 + Math.cos(a) * (r - 7), 130 + Math.sin(a) * (r - 7), 130 + Math.cos(a) * (r + 3), 130 + Math.sin(a) * (r + 3)); }
+    dc.setPenWidth(1);
+  },
+  // Personality-style hint arc at a button: 4 px band r 124..128, ±10° around the button.
+  drawHintArc(dc, pos, kind = "dark") {
+    dc.setColor({ dark: T.TEXT_1, accent: T.ACCENT, positive: "#00AA00", destructive: T.DESTRUCTIVE }[kind] || T.TEXT_1);
+    dc.arcBand(130, 130, 124, 128, BTN[pos] - 10, BTN[pos] + 10);
+  },
+  // Small glyph inside the bezel next to a button (r 108), plus its hint arc.
+  drawBezelGlyph(dc, pos, glyph, color = T.TEXT_2, arc = "dark") {
+    const a = BTN[pos] * Math.PI / 180, x = Math.round(130 + Math.cos(a) * 108), y = Math.round(130 + Math.sin(a) * 108);
+    NIcons.draw(dc, glyph, x, y, 6, color); if (arc) Ui.drawHintArc(dc, pos, arc);
+    return { x: x - 6, y: y - 6, w: 12, h: 12 };
+  },
+  drawPageIndicator(dc, idx, count, style = "arc") {
+    if (style === "arc") { Native.pageIndicatorArc(dc, idx, count); return; }
+    for (let i = 0; i < count; i++) {
+      const a = (180 + ((count - 1) / 2 - i) * 7.5) * Math.PI / 180, x = Math.round(130 + Math.cos(a) * 118), y = Math.round(130 + Math.sin(a) * 118);
+      if (i === idx) { dc.setColor(T.ACCENT); dc.fillCircle(x, y, 4); } else { dc.setColor(T.RULE); dc.fillCircle(x, y, 3); }
+    }
+  },
+  // Scroll position on the right bezel: track ±15° at r 126, thumb sized visible/total.
+  drawScrollArc(dc, first, visible, total) {
+    if (total <= visible) return;
+    const span = 30, a0 = -span / 2, thumb = span * visible / total, start = a0 + span * first / total;
+    dc.setPenWidth(3); dc.setColor(T.RULE); dc.drawArc(130, 130, 126, a0, a0 + span);
+    dc.setColor(T.TEXT_2); dc.drawArc(130, 130, 126, start, start + thumb); dc.setPenWidth(1);
+  },
+  // Age line: xtiny grey, or amber "! 17 h ago" in tiny when stale. y = top.
+  drawAge(dc, y, min, o = {}) {
+    if (Age.stale(min)) { const s = "! " + (o.short ? Age.short(min) : Age.text(min)); dc.setColor(T.WARNING); dc.drawText(130, y - 2, "tiny", s, J.CENTER); return { y: y - 2, h: FM.tiny.h }; }
+    const s = o.prefix ? o.prefix + Age.text(min) : (o.short ? Age.short(min) : Age.text(min));
+    dc.setColor(T.TEXT_2); dc.drawText(130, y, "xtiny", s, J.CENTER); return { y, h: FM.xtiny.h };
+  }
+};
+
+// ---------------------------------------------------------------- Garmin native UI (fēnix 7 Pro device files)
+// Used by OLD and NEW alike. Always white on black; Menu2 themes are not supported on this watch.
+const Native = {
+  hintArc(dc, pos, color = T.TEXT_1) { dc.setColor(color); dc.arcBand(130, 130, 124, 128, BTN[pos] - 10, BTN[pos] + 10); },
+  // simulator.json layouts.menu2: title 78, focused row 87 (label small, sub tiny), neighbours 55 (tiny),
+  // 3 x 57 focus bar at x 13. Focused row is centred on y 130.
+  menu2(dc, o) {
+    const items = o.items, focus = o.focus || 0;
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    const fTop = 130 - 43;
+    const label = it => String(it.label).replace(/\n/g, " ");
+    // title block sits directly above the first item
+    let y = fTop; for (let i = focus - 1; i >= 0; i--) y -= 55;
+    const titleTop = y - 78;
+    if (o.title && titleTop + 25 >= 6) { dc.setColor(T.TEXT_1); dc.drawText(130, titleTop + 39, "tiny", Ui.fit(dc, o.title, "tiny", Ui.usable(titleTop + 25, titleTop + 54)), J.CENTER | J.VCENTER); dc.setColor(T.RULE); dc.fillRectangle(40, titleTop + 76, 180, 1); }
+    let yy = titleTop + 78;
+    items.forEach((it, i) => {
+      const focused = i === focus, h = focused ? 87 : 55, mid = yy + h / 2;
+      if (yy < 260 && yy + h > 0) {
+        const hasIcon = !!it.icon, xL = focused ? 23 + 8 : 0;
+        if (focused) {
+          dc.setColor(T.TEXT_1); dc.fillRectangle(13, mid - 28, 3, 57);
+          let x = 30; if (hasIcon) { NIcons.draw(dc, it.icon, 50, mid, 10, it.iconColor || T.TEXT_1); x = 70; }
+          const maxW = (it.toggle != null || it.check != null ? 196 : 226) - x;
+          dc.setColor(T.TEXT_1); dc.drawText(x, it.sub ? mid - 13 : mid, "small", Ui.fit(dc, label(it), "small", maxW), J.LEFT | J.VCENTER);
+          if (it.sub) { dc.setColor(T.TEXT_2); dc.drawText(x, mid + 17, "tiny", Ui.fit(dc, it.sub, "tiny", maxW), J.LEFT | J.VCENTER); }
+          if (it.toggle != null) Native._toggle(dc, 214, mid, it.toggle);
+          if (it.check != null) Native._check(dc, 214, mid, it.check);
+        } else {
+          const w = Ui.usable(mid - 14, mid + 14) - (hasIcon ? 26 : 0);
+          // A row that only peeks past the edge shows no label (the watch shows just the edge of the row).
+          if (w < Math.min(80, dc.getTextWidthInPixels(label(it), "tiny"))) { yy += h; return; }
+          const s = Ui.fit(dc, label(it), "tiny", Math.min(193, w)), sw = dc.getTextWidthInPixels(s, "tiny") + (hasIcon ? 26 : 0), x0 = 130 - sw / 2;
+          if (hasIcon) NIcons.draw(dc, it.icon, x0 + 9, mid, 8, T.TEXT_2);
+          dc.setColor(T.TEXT_2); dc.drawText(x0 + (hasIcon ? 26 : 0), mid, "tiny", s, J.LEFT | J.VCENTER);
+        }
+      }
+      yy += h;
+    });
+  },
+  _toggle(dc, cx, cy, on) { dc.setColor(on ? "#00FF00" : T.TEXT_2); dc.fillRoundedRectangle(cx - 5, cy - 25, 9, 50, 4); dc.setColor(T.TEXT_1); dc.fillRoundedRectangle(cx - 3, on ? cy - 23 : cy + 5, 5, 18, 2); },
+  _check(dc, cx, cy, on) { dc.setColor(T.RULE); dc.setPenWidth(2); dc.drawRectangle(cx - 15, cy - 15, 30, 30); dc.setPenWidth(1); if (on) NIcons.draw(dc, "check", cx, cy, 12, "#00FF00"); },
+  // personality.mss confirmation: body (52,52,156,156) FONT_TINY; confirm hint at START, reject at DOWN.
+  confirmation(dc, text) {
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    const lines = Ui.wrap(dc, text, "tiny", [156], 5), lh = FM.tiny.h, top = 130 - Math.floor(lines.length * lh / 2);
+    dc.setColor(T.TEXT_1); lines.forEach((l, i) => dc.drawText(130, top + i * lh, "tiny", l, J.CENTER));
+    Native.hintArc(dc, "start"); NIcons.draw(dc, "check", 222, 76, 10, "#00FF00");
+    Native.hintArc(dc, "down"); NIcons.draw(dc, "cross", 38, 184, 8, T.DESTRUCTIVE);
+  },
+  // simulator.json toast: partial banner from the top, icon 40 at y 26, one line of small text.
+  toast(dc, under, o) {
+    under(dc);
+    dc.setColor(T.BG); dc.fillRectangle(0, 0, 260, 124); dc.setColor(T.RULE); dc.fillRectangle(30, 124, 200, 1);
+    if (o.icon) NIcons.draw(dc, o.icon, 130, 46, 14, o.icon === "check" ? "#00FF00" : o.icon === "bang" ? T.WARNING : T.TEXT_1);
+    dc.setColor(T.TEXT_1); dc.drawText(130, 92, "small", Ui.fit(dc, o.text, "small", Ui.usable(76, 108)), J.CENTER | J.VCENTER);
+  },
+  // simulator.json actionMenu: panel x 147..260, 2 px white left border, entries x 12 (panel), selected at y 119.
+  actionMenu(dc, under, o) {
+    under(dc);
+    dc.setColor(T.BG); dc.fillRectangle(147, 0, 113, 260); dc.setColor(T.TEXT_1); dc.fillRectangle(147, 0, 2, 260);
+    const f = o.focus || 0;
+    dc.fillRectangle(152, 111, 4, 42);
+    o.items.forEach((it, i) => {
+      const y = 132 + (i - f) * 25; if (y < 10 || y > 250) return;
+      const maxW = Math.max(0, Math.min(100, 130 + Math.floor(Math.sqrt(Math.max(0, 130 * 130 - (y - 130) * (y - 130)))) - 8 - 159));
+      dc.setColor(i === f ? T.TEXT_1 : T.TEXT_2); dc.drawText(159, y, "xtiny", Ui.fit(dc, it, "xtiny", maxW), J.LEFT | J.VCENTER);
+    });
+  },
+  // ViewLoop page indicator: type arc on the left. 6° segments, 2° gaps at r 120, filled white; current black with white outline.
+  pageIndicatorArc(dc, idx, count) {
+    for (let i = 0; i < count; i++) {
+      const mid = 180 + ((count - 1) / 2 - i) * 8;
+      dc.setColor(T.TEXT_1); dc.arcBand(130, 130, 116, 124, mid - 3, mid + 3);
+      if (i === idx) { dc.setColor(T.BLACK); dc.arcBand(130, 130, 117.5, 122.5, mid - 2, mid + 2); }
+    }
+  }
+};
+
+// ---------------------------------------------------------------- NEW menus in Škoda green
+// Menu2 cannot be recoloured on the fēnix 7 Pro (themes unsupported), so the NEW design draws its menus
+// itself: on the watch this is a WatchUi.CustomMenu with CustomMenuItem.draw(), which keeps Garmin's own
+// scrolling, focus animation and key/touch handling. Same geometry as Menu2 (title 78, focused 87, rows 55).
+Ui.menu = function (dc, o) {
+  // Mirrors app/source/ui/NightMenu.mc: rows of 65 px (Ui.ROW_H), and only the focused row and one
+  // above and one below are drawn (NightMenuLayout.isShown), so three sit close together in the
+  // middle and the rest stays off screen. The title is the platform's 78 px area directly above
+  // row 0 and counts as row -1. The pill follows its text and sits centred.
+  // o.shift (px) moves every row during the simulator's slide (Ui.slideShift). The row leaving the
+  // screen is not drawn, as in the app (its focus has already moved): sliding out it would pass
+  // through the round edge with its text cut. The row coming in slides into place.
+  const H = Ui.ROW_H, items = o.items, focus = o.focus || 0, shift = o.shift || 0, label = it => String(it.label).replace(/\n/g, " ");
+  dc.setColor(T.TEXT_1, T.BG); dc.clear();
+  const titleBottom = 130 - Math.floor(H / 2) - focus * H + shift;
+  if (o.title && focus === 0 && titleBottom - 78 / 2 - 14 >= 6) {
+    const cy = titleBottom - 39;
+    dc.setColor(T.ACCENT); dc.drawText(130, cy, "tiny", Ui.fit(dc, o.title, "tiny", Ui.usable(cy - 14, cy + 15)), J.CENTER | J.VCENTER);
+    dc.setColor(T.RULE); dc.fillRectangle(60, titleBottom - 2, 140, 1);
+  }
+  for (let i = Math.max(0, focus - 1); i <= Math.min(items.length - 1, focus + 1); i++) {
+    const it = items[i], cy = Math.round(130 + (i - focus) * H + shift);
+    if (i === focus) {
+      const ph = Math.min(it.sub ? FM.small.h + FM.xtiny.h + 14 : FM.medium.h + 14, H - 6), px = 24, pw = 212, py = Math.round(cy - ph / 2);
+      dc.setColor(dc.mono ? T.TEXT_1 : T.ACCENT); dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);
+      const right = it.toggle != null || it.check != null ? 34 : 0;
+      let x = px + 20; if (it.icon) { NIcons.draw(dc, it.icon, x + 8, cy, 9, T.BLACK); x += 26; }
+      const maxW = px + pw - 20 - right - x;
+      let f = it.sub ? "small" : "medium"; if (dc.getTextWidthInPixels(label(it), f) > maxW) f = it.sub ? "tiny" : "small"; if (dc.getTextWidthInPixels(label(it), f) > maxW) f = "tiny";
+      dc.setColor(T.BLACK); dc.drawText(x, it.sub ? cy - Math.round(ph / 5) : cy, f, Ui.fit(dc, label(it), f, maxW), J.LEFT | J.VCENTER);
+      if (it.sub) { dc.setColor(dc.mono ? T.BLACK : T.EMERALD); dc.drawText(x, cy + Math.round(ph / 4), "xtiny", Ui.fit(dc, it.sub, "xtiny", maxW), J.LEFT | J.VCENTER); }
+      if (it.check) NIcons.draw(dc, "check", px + pw - 30, cy, 9, T.BLACK);
+    } else {
+      const block = FM.tiny.h + (it.sub ? FM.xtiny.h : 0);
+      const iconW = it.icon ? 26 : 0, at = 130 + (i - focus) * H, maxW = Math.min(193, Ui.usable(at - block / 2, at + block / 2, 8)) - iconW;   // fitted where it settles, as in the app
+      const s1 = Ui.fit(dc, label(it), "tiny", maxW), s2 = it.sub ? Ui.fit(dc, it.sub, "xtiny", maxW) : null;
+      const tw = Math.max(dc.getTextWidthInPixels(s1, "tiny"), s2 ? dc.getTextWidthInPixels(s2, "xtiny") : 0) + iconW, x0 = Math.round(130 - tw / 2);
+      const top = Math.round(cy - block / 2);
+      if (it.icon) NIcons.draw(dc, it.icon, x0 + 9, cy, 8, T.ACCENT);
+      dc.setColor(T.TEXT_2); dc.drawText(x0 + iconW, top + Math.round(FM.tiny.h / 2), "tiny", s1, J.LEFT | J.VCENTER);
+      if (s2) dc.drawText(x0 + iconW, top + FM.tiny.h + Math.round(FM.xtiny.h / 2), "xtiny", s2, J.LEFT | J.VCENTER);
+    }
+  }
+};
+// Row pitch of every NEW list (Theme.rowHeight(): a quarter of the 260 px display).
+Ui.ROW_H = 65;
+// Slide between two focus positions, like the CustomMenu's own scroll: the rows start where they
+// were (one row back) and ease into place. slide = {d: +1 DOWN / -1 UP, t0}; 0 when done or absent.
+Ui.SLIDE_MS = 180;
+Ui.slideShift = function (slide, now) {
+  if (!slide || !(Ui.SLIDE_MS > 0)) return 0;
+  const t = Math.min(1, (now - slide.t0) / Ui.SLIDE_MS);
+  return t >= 1 ? 0 : slide.d * Ui.ROW_H * Math.pow(1 - t, 2);
+};
+// Action menu in Škoda green. Garmin's ActionMenu (a panel over the right half) cannot be recoloured and
+// cuts through the screen behind it, so the NEW design shows the actions as a full-screen Ui.menu instead.
+// On the watch: a CustomMenu pushed with SLIDE_LEFT. `under` is kept in the signature but not drawn.
+const ACTION_ICONS = { Refresh: "refresh", Navigate: "pin", "Navigate to car": "pin", "Charge limit": "battery", "Charging profiles": "list", Charging: "bolt", Settings: "gear", Status: "list" };
+Ui.actionMenu = function (dc, under, o) {
+  Ui.menu(dc, { title: o.title || "Actions", items: o.items.map(l => ({ label: l, icon: ACTION_ICONS[l] })), focus: o.focus || 0 });
+};
+
+// ---------------------------------------------------------------- registries
+// OLD_SCREENS: filled by 20-old.js (id -> {section, order, name, draw, keys, src, tags, notes}).
+// CARDS: each NEW part pushes {id, section, order, name, neu:[{label, draw, keys, decision}], fixes, changed, notes}.
+//   A card whose id matches an OLD_SCREENS id is shown next to that old screen; otherwise it is new-only.
+// SIM_VIEWS: name -> {init(o) -> state, draw(dc, state), key(k, state) -> null | {push, o} | {pop:true} |
+//   {toast:{text, icon}} | {confirm:{text, then}} | {replace, o}}; k in UP DOWN START BACK MENU SWIPE_UP SWIPE_DOWN TAP.
+const OLD_SCREENS = {};
+const CARDS = [];
+const SIM_VIEWS = {};
+const SECTION_ORDER = ["entry", "home", "status", "charging", "findcar", "settings", "onboarding", "garmin"];
+
+
+// ================================================================ OLD screens (code-faithful port of app/source/ui at 3c4d005)
+// ---------------------------------------------------------------- views
+function controls(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  const strip = o.strip || { soc: MOCK.soc + "%", charging: MOCK.chargingState, lockRaw: MOCK.lock, chargingRaw: MOCK.chargingState, climateRaw: MOCK.climate };
+  dc.setColor(COL.WHITE);
+  dc.drawText(130, 18, "xtiny", strip.soc + "  " + strip.charging + "  " + (strip.lockRaw == null ? DASH : lockLabel(strip.lockRaw)), J.CENTER);
+  Icons.draw(dc, Icons.forLock(strip.lockRaw), 130, 38, 9, COL.WHITE);
+  const ci = Icons.forCharging(strip.chargingRaw); if (ci) Icons.draw(dc, ci, 90, 38, 9, COL.WHITE);
+  const cl = Icons.forClimate(strip.climateRaw); if (cl) Icons.draw(dc, cl, 170, 38, 9, COL.WHITE);
+  const tiles = o.tiles, scroll = o.scroll || 0, total = Math.ceil(tiles.length / 2);
+  tiles.forEach((label, i) => {
+    const col = i % 2, row = Math.floor(i / 2), x = col ? 135 : 35, y = 52 + (row - scroll) * 52;
+    const st = i === o.hi ? "hi" : "def";
+    dc.setColor(st === "hi" ? COL.BLUE : COL.DK_GRAY); dc.fillRoundedRectangle(x, y, 90, 46, 8);
+    if (st === "hi") { dc.setPenWidth(2); dc.setColor(COL.WHITE); dc.drawRoundedRectangle(x, y, 90, 46, 8); dc.setPenWidth(1); }
+    dc.setColor(COL.WHITE); dc.drawText(x + 45, y + 23, "xtiny", label, J.CENTER | J.VCENTER);
+  });
+  dc.setColor(COL.LT_GRAY);
+  if (scroll > 0) dc.fillPolygon([[124, 50], [136, 50], [130, 44]]);
+  if (scroll + 3 < total) dc.fillPolygon([[124, 206], [136, 206], [130, 212]]);
+  if (o.msg) { dc.setColor(o.msg.err ? COL.ORANGE : COL.GREEN); dc.drawText(130, 216, "xtiny", o.msg.text, J.CENTER); }
+  TB.fitted(dc, "UP charging - DOWN status", "xtiny", COL.DK_GRAY, 240);
+}
+const TILES_MOCK = ["Start\nclimate", "Stop\nclimate", "Start\ncharging", "Stop\ncharging", "Find\nmy car", "Status", "Settings"];
+const TILES_UNKNOWN = ["Start\nclimate", "Stop\nclimate", "Start\nventilation", "Stop\nventilation", "Start\ncharging", "Stop\ncharging", "More"];
+
+function ageText(min) { if (min < 1) return "Updated just now"; if (min < 60) return min + " min ago"; const h = Math.floor(min / 60); if (h < 24) return h + "h " + (min - h * 60) + "m ago"; return Math.floor(h / 24) + "d ago"; }
+
+function statusPage(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 12, "xtiny", o.page + "/5", J.CENTER);
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 28, "xtiny", "SELECT to refresh", J.CENTER);
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 56, "small", o.title, J.CENTER);
+  if (o.kind) {
+    dc.setColor(COL.WHITE); dc.drawText(130, 100, "numMed", DASH, J.CENTER);
+    dc.setColor(o.kind === "DISABLED" ? COL.LT_GRAY : COL.YELLOW); dc.drawText(130, 150, "small", o.kindLabel, J.CENTER);
+  } else {
+    const vc = o.emph ? COL.ORANGE : COL.WHITE;
+    dc.setColor(vc); dc.drawText(130, 100, "numMed", o.value, J.CENTER);
+    if (o.icon) { const vw = dc.getTextWidthInPixels(o.value, "numMed"); const ix = Math.min(130 + Math.floor(vw / 2) + 20, 242); Icons.draw(dc, o.icon, ix, 100 + 37, 12, vc); }
+    dc.setColor(COL.WHITE); let y = 152;
+    o.sub.slice(0, 3).forEach(s => { dc.drawText(130, y, "xtiny", s, J.CENTER); y += 16; });
+    const stale = o.age > 60;
+    dc.setColor(stale ? COL.RED : COL.DK_GRAY); dc.drawText(130, 210, stale ? "tiny" : "xtiny", (stale ? "! " : "") + ageText(o.age), J.CENTER);
+  }
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 260 - 22, "xtiny", "UP/DOWN pages - SELECT refresh", J.CENTER);
+}
+
+function chargingDetail(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 12, "xtiny", "CHARGING", J.CENTER);
+  dc.setColor(COL.WHITE); dc.drawText(130, 60, "medium", o.state, J.CENTER);
+  if (o.cable) { dc.setColor(COL.ORANGE); dc.drawText(130, 84, "xtiny", "No cable appears to be connected", J.CENTER); }
+  dc.setColor(COL.WHITE); let y = 110;
+  ["Type: " + o.type, "Power: " + o.power, "Rate: " + o.rate, "Remaining: " + o.remaining, "Full by: " + o.full].forEach(s => { dc.drawText(130, y, "xtiny", s, J.CENTER); y += 18; });
+  if (o.msg) { dc.setColor(o.msg.err ? COL.ORANGE : COL.GREEN); dc.drawText(130, 196, "xtiny", o.msg.text, J.CENTER); }
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 214, "xtiny", ageText(o.age), J.CENTER);
+  dc.drawText(130, 240, "xtiny", "SELECT refresh - MENU actions", J.CENTER);
+}
+
+function chargeLimit(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.WHITE); dc.drawText(130, 110, "numMed", o.value + "%", J.CENTER);
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 50, "small", "Charge limit", J.CENTER);
+  if (o.recommended) { dc.setColor(COL.GREEN); dc.drawText(130, 150, "xtiny", "Recommended (battery care)", J.CENTER); }
+  TB.fitted(dc, "UP/DOWN adjust - SELECT set", "xtiny", COL.DK_GRAY, 236);
+}
+
+function profiles(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 12, "xtiny", "CHARGING PROFILES", J.CENTER);
+  if (o.unsupported) { dc.drawText(130, 120, "small", "Not supported\nby this car", J.CENTER); return; }
+  const p = o.p;
+  dc.setColor(p.current ? COL.GREEN : COL.WHITE); dc.drawText(130, 50, "small", p.current ? p.name + " (here)" : p.name, J.CENTER);
+  dc.setColor(COL.WHITE); let y = 80;
+  dc.drawText(130, y, "xtiny", "Target: " + p.target + "%", J.CENTER); y += 18;
+  dc.drawText(130, y, "xtiny", "Max current: " + p.maxCurrent, J.CENTER); y += 18;
+  dc.setColor(COL.LT_GRAY); p.timers.forEach(t => { dc.drawText(130, y, "xtiny", t, J.CENTER); y += 16; });
+  TB.fitted(dc, o.idx + "/" + o.count + " - UP/DOWN", "xtiny", COL.DK_GRAY, 240);
+}
+
+function findCar(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.LT_GRAY); dc.drawText(130, 12, "small", "FIND MY CAR", J.CENTER);
+  const addr = MOCK.address.length > 40 ? MOCK.address.slice(0, 40) : MOCK.address;
+  if (o.mode === "moving") {
+    dc.setColor(COL.YELLOW); dc.drawText(130, 110, "small", "Car is moving", J.CENTER);
+    dc.setColor(COL.LT_GRAY); dc.drawText(130, 150, "xtiny", "Last parked:", J.CENTER); dc.drawText(130, 168, "xtiny", addr, J.CENTER);
+    dc.setColor(COL.DK_GRAY); dc.drawText(130, 210, "xtiny", ageText(o.age), J.CENTER);
+  } else {
+    dc.setColor(COL.WHITE); dc.drawText(130, 56, "xtiny", addr, J.CENTER);
+    if (o.mode === "gps") { dc.setColor(COL.LT_GRAY); dc.drawText(130, 120, "small", "Acquiring GPS\nposition...", J.CENTER); }
+    else {
+      dc.setColor(COL.WHITE); dc.drawText(130, 108, "numMed", o.distance, J.CENTER);
+      const a = o.angle * Math.PI / 180, cx = 130, cy = 172, r = 28, br = r * 0.45, sp = 2.5;
+      dc.setColor(COL.DK_GRAY); dc.drawCircle(cx, cy, r + 4);
+      dc.setColor(COL.GREEN); dc.fillPolygon([[Math.trunc(cx + r * Math.sin(a)), Math.trunc(cy - r * Math.cos(a))], [Math.trunc(cx + br * Math.sin(a + sp)), Math.trunc(cy - br * Math.cos(a + sp))], [cx, cy], [Math.trunc(cx + br * Math.sin(a - sp)), Math.trunc(cy - br * Math.cos(a - sp))]]);
+    }
+    dc.setColor(COL.DK_GRAY); dc.drawText(130, 210, "xtiny", ageText(o.age), J.CENTER);
+  }
+  dc.setColor(COL.DK_GRAY); dc.drawText(130, 240, "xtiny", o.mode === "parked" ? "SELECT map - MENU navigate" : "MENU for options", J.CENTER);
+}
+
+function targetTemp(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  dc.setColor(COL.WHITE); dc.drawText(130, 130, "numMed", o.value + "°C", J.CENTER | J.VCENTER);
+  TB.fitted(dc, "UP/DOWN to adjust", "xtiny", COL.DK_GRAY, 230);
+}
+
+function textScreen(dc, text) { dc.setColor(COL.WHITE, COL.BLACK); dc.clear(); TB.draw(dc, text, "xtiny", COL.WHITE); }
+
+// --- Garmin system UI, approximated
+// Garmin system UI: now drawn from the fēnix 7 Pro device files (Native), for OLD and NEW alike.
+function menu2(dc, title, items, focus = 0) { Native.menu2(dc, { title, items, focus }); }
+function confirmation(dc, text) { Native.confirmation(dc, text); }
+function toastOver(dc, under, text) { Native.toast(dc, under, { text, icon: "check" }); }
+function mapPreview(dc) {
+  const c = dc.c; c.fillStyle = "#FFFFAA"; c.fillRect(0, 0, 260, 260);
+  c.fillStyle = "#AAFFAA"; c.beginPath(); c.moveTo(20, 30); c.lineTo(110, 18); c.lineTo(120, 92); c.lineTo(36, 110); c.closePath(); c.fill();
+  c.fillStyle = "#AAFFFF"; c.beginPath(); c.ellipse(205, 210, 60, 26, -0.4, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 9; c.beginPath(); c.moveTo(-10, 150); c.lineTo(270, 120); c.moveTo(150, -10); c.lineTo(170, 270); c.stroke();
+  c.strokeStyle = "#AAAAAA"; c.lineWidth = 1; c.beginPath(); c.moveTo(-10, 150); c.lineTo(270, 120); c.moveTo(150, -10); c.lineTo(170, 270); c.stroke();
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 4; c.beginPath(); c.moveTo(60, 270); c.lineTo(120, 140); c.moveTo(165, 60); c.lineTo(260, 70); c.stroke();
+  const pin = (x, y, label) => { dc.setColor(COL.RED); dc.fillCircle(x, y - 14, 8); dc.fillPolygon([[x - 6, y - 10], [x + 6, y - 10], [x, y]]); dc.setColor(COL.WHITE); dc.fillCircle(x, y - 14, 3); dc.setColor(COL.BLACK); dc.drawText(x, y + 2, "xtiny", label, J.CENTER); };
+  pin(130, 136, "Car"); pin(96, 196, "You");
+}
+function glance(dc, o) {
+  dc.setColor(COL.WHITE, COL.BLACK); dc.clear();
+  const c = dc.c;
+  // neighbouring glances, dimmed
+  c.globalAlpha = .35; dc.setColor(COL.DK_GRAY); dc.fillCircle(45, 40, 18); dc.fillCircle(45, 222, 18);
+  dc.setColor(COL.LT_GRAY); dc.drawText(76, 30, "xtiny", "Body Battery", J.LEFT); dc.drawText(76, 212, "xtiny", "Weather", J.LEFT); c.globalAlpha = 1;
+  dc.setColor(COL.DK_GRAY); dc.drawLine(20, 84, 240, 84); dc.drawLine(20, 176, 240, 176);
+  // launcher icon in the icon area
+  const ix = 25, iy = 110;
+  dc.setColor("#2B2F36"); dc.fillRoundedRectangle(ix, iy, 40, 40, 8);
+  dc.setColor("#C7CDD6"); dc.fillPolygon([[5, 31], [5, 25], [9, 25], [14, 16], [26, 16], [31, 25], [35, 25], [35, 31]].map(([x, y]) => [ix + x, iy + y]));
+  dc.setColor("#2B2F36"); dc.fillCircle(ix + 12.5, iy + 31.5, 4.5); dc.fillCircle(ix + 27.5, iy + 31.5, 4.5);
+  dc.setColor("#C7CDD6"); dc.setPenWidth(3); dc.drawCircle(ix + 29, iy + 10, 6.5); dc.setColor("#2B2F36"); dc.fillRectangle(ix + 27.5, iy + 1.5, 3, 5.5);
+  dc.setColor("#C7CDD6"); dc.drawLine(ix + 29, iy + 3, ix + 29, iy + 10); dc.setPenWidth(1);
+  // content area 171 x 63 at x 70, centred on the row
+  c.save(); c.translate(70, 99); c.beginPath(); c.rect(0, 0, 171, 63); c.clip();
+  const midY = 31;
+  dc.setColor(COL.WHITE); dc.drawText(8, midY - 10, "xtiny", "Vozidlo", J.LEFT | J.VCENTER);
+  const measure = s => dc.getTextWidthInPixels(s, "xtiny");
+  const trunc = (t, mw) => { if (measure(t) <= mw) return t; let s = t; while (s.length > 1 && measure(s + "…") > mw) s = s.slice(0, -1); return s + "…"; };
+  if (o.data) {
+    Icons.draw(dc, "locked", 8, midY + 10, 7, COL.WHITE);
+    dc.setColor(COL.WHITE); dc.drawText(18, midY + 10, "xtiny", trunc("100%  READY_FOR_CHARGING  LOCKED  12 min ago", 171 - 18 - 4), J.LEFT | J.VCENTER);
+  } else { dc.setColor(COL.LT_GRAY); dc.drawText(8, midY + 10, "xtiny", trunc("Open for your car", 171 - 12), J.LEFT | J.VCENTER); }
+  c.restore();
+}
+
+const GUIDE = "Open for your car";
+const OB_GUIDANCE = "A key is created in the MyŠkoda app (v8.16+), not here. It only works for the vehicles you selected when you created it. Enter it in this app's phone settings. Menu for more.";
+const KEYS = (o) => Object.entries(o);
+
+const SECTIONS = [
+ { id: "entry", title: "Entry", src: "ui/GlanceView.mc", blurb: "The glance in the widget loop. It only reads the cache and never makes a request. START opens the app on the home tiles.", screens: [
+  { id: "glance-data", name: "Glance, with cached data", tags: ["mock", "sys"], src: "ui/GlanceView.mc · onUpdate", draw: dc => glance(dc, { data: true }),
+    keys: { START: "Open app (home)", "UP/DOWN": "Next glance" },
+    notes: ["Neighbouring glances and separators are the watch's own; only the 171 × 63 content area is ours.", { flag: "The summary repeats the raw enum READY_FOR_CHARGING and is cut off with …; the age never fits." }, "Lock icon sits on the second line's centre, left of the text."] },
+  { id: "glance-empty", name: "Glance, nothing cached", tags: ["sys"], src: "ui/GlanceView.mc · onUpdate", draw: dc => glance(dc, { data: false }),
+    keys: { START: "Open app" }, notes: ["Shown before the first successful request."] },
+ ]},
+ { id: "home", title: "Home: control tiles", src: "ui/ControlsView.mc", blurb: "The app lands here (US-036). Status strip on top, a 2-column grid of 90 × 46 tiles with 3 rows visible, a status line and a fitted hint at the bottom.", screens: [
+  { id: "home-mock", name: "Home", tags: ["mock"], src: "ui/ControlsView.mc · onUpdate", draw: dc => controls(dc, { tiles: TILES_MOCK, hi: 0 }),
+    keys: { START: "Activate highlighted tile", UP: "Charging detail", DOWN: "Status pages", BACK: "Exit app", "Touch": "Tap = run tile (SDK; verify on watch)" },
+    notes: ["Mock vehicle: climate + charging operations only, so 7 tiles and no More.", { flag: "Strip text is about 250 px wide where the circle allows about 130 px." }, { flag: "Fitted hint lands at y ≈ 208, on the scroll arrow and the fourth row (Settings) that peeks out under row 3." }] },
+  { id: "home-scrolled", name: "Home, scrolled to Settings", tags: ["mock"], src: "ui/ControlsView.mc · ensureTileVisible", draw: dc => controls(dc, { tiles: TILES_MOCK, hi: 6, scroll: 1 }),
+    keys: { START: "Open Tile order" },
+    notes: [{ flag: "Row 1 moves to y = 0 and covers the strip; the tiles are not clipped to the grid area." }] },
+  { id: "home-unknown", name: "Home, first launch (no operations cached)", tags: [], src: "ui/ControlsView.mc · ControlTiles.capped", draw: dc => controls(dc, { tiles: TILES_UNKNOWN, hi: 0, strip: { soc: DASH, charging: DASH, lockRaw: null } }),
+    keys: { START: "Activate tile" },
+    notes: ["Unknown operations means every action is offered: 9 tiles, capped at 7 with More.", "Find my car, Status and Settings end up behind More.", "This is the layout in the current store screenshots."] },
+  { id: "home-sent", name: "Home, after a command", tags: ["mock"], src: "ui/ControlsView.mc · _announceSent", draw: dc => controls(dc, { tiles: TILES_MOCK, hi: 0, msg: { text: "Command sent", err: false } }),
+    keys: {}, notes: ["Status line at y = 216, green; orange for errors such as \"Not sent: …\" or \"Quota spent for this hour\".", "Same text also goes to a toast."] },
+  { id: "home-toast", name: "Toast", tags: ["sys"], src: "WatchUi.showToast", draw: dc => toastOver(dc, d => controls(d, { tiles: TILES_MOCK, hi: 0 }), "Command sent"),
+    keys: {}, notes: ["Garmin draws the toast; position and style are approximated.", "A 200 ms vibration goes with every sent command."] },
+  { id: "home-confirm", name: "Confirmation", tags: ["sys"], src: "api/ConfirmationPolicy.mc", draw: dc => confirmation(dc, "Stop charging?"),
+    keys: { START: "Yes, send", BACK: "No" },
+    notes: ["Always asked for: stop charging, aux heater start/stop, clear data.", "Asked for everything else only when the quota estimate is low."] },
+  { id: "home-more", name: "More menu", tags: ["sys"], src: "ui/ControlsView.mc · openMoreActions", draw: dc => menu2(dc, "More", [{ label: "Find\nmy car" }, { label: "Status" }, { label: "Settings" }]),
+    keys: { START: "Open", BACK: "Back to tiles" },
+    notes: [{ flag: "Reuses the tile label, so \"Find\\nmy car\" carries a line break into the menu." }] },
+ ]},
+ { id: "status", title: "Status pages", src: "ui/StatusView.mc", blurb: "DOWN from home. Five pages, one per API section, looped with UP/DOWN. Each page: counter, quota line, title, one big value, up to three sub-lines and that section's own age.", screens: [
+  { id: "st-lock", name: "1 · Lock & doors", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 1, title: "LOCK & DOORS", value: "LOCKED", icon: "locked", sub: ["Doors CLOSED", "Windows CLOSED", "Lights OFF"], age: 13 }),
+    keys: { "UP/DOWN": "Previous / next page", START: "Refresh (1 request)", BACK: "Home" },
+    notes: [{ flag: "LOCKED is drawn in the number font, which has no letters." }, "Bonnet and Trunk do not fit: only three sub-lines are shown.", { flag: "Bottom hint is clipped by the bezel." }] },
+  { id: "st-fuel", name: "2 · Fuel / range", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 2, title: "FUEL / RANGE", value: "436 km", sub: ["GASOLINE 62%", "ELECTRIC 100%"], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: [{ flag: "The km unit is outside the number font." }, "Engine types are shown as raw enums."] },
+  { id: "st-charging", name: "3 · Charging", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 3, title: "CHARGING", value: "100%", icon: "pluggedIn", sub: ["READY_FOR_CHARGING", "36 km range"], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: ["The one value that fits the number font as is."] },
+  { id: "st-odo", name: "4 · Odometer", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 4, title: "ODOMETER", value: "123456 km", sub: [], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: ["Digits plus unit nearly fill the circle at that height; a six-digit odometer is common."] },
+  { id: "st-ac", name: "5 · Air conditioning", tags: ["mock"], src: "ui/StatusView.mc · _drawPage", draw: dc => statusPage(dc, { page: 5, title: "AIR CONDITIONING", value: "OFF", sub: ["Front window heat OFF", "Rear window heat OFF"], age: 12 }),
+    keys: { "UP/DOWN": "Pages" }, notes: ["No icon when climate is off."] },
+  { id: "st-ac-stale", name: "5 · Air conditioning, 17 h old", tags: ["mock"], src: "mock scenario stale-airconditioning-17h", draw: dc => statusPage(dc, { page: 5, title: "AIR CONDITIONING", value: "OFF", sub: ["Front window heat OFF", "Rear window heat OFF"], age: 17 * 60 }),
+    keys: {}, notes: ["Older than an hour: age turns red, larger, with \"!\" (US-009)."] },
+  { id: "st-nodata", name: "Section without data", tags: [], src: "ui/StatusView.mc · _kindLabel", draw: dc => statusPage(dc, { page: 5, title: "AIR CONDITIONING", kind: "UNKNOWN", kindLabel: "No data yet - refresh to fetch" }),
+    keys: { START: "Refresh" }, notes: [{ flag: "Yellow label is about 255 px wide in the small font at y = 150." }, "Other states: Temporarily unavailable, Switched off for this car (grey)."] },
+ ]},
+ { id: "charging", title: "Charging", src: "ui/ChargingDetailView.mc", blurb: "UP from home. State, five detail lines, MENU for limit, mode and profiles.", screens: [
+  { id: "ch-detail", name: "Charging detail", tags: ["mock"], src: "ui/ChargingDetailView.mc · onUpdate", draw: dc => chargingDetail(dc, { state: "Ready to charge", type: "Not charging", power: DASH, rate: DASH, remaining: DASH, full: DASH, age: 12 }),
+    keys: { START: "Refresh", MENU: "Charging menu (hold UP)", BACK: "Home" },
+    notes: ["Mock car is plugged in but not charging.", { flag: "Bottom hint is clipped by the bezel." }] },
+  { id: "ch-active", name: "Charging detail, while charging", tags: ["ex"], src: "ui/ChargingDetailView.mc · onUpdate", draw: dc => chargingDetail(dc, { state: "Charging", type: "AC", power: "7.2 kW", rate: "38.0 km/h", remaining: "95 min", full: "18:40", age: 3 }),
+    keys: {}, notes: ["Example values, not from the mock."] },
+  { id: "ch-cable", name: "Cable warning", tags: ["ex"], src: "ChargingLogic.needsCableWarning", draw: dc => chargingDetail(dc, { state: "Connect the cable", cable: true, type: "Not charging", power: DASH, rate: DASH, remaining: DASH, full: DASH, age: 5 }),
+    keys: {}, notes: ["The orange warning line fits the circle at y = 84 (measured)."] },
+  { id: "ch-menu", name: "Charging menu", tags: ["sys", "mock"], src: "ui/ChargingDetailView.mc · openMenu", draw: dc => menu2(dc, "Charging", [{ label: "Refresh" }, { label: "Set charge limit" }, { label: "Charging profiles" }]),
+    keys: { START: "Open", BACK: "Charging detail" }, notes: ["Set charge mode is hidden: the mock reports no available modes."] },
+  { id: "ch-limit", name: "Charge limit", tags: ["mock"], src: "ui/ChargingLimitView.mc · onUpdate", draw: dc => chargeLimit(dc, { value: 80 }),
+    keys: { "UP/DOWN": "50 · 60 · 70 · 80 · 90 · 100", START: "Set (asks when quota is low)" }, notes: ["Starts at 80% when the car reports no limit."] },
+  { id: "ch-limit-care", name: "Charge limit, battery-care match", tags: ["ex"], src: "ui/ChargingLimitView.mc · onUpdate", draw: dc => chargeLimit(dc, { value: 80, recommended: true }),
+    keys: {}, notes: ["Green line when the value equals the car's battery-care target."] },
+  { id: "ch-mode", name: "Charge mode", tags: ["sys", "ex"], src: "ui/ChargingModeView.mc", draw: dc => menu2(dc, "Charge mode", [{ label: "Manual", sub: "Current" }, { label: "Timer" }, { label: "Preferred times" }]),
+    keys: { START: "Set mode" }, notes: ["Example modes; only shown when the car lists any."] },
+  { id: "ch-profiles", name: "Charging profiles", tags: ["mock"], src: "ui/ChargingProfilesView.mc · onUpdate", draw: dc => profiles(dc, { unsupported: true }),
+    keys: { "UP/DOWN": "Profiles", START: "Load" }, notes: ["The mock car has no profiles."] },
+  { id: "ch-profile-ex", name: "Charging profile page", tags: ["ex"], src: "ui/ChargingProfilesView.mc · _drawProfile", draw: dc => profiles(dc, { idx: 1, count: 2, p: { name: "Home", current: true, target: 80, maxCurrent: "Reduced", timers: ["22:00 Mon,Tue,Wed,Thu,Fri", "07:30 Sat,Sun"] } }),
+    keys: { "UP/DOWN": "Next profile" }, notes: ["Example profile. Green name means the car is at this profile's location."] },
+ ]},
+ { id: "findcar", title: "Find my car", src: "ui/LocationView.mc", blurb: "From the Find my car tile. Distance and a bearing arrow that follows the watch heading; START for the map, MENU to navigate.", screens: [
+  { id: "fc-parked", name: "Parked", tags: ["mock", "ex"], src: "ui/LocationView.mc · _drawParked", draw: dc => findCar(dc, { mode: "parked", distance: "240 m", angle: 35, age: 12 }),
+    keys: { START: "Map", MENU: "Navigate / Refresh", BACK: "Home" },
+    notes: ["Mock address; distance and bearing are example values.", { flag: "The m unit is outside the number font." }, "Address is cut at 40 characters, not at a word."] },
+  { id: "fc-gps", name: "Waiting for GPS", tags: ["mock"], src: "ui/LocationView.mc · _drawParked", draw: dc => findCar(dc, { mode: "gps", age: 12 }),
+    keys: { MENU: "Options" }, notes: [] },
+  { id: "fc-moving", name: "Car is moving", tags: ["mock"], src: "ui/LocationView.mc · onUpdate", draw: dc => findCar(dc, { mode: "moving", age: 12 }),
+    keys: { MENU: "Options" }, notes: ["Shows the last parked address from storage."] },
+  { id: "fc-menu", name: "Find my car menu", tags: ["sys"], src: "LocationActionMenu.push", draw: dc => menu2(dc, "Find my car", [{ label: "Navigate to car" }, { label: "Refresh" }]),
+    keys: { START: "Open" }, notes: [] },
+  { id: "fc-nav", name: "Navigate confirmation", tags: ["sys"], src: "ui/LocationView.mc · confirmNavigate", draw: dc => confirmation(dc, "Navigate to the car? This closes this app - starting navigation always exits to the system."),
+    keys: { START: "Save waypoint, exit to navigation" }, notes: ["The system then asks again (exitTo). Known Garmin bug: activity may start without the route."] },
+  { id: "fc-map", name: "Map preview", tags: ["sys"], src: "ui/MapPreviewView.mc", draw: dc => mapPreview(dc),
+    keys: { START: "Browse mode (pan / zoom)", BACK: "Back (browse, then preview, then out)" },
+    notes: ["Native MapView, 400 m around the car; drawn here as a stand-in.", { flag: "No MENU handler, so no way to navigate from the map." }] },
+ ]},
+ { id: "settings", title: "Settings", src: "ui/TileOrderView.mc", blurb: "Tile order from the Settings tile; target temperature from Garmin's app-settings entry.", screens: [
+  { id: "set-order", name: "Tile order", tags: ["sys"], src: "ui/TileOrderView.mc", draw: dc => menu2(dc, "Tile order", [{ label: "Climate", sub: "Position 1" }, { label: "Charging", sub: "Position 2" }, { label: "Find my car", sub: "Position 3" }, { label: "Status detail", sub: "Position 4" }], 0),
+    keys: { START: "Edit item" }, notes: ["Hidden categories show \"Hidden\" as sub-label."] },
+  { id: "set-order-item", name: "Tile order item", tags: ["sys"], src: "ui/TileOrderView.mc · TileOrderDetailMenu", draw: dc => menu2(dc, "Climate", [{ label: "Move up" }, { label: "Move down" }, { label: "Hide" }], 1),
+    keys: { START: "Apply" }, notes: [] },
+  { id: "set-temp", name: "Target temperature", tags: ["mock"], src: "ui/TargetTemperatureSettingsView.mc", draw: dc => targetTemp(dc, { value: 21 }),
+    keys: { "UP/DOWN": "± 1 degree, saved right away" }, notes: [{ flag: "°C: the C is outside the number font." }, "No title on screen."] },
+ ]},
+ { id: "onboarding", title: "Onboarding", src: "ui/OnboardingGate.mc", blurb: "Before home, when the key or VIN is missing, never validated, near its estimated expiry, or rejected. All text screens use TextBlock: wrapped to the circle and centred.", screens: [
+  { id: "ob-guide", name: "No key yet", tags: [], src: "ui/OnboardingView.mc", draw: dc => textScreen(dc, OB_GUIDANCE),
+    keys: { MENU: "Onboarding menu", START: "Retry" }, notes: [] },
+  { id: "ob-check", name: "Checking the key", tags: [], src: "ui/OnboardingView.mc", draw: dc => textScreen(dc, "Checking your key against your car…"), keys: {}, notes: [] },
+  { id: "ob-expiry", name: "Key near expiry", tags: [], src: "ui/OnboardingExpiryNoticeView.mc", draw: dc => textScreen(dc, "Your key is probably close to expiring: this is an estimate, not a fact. If you would rather not be caught out, create a new one soon in the MyŠkoda app. Select to continue."),
+    keys: { START: "Continue to home" }, notes: [] },
+  { id: "ob-expired", name: "Key expired", tags: [], src: "ui/OnboardingGate.mc · _expiredText", draw: dc => textScreen(dc, "Your API key has expired. " + OB_GUIDANCE),
+    keys: { MENU: "Onboarding menu" }, notes: [{ flag: "Long text: check whether the last lines are cut." }] },
+  { id: "ob-menu", name: "Onboarding menu", tags: ["sys"], src: "ui/OnboardingActionMenu.mc", draw: dc => menu2(dc, "Onboarding", [{ label: "Get a key" }, { label: "Clear stored data" }]),
+    keys: { START: "Open" }, notes: ["Clear stored data always asks for confirmation."] },
+ ]},
+];
+
+const TAGS = { mock: ["mock", "Mock data"], ex: ["ex", "Example data"], sys: ["sys", "Garmin UI, approx."] };
+
+// Device check (Bart, 2026-10-07): on the fēnix 7 Pro UP/DOWN on home move the tile focus.
+(function fixOldHomeKeys() {
+  const home = SECTIONS.find(s => s.id === "home");
+  home.blurb = "The app lands here (US-036). Status strip on top, a 2-column grid of 90 × 46 tiles with 3 rows visible, a status line and a fitted hint at the bottom. On the watch UP/DOWN move the tile focus.";
+  const m = home.screens.find(s => s.id === "home-mock");
+  m.keys = { START: "Activate focused tile", "UP/DOWN": "Move tile focus (verified on the watch)", BACK: "Exit app", "Swipe down": "Charging detail (not confirmed)", "Swipe up": "Status pages", Touch: "Tap = run tile (SDK; verify on watch)" };
+  m.notes.push({ flag: "The hint promises UP = charging and DOWN = status, but UP/DOWN move the focus. Charging detail, charge limit, mode and profiles cannot be reached with buttons." });
+  for (const s of SECTIONS) for (const scr of s.screens) if (scr.tags.includes("sys")) scr.tags = scr.tags.map(t => t === "sys" ? "native" : t);
+})();
+TAGS.native = ["sys", "Garmin UI, from device files"];
+const SECTION_META = {};
+SECTIONS.forEach((s, si) => {
+  SECTION_META[s.id] = { title: s.title, src: s.src, blurb: s.blurb };
+  s.screens.forEach((scr, i) => { OLD_SCREENS[scr.id] = Object.assign({ section: s.id, order: si * 100 + i }, scr); });
+});
+SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Native components drawn from the fēnix 7 Pro device files (simulator.json, personality.mss). Used by both OLD and NEW." };
+
+// ================================================================ NEW home (agent B)
+// D1 variants: (a) grid per C1a, (b) hero + action list per C1b. Both expose Charging with buttons.
+(function () {
+  const NH = {};
+
+  // ---------------------------------------------------------------- data
+  // Tile order (TileOrder): climate, charging, Charging detail, Find my car, Status, Settings.
+  NH.TILES = ["Start climate", "Stop climate", "Start charging", "Stop charging", "Charging", "Find my car", "Status", "Settings"];
+  // First launch: operations unknown, so every action is offered (ventilation included).
+  NH.TILES_UNKNOWN = ["Start climate", "Stop climate", "Start ventilation", "Stop ventilation", "Start charging", "Stop charging", "Charging", "Find my car", "Status", "Settings"];
+  // Grid rule: up to 8 tiles (four full rows) are shown as is; above 8 the first 7 plus "More".
+  NH.GRID_CAP = 8;
+  NH.capGrid = tiles => tiles.length <= NH.GRID_CAP ? tiles.slice() : tiles.slice(0, NH.GRID_CAP - 1).concat(["More"]);
+  NH.moreItems = tiles => tiles.length <= NH.GRID_CAP ? [] : tiles.slice(NH.GRID_CAP - 1);
+  NH.ICON = { "Charging": "bolt", "Find my car": "pin", "Status": "list", "Settings": "gear" };
+  NH.mockStrip = () => ({ soc: NMOCK.soc, lock: NMOCK.lock, charging: NMOCK.charging, climate: NMOCK.climate });
+  NH.UNKNOWN_STRIP = { soc: null, lock: null, charging: null, climate: null };
+  NH.VISIBLE_ROWS = 3;
+  NH.rowsOf = n => Math.ceil(n / 2);
+  // GridScroll.offsetFor: minimal scroll that keeps `row` visible, clamped to the content.
+  NH.offsetFor = (cur, row, vis, total) => {
+    if (vis <= 0 || total <= 0) return 0;
+    let o = cur; if (row < o) o = row; else if (row > o + vis - 1) o = row - vis + 1;
+    return Math.max(0, Math.min(o, Math.max(0, total - vis)));
+  };
+
+  const lockWarn = raw => raw === "NO" || raw === "OPENED" || raw === "TRUNK_OPENED";
+  const ageOf = o => o.ageMin == null ? NMOCK.ageMin : o.ageMin;
+
+  // ---------------------------------------------------------------- shared parts
+  // Status line: command result, error, or the data age (amber "! 17 h" when stale).
+  function statusLine(dc, y, o, maxW) {
+    const m = o.msg;
+    if (m && m.kind === "sent") {
+      const t = Ui.fit(dc, m.text || "Sent", "xtiny", maxW - 16), w = dc.getTextWidthInPixels(t, "xtiny") + 16, x0 = Math.round(130 - w / 2);
+      NIcons.draw(dc, "check", x0 + 6, y + 10, 6, T.POSITIVE);
+      dc.setColor(T.TEXT_1); dc.drawText(x0 + 16, y, "xtiny", t, J.LEFT);
+    } else if (m && m.kind === "error") {
+      dc.setColor(T.DESTRUCTIVE); dc.drawText(130, y, "xtiny", Ui.fit(dc, "! " + m.text, "xtiny", maxW), J.CENTER);
+    } else {
+      const min = ageOf(o);
+      Ui.drawAge(dc, y, min, Age.stale(min) ? { short: true } : {});
+    }
+  }
+  function chargeChip(raw) {
+    if (raw === "CHARGING") return { kind: "accent", icon: "bolt", text: "Charging" };
+    if (raw === "CONNECT_CABLE") return { kind: "warn", text: "Plug in" };
+    if (Icons.forCharging(raw)) return { icon: "pluggedIn", text: Labels.charging(raw) };
+    return null;
+  }
+  function lockChip(raw) {
+    if (raw == null) return { text: "—" };
+    if (lockWarn(raw)) return { kind: "warn", text: Labels.lock(raw) };
+    return { icon: "locked", text: Labels.lock(raw) };
+  }
+
+  // ---------------------------------------------------------------- (a) grid, C1a
+  // Black band: "100%" small y 14; plug · padlock "Locked" · climate at y 45 (icons cy 54); rule at y 66.
+  function gridStrip(dc, s) {
+    dc.setColor(T.TEXT_1); dc.drawText(130, 14, "small", s.soc == null ? "—" : s.soc + "%", J.CENTER);
+    const ci = Icons.forCharging(s.charging), cl = Icons.forClimate(s.climate), cy = 54;
+    let w, drawMid;
+    if (s.lock != null && lockWarn(s.lock)) {
+      const chip = { kind: "warn", text: Labels.lock(s.lock) }; w = Ui.chipWidth(dc, chip);
+      drawMid = x => Ui.drawChip(dc, x + w / 2, 44, chip);
+    } else {
+      const label = s.lock == null ? "—" : Labels.lock(s.lock), iw = s.lock == null ? 0 : 18;
+      w = iw + dc.getTextWidthInPixels(label, "xtiny");
+      drawMid = x => { if (iw) NIcons.draw(dc, "locked", x + 7, cy, 7, T.TEXT_1); dc.setColor(T.TEXT_1); dc.drawText(x + iw, 45, "xtiny", label, J.LEFT); };
+    }
+    const gap = 12, total = w + (ci ? 14 + gap : 0) + (cl ? 14 + gap : 0);
+    let x = Math.round(130 - total / 2);
+    if (ci) { NIcons.draw(dc, ci, x + 7, cy, 7, s.charging === "CHARGING" ? T.ACCENT : T.TEXT_1); x += 14 + gap; }
+    drawMid(x); x += w + gap;
+    if (cl) NIcons.draw(dc, cl, x + 7, cy, 7, T.TEXT_1);
+    dc.setColor(T.RULE); dc.fillRectangle(20, 66, 220, 1);
+  }
+  // Tile 90 x 44 r 8: RULE outline + white label, or accent fill + black label + 2 px white outline.
+  function tile(dc, x, y, label, focused) {
+    const lines = Ui.wrap(dc, label, "xtiny", [76], 2);
+    if (focused) {
+      dc.setColor(dc.mono ? T.TEXT_1 : T.ACCENT); dc.fillRoundedRectangle(x, y, 90, 44, 8);
+      if (!dc.mono) { dc.setColor(T.TEXT_1); dc.setPenWidth(2); dc.drawRoundedRectangle(x, y, 90, 44, 8); dc.setPenWidth(1); }
+    } else { dc.setColor(T.RULE); dc.setPenWidth(1); dc.drawRoundedRectangle(x, y, 90, 44, 8); }
+    dc.setColor(focused ? T.BLACK : T.TEXT_1); dc.drawText(x + 45, y + 22, "xtiny", lines.join("\n"), J.CENTER | J.VCENTER);
+  }
+  // o: {tiles, focus, scroll (rows), strip {soc, lock, charging, climate}, msg {text, kind: sent|error}, ageMin}
+  NH.grid = function (dc, o = {}) {
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    const tiles = o.tiles || NH.TILES, focus = o.focus || 0, scroll = o.scroll || 0, rows = NH.rowsOf(tiles.length);
+    gridStrip(dc, o.strip || NH.mockStrip());
+    dc.setClip(0, 68, 260, 144);
+    tiles.forEach((t, i) => {
+      const x = i % 2 ? 135 : 35, y = 70 + (Math.floor(i / 2) - scroll) * 48;
+      if (y + 44 < 68 || y > 212) return;
+      tile(dc, x, y, t, i === focus);
+    });
+    dc.clearClip();
+    Ui.drawScrollArc(dc, scroll, NH.VISIBLE_ROWS, rows);
+    statusLine(dc, 214, o, 142);
+    Ui.drawHintArc(dc, "start", "accent");
+  };
+
+  // ---------------------------------------------------------------- (b) hero + action list, C1b
+  // o: {rows, focus, strip, msg, ageMin}. Ring margin 12 for every line.
+  // Mirrors app/source/ui/HomeMenu.mc + HomeHero.mc: a CustomMenu with rows of ROW_H, of which only
+  // the focused row and its two neighbours are drawn, the hero in the 98 px title area above row 0
+  // (drawn at focus 0 only, so it slides in coming back to row 0 and is blank once row 1 has the focus), laid out bottom-up: status line, chips, then the SoC in the largest
+  // font whose digits clear y 12 and fit the chord (HomeHero.HeroFit). o.shift: see Ui.menu.
+  NH.ROW_H = Ui.ROW_H;
+  NH.HERO_BOTTOM = 130 - Math.floor(NH.ROW_H / 2);
+  NH.hero = function (dc, o = {}) {
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    const rows = o.rows || NH.TILES, f = Math.max(0, Math.min(rows.length - 1, o.focus || 0)), s = o.strip || NH.mockStrip();
+    const H = NH.ROW_H, shift = o.shift || 0, heroDy = Math.round(-f * H + shift);
+    if (f === 0) {
+      dc.translate(0, heroDy);
+      const statusTop = NH.HERO_BOTTOM - FM.xtiny.h;
+      const chips = [lockChip(s.lock), chargeChip(s.charging)].filter(Boolean);
+      if (Icons.forClimate(s.climate)) chips.push({ icon: "climate", text: Labels.climate(s.climate) });
+      const chipH = 21, chipsTop = chips.length ? statusTop - 2 - chipH : statusTop, baseline = chipsTop - 4;
+      statusLine(dc, statusTop, o, Ui.usable(statusTop, statusTop + FM.xtiny.h, 12));
+      if (chips.length) {
+        const maxW = Ui.usable(chipsTop, chipsTop + chipH, 12);
+        let keep = chips.length;
+        const widthOf = n => chips.slice(0, n).reduce((a, c) => a + Ui.chipWidth(dc, c), 0) + 6 * (n - 1);
+        while (keep > 0 && widthOf(keep) > maxW) keep--;
+        if (keep) Ui.drawChipRow(dc, chipsTop, chips.slice(0, keep));
+      }
+      if (s.soc == null) Ui.drawHero(dc, { word: "—", y: baseline - FM.medium.asc });
+      else {
+        const value = String(s.soc), unitW = dc.getTextWidthInPixels("%", "small") + 4;
+        let font = "medium";
+        for (const fnt of ["numMed", "numMild", "medium"]) {
+          const top = baseline - Math.floor((FM[fnt].asc * 4 + 4) / 5);
+          if (top < 12) continue;
+          if (dc.getTextWidthInPixels(value, fnt) + unitW <= Ui.usable(top, baseline, 12)) { font = fnt; break; }
+        }
+        Ui.drawValueWithUnit(dc, 130, baseline - FM[font].asc, value, "%", { num: font, unitFont: "small" });
+      }
+      dc.translate(0, -heroDy);
+    }
+    // Rows: centre y = 130 + (i - f) * H; only the focused row and its neighbours are drawn. While
+    // o.shift is set they slide into place; the hero and the row leaving are blank (see Ui.menu).
+    for (let i = Math.max(0, f - 1); i <= Math.min(rows.length - 1, f + 1); i++) {
+      const cy = Math.round(130 + (i - f) * H + shift);
+      if (i === f) Ui.focusPill(dc, 24, cy - 25, 212, 51, rows[i], "medium");
+      else {
+        const at = 130 + (i - f) * H, w = Ui.usable(at - 14, at + 15, 8);   // fitted where it settles, as in the app
+        dc.setColor(T.TEXT_2); dc.drawText(130, cy, "tiny", Ui.fit(dc, rows[i], "tiny", Math.min(193, w)), J.CENTER | J.VCENTER);
+      }
+    }
+    Ui.drawRing(dc, s.soc == null ? 0 : s.soc / 100, { fill: s.charging === "CHARGING" ? T.ACCENT : T.TEXT_1 });
+  };
+
+  // ---------------------------------------------------------------- cards
+  const KEYS_A = { START: "Run focused tile", "UP/DOWN": "Move tile focus (no wrap)", "Swipe up/down": "Scroll one row", Tap: "Run tile", BACK: "Exit app" };
+  const KEYS_B = { START: "Run focused row", "UP/DOWN": "Previous / next row, wrapping at both ends", "Swipe": "Move focus", Tap: "Run row", BACK: "Exit app" };
+  const A = (draw, keys = KEYS_A) => ({ label: "a · grid", draw, keys, decision: "D1", fitcheck: true });
+  const B = (draw, keys = KEYS_B) => ({ label: "b · hero list", draw, keys, decision: "D1", fitcheck: true });
+  const ord = id => OLD_SCREENS[id] ? OLD_SCREENS[id].order : undefined;
+  const REACH = [
+    "How Charging and Status are reached: (a) the Charging tile (row 3) and the Status tile (row 4); UP/DOWN move the focus, as verified on the watch.",
+    "(b) Charging and Status are rows; the list wraps at both ends like Garmin's own menus (1.1.0 opened them past the ends, which read as a screen opening by itself). A tap on the hero opens Status."
+  ];
+  const lastIdx = NH.TILES.length - 1, lastScroll = NH.rowsOf(NH.TILES.length) - NH.VISIBLE_ROWS;
+  const unknownA = NH.capGrid(NH.TILES_UNKNOWN);
+  const toastOn = under => dc => Native.toast(dc, under, { text: "Command sent", icon: "check" });
+
+  CARDS.push(
+    { id: "home-mock", section: "home", order: ord("home-mock"), name: "Home",
+      neu: [A(dc => NH.grid(dc, {})), B(dc => NH.hero(dc, {}))],
+      fixes: ["A6", "A10", "A11", "A12", "A13", "A21", "C1a", "C1b", "D1"],
+      changed: ["Strip: \"100%\" on top, plug · padlock \"Locked\" below (A6); no raw enum, nothing cut off.",
+        "(a) New Charging tile: Charging detail is reachable with buttons.",
+        "(a) Black band with a rule at y 66; tiles clipped to y 68..212 (A10).",
+        "(a) Outline tiles, focused tile accent with black label (A21).",
+        "(a) Scroll arc on the right bezel replaces the carets.",
+        "No text hint and no UP/DOWN glyphs; START hint arc only.",
+        "(b) SoC ring, hero \"100%\", chips and the age in the title area, the focused row as accent pill, one row below (rows of 65 px; only the focused row and its neighbours are drawn, so three sit close together and the rest stays off screen)."],
+      notes: REACH.concat(["Mock: 8 tiles fill four rows, so no More. Rule chosen: up to 8 tiles shown as is, above 8 the first 7 plus More.",
+        { flag: "D1 open: (a) keeps the custom grid; (b) needs a CustomMenu with the hero as title area." }]) },
+    { id: "home-scrolled", section: "home", order: ord("home-scrolled"), name: "Home, scrolled to Settings",
+      neu: [A(dc => NH.grid(dc, { focus: lastIdx, scroll: lastScroll })), B(dc => NH.hero(dc, { focus: lastIdx }))],
+      fixes: ["A10", "A11", "C1a", "C1b", "D1"],
+      changed: ["(a) Tiles stay inside the clip: nothing covers the band.", "(a) Scroll arc thumb at the bottom.",
+        "(b) Focus on the last row: the hero has scrolled away; one row above the pill, none below."],
+      notes: REACH.concat(["Returning from Settings keeps focus and scroll (A11); the OLD app resets to the top."]) },
+    { id: "home-unknown", section: "home", order: ord("home-unknown"), name: "Home, first launch (no operations cached)",
+      neu: [A(dc => NH.grid(dc, { tiles: unknownA, strip: NH.UNKNOWN_STRIP })),
+            B(dc => NH.hero(dc, { rows: NH.TILES_UNKNOWN, strip: NH.UNKNOWN_STRIP }))],
+      fixes: ["A6", "A8", "A14", "C1a", "C1b", "D1"],
+      changed: ["Unknown SoC and lock show \"—\" (no number-font letters).", "(a) 10 tiles: first 7 plus More; Charging is tile 7.",
+        "(b) No cap: all 10 rows, including ventilation.", "(b) Hero \"—\" in FONT_MEDIUM, lock chip \"—\", empty ring track."],
+      notes: REACH.concat([{ flag: "(a) Find my car, Status and Settings end up behind More on first launch." }]) },
+    { id: "home-sent", section: "home", order: ord("home-sent"), name: "Home, after a command",
+      neu: [A(dc => NH.grid(dc, { msg: { text: "Sent", kind: "sent" } })), B(dc => NH.hero(dc, { msg: { text: "Sent", kind: "sent" } }))],
+      fixes: ["A12", "A21", "B3"],
+      changed: ["\"Sent\" in white with a green check icon; green is never text.", "Focus stays on the tile or row that fired (A12).",
+        "Errors use red with \"!\" in the same line (see Home, phone offline)."],
+      notes: ["The toast carries the full text; the status line keeps one short word.", "(b) status line max 100 px, (a) max 142 px."] },
+    { id: "home-toast", section: "home", order: ord("home-toast"), name: "Toast",
+      neu: [Object.assign(A(toastOn(dc => NH.grid(dc, { msg: { text: "Sent", kind: "sent" } }))), { fitcheck: false }), Object.assign(B(toastOn(dc => NH.hero(dc, { msg: { text: "Sent", kind: "sent" } }))), { fitcheck: false })],
+      fixes: ["B4"], changed: ["Native toast (device file layout) over the NEW home; nothing custom."],
+      notes: ["Garmin draws the toast; the app only chooses text and icon.", "200 ms vibration unchanged.",
+        { flag: "Not fitchecked: the toast's grey rule at y 124 crosses what is underneath it, the tile labels in (a) and the focus pill in (b) (Garmin's layout, not ours)." }] },
+    { id: "home-more", section: "home", order: ord("home-more"), name: "More menu",
+      neu: [{ label: "a · grid", decision: "D1", fitcheck: true, keys: { START: "Open", BACK: "Back to tiles" },
+        draw: dc => Ui.menu(dc, { title: "More", items: NH.moreItems(NH.TILES_UNKNOWN).map(l => ({ label: l, icon: NH.ICON[l] })), focus: 0 }) }],
+      fixes: ["A14", "D1"], changed: ["Labels without \"\\n\" (A14).", "Icons pin, list and gear.", "Menu pops before the action runs (A14)."],
+      notes: ["Only (a) has a More menu, and only above 8 tiles (first launch).", "(b) has no More menu: every action is a row." ] }
+  );
+  // New-only states
+  CARDS.push(
+    { id: "home-list-row3", section: "home", order: 150, name: "Home (b), focus on row 4",
+      neu: [B(dc => NH.hero(dc, { focus: 3 }))], fixes: ["C1b", "D1"],
+      changed: ["Focus on \"Stop charging\": summary on top, two previous rows above, two next rows below."],
+      notes: ["Row labels are fitted to the chord at their y with a 12 px ring margin.", REACH[1]] },
+    { id: "home-stale", section: "home", order: 151, name: "Home, data 17 h old",
+      neu: [A(dc => NH.grid(dc, { ageMin: 17 * 60 })), B(dc => NH.hero(dc, { ageMin: 17 * 60 }))], fixes: ["B1", "B3", "A17"],
+      changed: ["Stale age in amber tiny \"! 17 h\" in the status line (amends US-009 red)."],
+      notes: ["Short form keeps the line within the (b) 100 px budget."] },
+    { id: "home-error", section: "home", order: 152, name: "Home, phone offline",
+      neu: [A(dc => NH.grid(dc, { msg: { text: "Phone not connected", kind: "error" } })), B(dc => NH.hero(dc, { msg: { text: "Phone not connected", kind: "error" } }))],
+      fixes: ["A21", "B3"], changed: ["Error in red with \"!\" in the status line; full text in the toast."],
+      notes: ["Same line as \"Sent\", so command feedback always lands in one place."] },
+    { id: "home-trunk", section: "home", order: 153, name: "Home, trunk open",
+      neu: [A(dc => NH.grid(dc, { strip: Object.assign(NH.mockStrip(), { lock: "TRUNK_OPENED" }) })),
+            B(dc => NH.hero(dc, { strip: Object.assign(NH.mockStrip(), { lock: "TRUNK_OPENED" }) }))],
+      fixes: ["A9", "A21", "B3"], changed: ["Lock state becomes an amber chip \"! Trunk open\" (shape plus colour)."],
+      notes: ["Unlocked and open use the same amber chip; Locked stays a plain padlock."] }
+  );
+
+  // Sample card (lead): the confirmation is Garmin's own; the NEW text keeps it a yes/no question.
+  CARDS.push({ id: "home-confirm", section: "home", name: "Confirmation",
+    neu: [{ label: "", draw: dc => Native.confirmation(dc, "Stop charging?"), keys: { START: "Yes, send", DOWN: "No" } }],
+    fixes: ["B6"], changed: ["Drawn from the device files: green check at START, red cross at DOWN (personality.mss)."], notes: [] });
+  window.NH = NH;
+})();
+// ================================================================ NEW status + charging (agent C)
+// Status loop (C2), charging detail (C3), charge limit (C4), charging menus and profiles.
+// Namespaces: window.NS (status pages) and window.NC (charging), both from this one IIFE.
+(function () {
+  const NS = {}, NC = {};
+  const PAGES = ["lock", "fuel", "charging", "odo", "ac"];
+  const TITLES = { lock: "Lock & doors", fuel: "Fuel & range", charging: "Charging", odo: "Odometer", ac: "Air conditioning" };
+  const LIMIT_STOPS = [50, 60, 70, 80, 90, 100];
+  const EX_ACTIVE = { soc: 80, charging: "CHARGING", chargeType: "AC", powerKw: "7.2", full: "18:40", remainMin: 95, ageMin: 3 };
+  const EX_PROFILE = { name: "Home", here: true, target: 80, maxCurrent: "reduced", timers: ["22:00 Mon-Fri", "07:30 Sat, Sun"] };
+
+  // ------------------------------------------------------------ shared bits
+  // Native.menu2 draws rows that sit on the bezel edge (y < 16 or > 244) as "X…"; the round mask hides them on the
+  // watch anyway, so clip them away here instead of touching core.
+  function menu2(dc, o) { dc.setColor(T.TEXT_1, T.BG); dc.clear(); dc.setClip(0, 16, 260, 228); Ui.menu(dc, o); dc.clearClip(); }
+  // arc = false on ring screens: the hint arc band (r 124..128) would sit on the SoC ring.
+  function startGlyph(dc, start, arc = "accent") { Ui.drawBezelGlyph(dc, "start", start === "menu" ? "menu" : "refresh", T.TEXT_1, arc); }
+  // Lines of xtiny text, centred, each fitted to the chord at its own y.
+  function lines(dc, y0, pitch, list, color) {
+    list.forEach((s, i) => { const y = y0 + i * pitch; dc.setColor(color || T.TEXT_1); dc.drawText(130, y, "xtiny", Ui.fit(dc, s, "xtiny", Ui.usable(y, y + FM.xtiny.h, 12)), J.CENTER); });
+  }
+  // Fixed-size chip for the lock grid (C2): outline + check when closed, amber fill + "!" when open.
+  function gridChip(dc, x, y, w, h, c) {
+    const warn = c.kind === "warn", fg = warn ? T.BLACK : T.TEXT_1;
+    if (warn) { dc.setColor(T.WARNING); dc.fillRoundedRectangle(x, y, w, h, h / 2); }
+    else { dc.setColor(T.RULE); dc.setPenWidth(1); dc.drawRoundedRectangle(x, y, w, h, h / 2); }
+    const text = Ui.fit(dc, c.text, "xtiny", w - 30), tw = dc.getTextWidthInPixels(text, "xtiny"), cw = 12 + 4 + tw, x0 = Math.round(x + (w - cw) / 2);
+    NIcons.draw(dc, warn ? "bang" : "check", x0 + 6, y + h / 2, 6, fg);
+    dc.setColor(fg); dc.drawText(x0 + 16, y + Math.round(h / 2), "xtiny", text, J.LEFT | J.VCENTER);
+  }
+  // Lock page items: open items first (A9), sunroof dropped when unsupported.
+  function lockItems(o) {
+    const raw = { doors: NMOCK.doors, windows: NMOCK.windows, bonnet: NMOCK.bonnet, trunk: o.trunkOpen ? "OPEN" : NMOCK.trunk, lights: NMOCK.lights, sunroof: NMOCK.sunroof };
+    const names = { doors: "Doors", windows: "Windows", bonnet: "Bonnet", trunk: "Trunk", lights: "Lights", sunroof: "Sunroof" };
+    const items = Object.keys(names).filter(k => raw[k] !== "UNSUPPORTED").map(k => ({ text: names[k], kind: raw[k] === "OPEN" ? "warn" : "outline" }));
+    return items.filter(i => i.kind === "warn").concat(items.filter(i => i.kind !== "warn"));
+  }
+  function heroValueIcon(dc, y, value, icon, color) {
+    const wv = dc.getTextWidthInPixels(value, "numMed"), iw = 26, total = wv + 8 + iw, x0 = Math.round(130 - total / 2);
+    dc.setColor(color || T.TEXT_1); dc.drawText(x0, y, "numMed", value, J.LEFT);
+    NIcons.draw(dc, icon, x0 + wv + 8 + 13, y + Math.round(FM.numMed.asc * 0.62), 12, color || T.TEXT_1);
+  }
+
+  // ------------------------------------------------------------ status page (C2)
+  // o = {page, ageMin, nodata, trunkOpen, indicator: "arc"|"dots", start: "refresh"|"menu", idx, count, merged}
+  NS.page = function (dc, o = {}) {
+    const page = o.page || "lock", idx = o.idx != null ? o.idx : PAGES.indexOf(page), count = o.count || PAGES.length;
+    if (o.merged && page === "charging" && !o.nodata) { NC.detail(dc, Object.assign({}, o, { merged: true, idx, count })); return; }
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    Ui.title(dc, TITLES[page]);
+    const age = o.ageMin != null ? o.ageMin : (page === "lock" ? NMOCK.statusAgeMin : NMOCK.ageMin);
+    if (o.nodata) {
+      dc.setColor(T.TEXT_1); dc.drawText(130, 98, "small", "No data yet", J.CENTER);
+      dc.setColor(T.TEXT_2); dc.drawText(130, 136, "xtiny", "START to refresh", J.CENTER);
+    } else if (page === "lock") {
+      const raw = o.trunkOpen ? "TRUNK_OPENED" : NMOCK.lock, insecure = raw !== "YES";
+      Ui.drawHero(dc, { word: Labels.lock(raw), icon: Icons.forLock(raw), y: 70, color: insecure ? T.WARNING : T.TEXT_1 });
+      const items = lockItems(o), W = 89, H = 22, xs = [38, 133], ys = [116, 140, 164];
+      items.slice(0, 6).forEach((c, i) => {
+        const row = Math.floor(i / 2), alone = i === items.length - 1 && i % 2 === 0;
+        gridChip(dc, alone ? Math.round(130 - W / 2) : xs[i % 2], ys[row], W, H, c);
+      });
+      Ui.drawAge(dc, 192, age);
+    } else if (page === "fuel") {
+      Ui.drawValueWithUnit(dc, 130, 64, String(NMOCK.totalRange), "km");
+      lines(dc, 142, 20, [Labels.engine(NMOCK.primary.engine) + " " + NMOCK.primary.pct + "%", Labels.engine(NMOCK.secondary.engine) + " " + NMOCK.secondary.pct + "%"]);
+      Ui.drawAge(dc, 192, age);
+    } else if (page === "charging") {
+      heroValueIcon(dc, 64, NMOCK.soc + "%", Icons.forCharging(NMOCK.charging) || "pluggedIn");
+      lines(dc, 142, 20, [Labels.charging(NMOCK.charging), NMOCK.rangeKm + " km range"]);
+      Ui.drawAge(dc, 192, age);
+    } else if (page === "odo") {
+      Ui.drawValueWithUnit(dc, 130, 64, String(NMOCK.odometer), "km", { gap: 3 });
+      Ui.drawAge(dc, 192, age);
+    } else if (page === "ac") {
+      const on = NMOCK.climate !== "OFF";
+      Ui.drawHero(dc, { word: Labels.climate(NMOCK.climate), icon: on ? "climate" : "fan", y: 70 });
+      lines(dc, 128, 20, ["Windscreen heat " + Labels.state(NMOCK.heatFront).toLowerCase(), "Rear window heat " + Labels.state(NMOCK.heatRear).toLowerCase()]);
+      Ui.drawAge(dc, 192, age);
+    }
+    Ui.drawPageIndicator(dc, idx, count, o.indicator || "arc");
+    startGlyph(dc, o.start);
+  };
+  NS.pages = PAGES;
+  NS.titles = TITLES;
+
+  // Status ActionMenu (D4): over the lock page only Refresh; over the merged charging page also the charging actions.
+  NS.actionItems = function (page, merged) { return merged && page === "charging" ? ["Refresh", "Charge limit", "Charging profiles"] : ["Refresh"]; };
+  NS.actionMenu = function (dc, o = {}) {
+    const page = o.page || "lock";
+    Ui.actionMenu(dc, d => NS.page(d, Object.assign({}, o, { start: "menu" })), { items: NS.actionItems(page, o.merged), focus: o.focus || 0 });
+  };
+
+  // ------------------------------------------------------------ charging detail (C3)
+  // o = {example, cable, merged, idx, count, indicator, start, limit, ageMin}
+  NC.detail = function (dc, o = {}) {
+    const ex = o.example ? EX_ACTIVE : null;
+    const soc = ex ? ex.soc : NMOCK.soc, raw = o.cable ? "CONNECT_CABLE" : ex ? ex.charging : NMOCK.charging, active = raw === "CHARGING";
+    const limit = o.limit != null ? o.limit : NMOCK.limit;
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    Ui.drawRing(dc, soc / 100, { fill: active ? T.ACCENT : T.TEXT_1, tick: limit != null ? limit / 100 : null });
+    Ui.title(dc, "Charging");
+    Ui.drawValueWithUnit(dc, 130, 58, soc + "%", null);
+    const chip = o.cable ? { text: Labels.charging(raw), kind: "warn" } : { text: Labels.charging(raw), icon: active ? "bolt" : "pluggedIn" };
+    Ui.drawChip(dc, 130, 134, chip);
+    const rows = [];
+    if (ex) { rows.push(ex.powerKw + " kW · " + Labels.chargeType(ex.chargeType)); rows.push("Full by " + ex.full + " (" + ex.remainMin + " min)"); }
+    else if (NMOCK.rangeKm != null) rows.push(NMOCK.rangeKm + " km range");
+    lines(dc, 160, 20, rows);
+    Ui.drawAge(dc, 202, o.ageMin != null ? o.ageMin : ex ? ex.ageMin : o.cable ? 5 : NMOCK.ageMin);
+    if (o.merged) { Ui.drawPageIndicator(dc, o.idx != null ? o.idx : 2, o.count || PAGES.length, o.indicator || "arc"); startGlyph(dc, o.start, false); }
+    else { startGlyph(dc, "refresh", false); Ui.drawBezelGlyph(dc, "up", "menu", T.TEXT_2, false); }
+  };
+
+  // ------------------------------------------------------------ charge limit (C4)
+  // o = {value, care}
+  NC.limit = function (dc, o = {}) {
+    const v = o.value || 80;
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    Ui.title(dc, "Charge limit", 36);
+    LIMIT_STOPS.forEach((s, i) => {
+      const a = (140 - i * 20) * Math.PI / 180, x = Math.round(130 + Math.cos(a) * 116), y = Math.round(130 + Math.sin(a) * 116);
+      if (s === v) { dc.setColor(T.ACCENT); dc.fillCircle(x, y, 7); } else { dc.setColor(T.RULE); dc.fillCircle(x, y, 4); }
+    });
+    Ui.drawValueWithUnit(dc, 130, 124 - Math.floor(FM.numMed.h / 2), v + "%", null);
+    if (o.care === v) Ui.drawChip(dc, 130, 166, { text: "Battery care", kind: "white", icon: "check" });
+    Ui.drawBezelGlyph(dc, "up", "plus", T.TEXT_1, "dark");
+    Ui.drawBezelGlyph(dc, "down", "minus", T.TEXT_1, "dark");
+    Ui.drawBezelGlyph(dc, "start", "check", T.TEXT_1, "accent");
+  };
+  NC.limitItems = function (care) { return LIMIT_STOPS.map(s => ({ label: s + "%", sub: s === care ? "Recommended" : null })); };
+  NC.limitMenu = function (dc, o = {}) {
+    const v = o.value || 80;
+    menu2(dc, { title: "Charge limit", items: NC.limitItems(o.care), focus: LIMIT_STOPS.indexOf(v) });
+  };
+
+  // ------------------------------------------------------------ menus, mode, profiles
+  NC.menuItems = [{ label: "Refresh", icon: "refresh" }, { label: "Set charge limit", icon: "battery" }, { label: "Charging profiles", icon: "list" }];
+  NC.menu = function (dc, o = {}) { menu2(dc, { title: "Charging", items: NC.menuItems, focus: o.focus || 0 }); };
+  NC.mode = function (dc, o = {}) {
+    menu2(dc, { title: "Charge mode", items: [{ label: "Manual", check: true }, { label: "Timer", check: false }, { label: "Preferred times", check: false }], focus: o.focus || 0 });
+  };
+  NC.profilesUnsupported = function (dc) {
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    Ui.title(dc, "Charging profiles", 40);
+    dc.setColor(T.TEXT_1); dc.drawText(130, 104, "small", "Not supported", J.CENTER);
+    dc.setColor(T.TEXT_2); dc.drawText(130, 136, "small", "by this car", J.CENTER);
+  };
+  // o = {idx, count, indicator}
+  NC.profile = function (dc, o = {}) {
+    const p = EX_PROFILE;
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    Ui.title(dc, "Charging profiles", 40);
+    Ui.drawHero(dc, { word: p.name, y: 70 });
+    if (p.here) Ui.drawChip(dc, 130, 108, { text: "Here", kind: "white", icon: "pin" });
+    lines(dc, 136, 19, ["Target " + p.target + "%", "Max current " + p.maxCurrent]);
+    lines(dc, 178, 19, p.timers, T.TEXT_2);
+    Ui.drawPageIndicator(dc, o.idx || 0, o.count || 2, o.indicator || "arc");
+  };
+
+  // ------------------------------------------------------------ cards
+  const SEC_ST = "status", SEC_CH = "charging";
+  const stFixes = ["A3", "A8", "A16", "A17", "C2"];
+  CARDS.push(
+    { id: "st-lock", section: SEC_ST, name: "Lock & doors",
+      neu: [
+        { label: "D7 native arc · D4 refresh glyph", draw: dc => NS.page(dc, { page: "lock" }), keys: { "UP/DOWN": "Previous / next page (wraps)", START: "Refresh", BACK: "Home" }, decision: "D7" },
+        { label: "D7 custom dots", draw: dc => NS.page(dc, { page: "lock", indicator: "dots" }), keys: { "UP/DOWN": "Previous / next page (wraps)", START: "Refresh" }, decision: "D7" },
+        { label: "D4 START opens action menu", draw: dc => NS.page(dc, { page: "lock", start: "menu" }), keys: { "UP/DOWN": "Pages", START: "Action menu (Refresh)" }, decision: "D4" }],
+      fixes: ["A3", "A8", "A9", "A15", "A16", "A17", "A21", "C2", "D4", "D7"],
+      changed: ["\"LOCKED\" in the number font becomes padlock + \"Locked\" in FONT_MEDIUM.", "Three sub-lines become a 2x3 chip grid: Doors, Windows, Bonnet, Trunk, Lights all visible (sunroof unsupported, dropped).",
+        "Closed = outline chip with check; open = amber chip with \"!\", sorted first.", "\"1/5\" counter and quota line dropped; page indicator on the left instead.", "Bottom hint replaced by a refresh glyph at START (or a menu glyph for D4)."],
+      notes: ["Dots: current filled accent r 4, others grey r 3 at r 118, so size also marks the page in monochrome.", "Taps no longer refresh (A15); refresh only on START or the action menu."] },
+    { id: "st-fuel", section: SEC_ST, name: "Fuel & range",
+      neu: [{ label: "", draw: dc => NS.page(dc, { page: "fuel" }), keys: { "UP/DOWN": "Pages", START: "Refresh" } }],
+      fixes: stFixes, changed: ["\"436\" in the number font, \"km\" in FONT_MEDIUM grey on the same baseline.", "\"GASOLINE 62%\" becomes \"Petrol 62%\" (Labels.engine)."], notes: [] },
+    { id: "st-charging", section: SEC_ST, name: "Charging page",
+      neu: [
+        { label: "D2 separate: status page", draw: dc => NS.page(dc, { page: "charging" }), keys: { "UP/DOWN": "Pages", START: "Refresh" }, decision: "D2" },
+        { label: "D2 merged: charging page", draw: dc => NS.page(dc, { page: "charging", merged: true }), keys: { "UP/DOWN": "Pages", START: "Refresh", MENU: "Charging menu" }, decision: "D2" }],
+      fixes: ["A8", "A16", "A19", "C2", "C3", "D2"],
+      changed: ["\"READY_FOR_CHARGING\" becomes \"Plugged in\".", "Merged variant: this page is the C3 charging detail, so the separate Charging view goes away."],
+      notes: [{ flag: "Merged + native arc: the indicator (r 116..124) sits right against the SoC ring (r 124..128); with dots it reads better." }] },
+    { id: "st-odo", section: SEC_ST, name: "Odometer",
+      neu: [{ label: "", draw: dc => NS.page(dc, { page: "odo" }), keys: { "UP/DOWN": "Pages", START: "Refresh" } }],
+      fixes: stFixes, changed: ["Digits in the number font, \"km\" in FONT_MEDIUM with a 3 px gap (tight: about 206 of 210 px)."], notes: ["If a seven-digit odometer shows up, the unit moves to a sub-line."] },
+    { id: "st-ac", section: SEC_ST, name: "Air conditioning",
+      neu: [{ label: "", draw: dc => NS.page(dc, { page: "ac" }), keys: { "UP/DOWN": "Pages", START: "Refresh" } }],
+      fixes: stFixes, changed: ["\"OFF\" in the number font becomes fan icon + \"Off\" in FONT_MEDIUM.", "\"Front window heat OFF\" becomes \"Windscreen heat off\"."], notes: [] },
+    { id: "st-ac-stale", section: SEC_ST, name: "Air conditioning, 17 h old",
+      neu: [{ label: "", draw: dc => NS.page(dc, { page: "ac", ageMin: 17 * 60 }), keys: {} }],
+      fixes: ["A17", "A21", "C2"], changed: ["Stale age turns amber with \"!\" (was red), \"! 17 h ago\"."], notes: [] },
+    { id: "st-nodata", section: SEC_ST, name: "Section without data",
+      neu: [{ label: "", draw: dc => NS.page(dc, { page: "ac", nodata: true }), keys: { START: "Refresh" } }],
+      fixes: ["A7", "A8", "C2"], changed: ["\"—\" in the number font plus a 255 px yellow line become \"No data yet\" and a grey \"START to refresh\"."], notes: [] },
+    { id: "st-trunk", section: SEC_ST, order: 207, name: "Lock & doors, trunk open",
+      neu: [{ label: "", draw: dc => NS.page(dc, { page: "lock", trunkOpen: true }), keys: { START: "Refresh" } }],
+      fixes: ["A9", "A21", "C2"], changed: ["New state: hero turns amber \"Trunk open\" with the open icon; amber \"! Trunk\" chip sorted first, never hidden."],
+      notes: ["Assumes the API reports TRUNK_OPENED as the lock state; with YES plus an open trunk the hero stays \"Locked\" and only the chip turns amber."] },
+    { id: "st-actionmenu", section: SEC_ST, order: 208, name: "Status action menu (D4)",
+      neu: [
+        { label: "From the lock page", draw: dc => NS.actionMenu(dc, { page: "lock" }), keys: { START: "Run", BACK: "Close" }, decision: "D4" },
+        { label: "From the merged charging page", draw: dc => NS.actionMenu(dc, { page: "charging", merged: true }), keys: { "UP/DOWN": "Move", START: "Run", BACK: "Close" }, decision: "D4" }],
+      fixes: ["D4", "B6"], changed: ["New: START opens Garmin's ActionMenu with Refresh first (quota friction, same on every page)."],
+      notes: ["On the lock page the menu has only Refresh: two presses for what the glyph variant does in one."] },
+    { id: "ch-detail", section: SEC_CH, name: "Charging detail",
+      neu: [
+        { label: "D2 separate view", draw: dc => NC.detail(dc, {}), keys: { START: "Refresh", MENU: "Charging menu (hold UP)", BACK: "Home" }, decision: "D2" },
+        { label: "D2 merged: page 3 of Status", draw: dc => NC.detail(dc, { merged: true }), keys: { "UP/DOWN": "Status pages", START: "Refresh", MENU: "Charging menu" }, decision: "D2" }],
+      fixes: ["A3", "A15", "A16", "A17", "A19", "C3", "D2"],
+      changed: ["SoC ring around the bezel (limit tick when the car reports a limit).", "\"Ready to charge\" headline becomes \"100%\" hero + \"Plugged in\" chip.",
+        "\"Type: Not charging\", \"Power: —\" etc. dropped: rows only when there is data (here \"36 km range\").", "Bottom hint replaced by a refresh glyph at START and a menu glyph at UP."],
+      notes: [{ flag: "Today this screen is unreachable with buttons: on home UP/DOWN move the tile focus (verified on the watch). NEW home exposes it as a Charging tile or row." }, "\"36 km range\" kept as a row so the merged variant loses nothing from the old status page."] },
+    { id: "ch-active", section: SEC_CH, name: "Charging detail, while charging",
+      neu: [{ label: "Example", draw: dc => NC.detail(dc, { example: true }), keys: { START: "Refresh", MENU: "Charging menu" } }],
+      fixes: ["C3", "A16"], changed: ["Accent ring at 80 %, bolt chip \"Charging\", \"7.2 kW · AC\", \"Full by 18:40 (95 min)\".", "Rate line (km/h) dropped to keep two rows."],
+      notes: ["Example values, not from the mock."] },
+    { id: "ch-cable", section: SEC_CH, name: "Cable warning",
+      neu: [{ label: "Example", draw: dc => NC.detail(dc, { cable: true }), keys: { START: "Refresh" } }],
+      fixes: ["A21", "C3"], changed: ["Orange sentence \"No cable appears to be connected\" becomes an amber chip \"! Plug in\"."], notes: ["Example state, not from the mock."] },
+    { id: "ch-menu", section: SEC_CH, name: "Charging menu",
+      neu: [{ label: "", draw: dc => NC.menu(dc), keys: { START: "Open", BACK: "Charging" } }],
+      fixes: ["A20", "B6"], changed: ["Icons per item (refresh, battery, list); slide left in, right out."], notes: ["Set charge mode stays hidden: the mock reports no available modes."] },
+    { id: "ch-limit", section: SEC_CH, name: "Charge limit",
+      neu: [
+        { label: "Stepper (C4)", draw: dc => NC.limit(dc, { value: 80 }), keys: { "UP / swipe up": "+10%", "DOWN / swipe down": "−10%", START: "Set", BACK: "Back" } },
+        { label: "Menu2 50..100", draw: dc => NC.limitMenu(dc, { value: 80 }), keys: { "UP/DOWN": "Move", START: "Set", BACK: "Back" } }],
+      fixes: ["A3", "A19", "C4", "B6"], changed: ["Title in the accent at y 36; six stop dots on the bottom arc (50 % left, 100 % right), current one accent.", "\"UP/DOWN adjust - SELECT set\" replaced by + / − glyphs at UP/DOWN and a check at START.", "Swipe up now increases (A19; today swipe up decreases)."],
+      notes: ["Menu2 variant: native list focused on the current value, \"Recommended\" on the battery-care value."] },
+    { id: "ch-limit-care", section: SEC_CH, name: "Charge limit, battery-care match",
+      neu: [
+        { label: "Stepper, Example", draw: dc => NC.limit(dc, { value: 80, care: 80 }), keys: {} },
+        { label: "Menu2, Example", draw: dc => NC.limitMenu(dc, { value: 80, care: 80 }), keys: {} }],
+      fixes: ["A21", "C4"], changed: ["Green \"Recommended (battery care)\" line becomes a white \"Battery care\" chip with check (green is for transient success only)."], notes: ["Example: battery-care target 80 %."] },
+    { id: "ch-mode", section: SEC_CH, name: "Charge mode",
+      neu: [{ label: "Example", draw: dc => NC.mode(dc), keys: { START: "Set mode", BACK: "Back" } }],
+      fixes: ["A16", "B6"], changed: ["\"Current\" sub-label becomes a single-choice check on the active mode."], notes: ["Example modes; only shown when the car lists any."] },
+    { id: "ch-profiles", section: SEC_CH, name: "Charging profiles",
+      neu: [{ label: "", draw: dc => NC.profilesUnsupported(dc), keys: { BACK: "Back" } }],
+      fixes: ["A4", "A18"], changed: ["Uppercase grey header becomes the accent title \"Charging profiles\" at y 34.", "\"by this car\" in grey."], notes: [] },
+    { id: "ch-profile-ex", section: SEC_CH, name: "Charging profile page",
+      neu: [{ label: "Example", draw: dc => NC.profile(dc, { idx: 0, count: 2 }), keys: { "UP/DOWN": "Next profile", BACK: "Back" } }],
+      fixes: ["A19", "A21", "B6"], changed: ["Green \"Home (here)\" becomes \"Home\" + white pin chip \"Here\".", "\"Target: 80%\" becomes \"Target 80%\"; timers as \"22:00 Mon-Fri\".", "\"1/2 - UP/DOWN\" hint replaced by the page indicator."],
+      notes: ["Example profile.", "Weekday ranges use a hyphen: the en dash is not in the measured font set."] }
+  );
+
+  // ------------------------------------------------------------ simulator views
+  const wrap = (i, n) => (i + n) % n;
+  const refreshed = () => ({ toast: { text: "Refreshed", icon: "check" } });
+
+  SIM_VIEWS["new:statusLoop"] = {
+    newDesign: true,
+    init(o = {}) {
+      const p = o.page == null ? 0 : typeof o.page === "number" ? o.page : Math.max(0, PAGES.indexOf(o.page));
+      return { d2: o.d2 || "separate", d4: o.d4 || "refresh", d7: o.d7 || "arc", idx: p, menu: null };
+    },
+    draw(dc, s) {
+      const o = { page: PAGES[s.idx], idx: s.idx, count: PAGES.length, indicator: s.d7, start: s.d4, merged: s.d2 === "merged" };
+      if (!s.menu) { NS.page(dc, o); return; }
+      if (s.menu.kind === "action") Ui.actionMenu(dc, d => NS.page(d, o), { items: s.menu.items, focus: s.menu.focus });
+      else NC.menu(dc, { focus: s.menu.focus });
+    },
+    key(k, s) {
+      const merged = s.d2 === "merged", page = PAGES[s.idx];
+      if (s.menu) {
+        const n = s.menu.items.length;
+        if (k === "UP" || k === "SWIPE_DOWN") { s.menu.focus = Math.max(0, s.menu.focus - 1); return null; }
+        if (k === "DOWN" || k === "SWIPE_UP") { s.menu.focus = Math.min(n - 1, s.menu.focus + 1); return null; }
+        if (k === "BACK") { s.menu = null; return null; }
+        if (k === "START" || k === "TAP") {
+          const it = s.menu.items[s.menu.focus], label = typeof it === "string" ? it : it.label; s.menu = null;
+          if (label === "Refresh") return refreshed();
+          if (label === "Charge limit" || label === "Set charge limit") return { push: "new:chargeLimit", o: {} };
+          if (label === "Charging profiles") return { push: "new:chargingProfiles", o: {} };
+        }
+        return null;
+      }
+      if (k === "UP" || k === "SWIPE_DOWN") { s.idx = wrap(s.idx - 1, PAGES.length); return null; }
+      if (k === "DOWN" || k === "SWIPE_UP") { s.idx = wrap(s.idx + 1, PAGES.length); return null; }
+      if (k === "START") {
+        if (s.d4 === "menu") { s.menu = { kind: "action", items: NS.actionItems(page, merged), focus: 0 }; return null; }
+        return refreshed();
+      }
+      if (k === "MENU" && merged && page === "charging") { s.menu = { kind: "menu2", items: NC.menuItems, focus: 0 }; return null; }
+      if (k === "BACK") return { pop: true };
+      return null;   // TAP: no refresh on tap (A15)
+    }
+  };
+
+  SIM_VIEWS["new:chargingDetail"] = {
+    newDesign: true,
+    init(o = {}) { return { example: !!o.example, cable: !!o.cable, menu: null }; },
+    draw(dc, s) { if (s.menu) NC.menu(dc, { focus: s.menu.focus }); else NC.detail(dc, { example: s.example, cable: s.cable }); },
+    key(k, s) {
+      if (s.menu) {
+        if (k === "UP" || k === "SWIPE_DOWN") { s.menu.focus = Math.max(0, s.menu.focus - 1); return null; }
+        if (k === "DOWN" || k === "SWIPE_UP") { s.menu.focus = Math.min(NC.menuItems.length - 1, s.menu.focus + 1); return null; }
+        if (k === "BACK") { s.menu = null; return null; }
+        if (k === "START" || k === "TAP") {
+          const label = NC.menuItems[s.menu.focus].label; s.menu = null;
+          if (label === "Refresh") return refreshed();
+          if (label === "Set charge limit") return { push: "new:chargeLimit", o: {} };
+          if (label === "Charging profiles") return { push: "new:chargingProfiles", o: {} };
+        }
+        return null;
+      }
+      if (k === "START") return refreshed();
+      if (k === "MENU") { s.menu = { focus: 0 }; return null; }
+      if (k === "BACK") return { pop: true };
+      return null;
+    }
+  };
+
+  SIM_VIEWS["new:chargeLimit"] = {
+    newDesign: true,
+    init(o = {}) { return { value: LIMIT_STOPS.includes(o.value) ? o.value : 80, care: o.care != null ? o.care : null }; },
+    draw(dc, s) { NC.limit(dc, { value: s.value, care: s.care }); },
+    key(k, s) {
+      if (k === "UP" || k === "SWIPE_UP") { s.value = Math.min(100, s.value + 10); return null; }
+      if (k === "DOWN" || k === "SWIPE_DOWN") { s.value = Math.max(50, s.value - 10); return null; }
+      if (k === "START") return { toast: { text: "Limit set to " + s.value + "%", icon: "check" } };
+      if (k === "BACK") return { pop: true };
+      return null;
+    }
+  };
+
+  SIM_VIEWS["new:chargingProfiles"] = {
+    newDesign: true,
+    init() { return {}; },
+    draw(dc) { NC.profilesUnsupported(dc); },
+    key(k) { return k === "BACK" ? { pop: true } : null; }
+  };
+
+  window.NS = NS;
+  window.NC = NC;
+})();
+// ================================================================ NEW find my car, settings, glance, onboarding, Garmin UI (agent D)
+(function () {
+  const NF = {}, NG = {}, NSet = {}, NO = {}, NGUI = {};
+  const t = Math.trunc;
+  const blank = dc => { dc.setColor(T.TEXT_1, T.BG); dc.clear(); };
+  // Native.menu2 wrapped in a clip y 2..240: rows that only peek past the circle edge are not drawn
+  // (core menu2 would otherwise draw them as a one-letter "F…").
+  const menu2 = (dc, o) => { blank(dc); dc.setClip(0, 2, 260, 238); Native.menu2(dc, o); dc.clearClip(); };
+  // NEW menus: CustomMenu in Škoda green (Menu2 itself cannot be recoloured on the fēnix 7 Pro).
+  const nmenu = (dc, o) => { blank(dc); dc.setClip(0, 2, 260, 238); Ui.menu(dc, o); dc.clearClip(); };
+
+  // ============================================================== NF: find my car (C5)
+  const EX = { dist: "240", unit: "m", bearing: 35 };      // Example values
+  const rad = deg => deg * Math.PI / 180;
+  const polar = (r, deg) => [Math.round(130 + Math.cos(rad(deg)) * r), Math.round(130 + Math.sin(rad(deg)) * r)];
+
+  // Ring track r 125; bearing pointer: accent wedge on the ring, apex outward (no accent ring segment,
+  // so it never merges with the accent START arc when the car is to the upper right). Outline only without a heading.
+  NF.ring = function (dc) { dc.setPenWidth(3); dc.setColor(T.RULE); dc.drawArc(130, 130, 125, 0, 360); dc.setPenWidth(1); };
+  NF.pointer = function (dc, bearing, hasHeading) {
+    const a = bearing - 90;                       // compass degrees -> canvas degrees
+    const tip = polar(128, a), l = polar(110, a - 7), r = polar(110, a + 7);
+    dc.setColor(T.ACCENT);
+    if (hasHeading) {
+      dc.fillPolygon([tip, l, r]);
+    } else {
+      dc.setPenWidth(2); dc.drawLine(tip[0], tip[1], l[0], l[1]); dc.drawLine(l[0], l[1], r[0], r[1]); dc.drawLine(r[0], r[1], tip[0], tip[1]); dc.setPenWidth(1);
+    }
+  };
+  // Address in xtiny, two lines wrapped to [158, 186] with "…".
+  NF.address = function (dc, y0, color = T.TEXT_1) {
+    const lines = Ui.wrap(dc, NMOCK.address, "xtiny", [158, 186], 2);
+    dc.setColor(color); lines.forEach((l, i) => dc.drawText(130, y0 + i * 19, "xtiny", l, J.CENTER));
+  };
+  NF.parked = function (dc, o = {}) {
+    blank(dc);
+    NF.ring(dc);
+    NF.address(dc, 46);
+    Ui.drawValueWithUnit(dc, 130, 88, EX.dist, EX.unit);
+    Ui.drawAge(dc, 172, o.age != null ? o.age : NMOCK.ageMin);
+    NF.pointer(dc, EX.bearing, o.heading !== false);
+    Ui.drawHintArc(dc, "start", "accent");          // START = map
+  };
+  NF.gps = function (dc) {
+    blank(dc); NF.ring(dc); NF.address(dc, 46);
+    dc.setColor(T.TEXT_2); dc.drawText(130, 112, "small", "Waiting for GPS", J.CENTER);
+    Ui.drawAge(dc, 172, NMOCK.ageMin);
+  };
+  NF.moving = function (dc) {
+    blank(dc); NF.ring(dc);
+    Ui.drawHero(dc, { word: "Car is moving", y: 90 });
+    dc.setColor(T.TEXT_2); dc.drawText(130, 130, "xtiny", "Last parked", J.CENTER);
+    NF.address(dc, 150);
+    Ui.drawAge(dc, 196, NMOCK.ageMin);
+  };
+  NF.MENU_ITEMS = ["Navigate", "Refresh"];
+  NF.menu = function (dc, focus = 0) { Ui.actionMenu(dc, d => NF.parked(d), { items: NF.MENU_ITEMS, focus }); };
+  NF.NAV_TEXT = "Navigate to the car? This closes the app.";
+  NF.nav = function (dc) { Native.confirmation(dc, NF.NAV_TEXT); };
+
+  // Map stand-in: the tiles and the pins are Garmin's MapView (MAP_MODE_PREVIEW, MAP_MARKER_ICON_PIN).
+  // Same look as the OLD stand-in; the park green is 0xAAFF55 because 0xAAFFAA is on the banned list.
+  NF.map = function (dc, o = {}) {
+    const c = dc.c; dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    c.fillStyle = "#FFFFAA"; c.fillRect(0, 0, 260, 260);
+    c.fillStyle = "#AAFF55"; c.beginPath(); c.moveTo(20, 30); c.lineTo(110, 18); c.lineTo(120, 92); c.lineTo(36, 110); c.closePath(); c.fill();
+    c.fillStyle = "#AAFFFF"; c.beginPath(); c.ellipse(205, 210, 60, 26, -0.4, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "#FFFFFF"; c.lineWidth = 9; c.beginPath(); c.moveTo(-10, 150); c.lineTo(270, 120); c.moveTo(150, -10); c.lineTo(170, 270); c.stroke();
+    c.strokeStyle = "#AAAAAA"; c.lineWidth = 1; c.beginPath(); c.moveTo(-10, 150); c.lineTo(270, 120); c.moveTo(150, -10); c.lineTo(170, 270); c.stroke();
+    c.strokeStyle = "#FFFFFF"; c.lineWidth = 4; c.beginPath(); c.moveTo(60, 270); c.lineTo(120, 140); c.moveTo(165, 60); c.lineTo(260, 70); c.stroke();
+    const pin = (x, y, label) => { dc.setColor("#FF0000"); dc.fillCircle(x, y - 14, 8); dc.fillPolygon([[x - 6, y - 10], [x + 6, y - 10], [x, y]]); dc.setColor("#FFFFFF"); dc.fillCircle(x, y - 14, 3); dc.setColor("#000000"); dc.drawText(x, y + 2, "xtiny", label, J.CENTER); };
+    pin(130, 136, "Car"); pin(96, 196, "You");
+    if (o.browse) {   // stand-in for Garmin's own browse controls
+      dc.setColor(T.BG); dc.fillRoundedRectangle(70, 30, 120, 24, 12);
+      dc.setColor(T.TEXT_1); dc.drawText(130, 42, "xtiny", "Browse: pan / zoom", J.CENTER | J.VCENTER);
+    }
+  };
+  NF.MAP_MENU = { title: "Map", items: [{ label: "Navigate to car" }] };
+  NF.mapMenu = function (dc) { nmenu(dc, NF.MAP_MENU); };
+
+  // ============================================================== NG: glance (C6)
+  // Chrome (neighbouring glances, separators, launcher icon) is the watch's own: same layout as the OLD board.
+  NG.chrome = function (dc) {
+    dc.setColor(T.TEXT_1, T.BG); dc.clear();
+    const c = dc.c;
+    c.globalAlpha = .35; dc.setColor(T.RULE); dc.fillCircle(45, 40, 18); dc.fillCircle(45, 222, 18);
+    dc.setColor(T.TEXT_2); dc.drawText(76, 30, "xtiny", "Body Battery", J.LEFT); dc.drawText(76, 212, "xtiny", "Weather", J.LEFT); c.globalAlpha = 1;
+    dc.setColor(T.RULE); dc.drawLine(20, 84, 240, 84); dc.drawLine(20, 176, 240, 176);
+    // launcher icon (the app's own bitmap resource, not part of the theme): the 1.1.0 steering wheel
+    NG.appIcon(dc, 25, 110, 1);
+  };
+  // The 1.1.0 launcher icon (app/resources/drawables/launcher_icon.svg), drawn with Dc calls:
+  // a three-spoke steering wheel, Electric Green rim and spokes, Emerald hub with a green edge,
+  // transparent background. (x, y) is the top-left of the 40 x 40 icon; k scales it.
+  NG.appIcon = function (dc, x, y, k) {
+    const P = (px, py) => [x + px * k, y + py * k];
+    dc.setColor(T.ACCENT); dc.setPenWidth(Math.max(1, Math.round(5 * k))); dc.drawCircle(x + 20 * k, y + 20 * k, 15.5 * k);
+    dc.fillPolygon([P(6, 18.25), P(14.5, 17), P(14.5, 23), P(6, 21.75)]);
+    dc.fillPolygon([P(34, 18.25), P(25.5, 17), P(25.5, 23), P(34, 21.75)]);
+    dc.fillPolygon([P(17.75, 34), P(22.25, 34), P(23.25, 25.5), P(16.75, 25.5)]);
+    dc.fillCircle(x + 20 * k, y + 20 * k, 6 * k);
+    dc.setColor(T.EMERALD); dc.fillCircle(x + 20 * k, y + 20 * k, 3 * k);
+    dc.setPenWidth(1);
+  };
+  // Content area 171 x 63 at (70, 99). Row 1 y 2, row 2 y 22, row 3 (SoC bar) y 55.
+  NG.content = function (dc, o) {
+    const X = 6, W = 171;
+    if (!o.data) {
+      dc.setColor(T.TEXT_2); dc.drawText(X, 2, "xtiny", "Vozidlo", J.LEFT);
+      dc.drawText(X, 22, "tiny", Ui.fit(dc, "Open for your car", "tiny", W - X - 1), J.LEFT);
+      return;
+    }
+    dc.setColor(T.TEXT_2); dc.drawText(X, 2, "xtiny", "Vozidlo", J.LEFT);
+    dc.drawText(W - 6, 2, "xtiny", Age.short(NMOCK.ageMin), J.RIGHT);
+    const soc = NMOCK.soc + "%", mid = 22 + Math.round(FM.tiny.h / 2);
+    dc.setColor(T.TEXT_1); dc.drawText(X, 22, "tiny", soc, J.LEFT);
+    let x = X + dc.getTextWidthInPixels(soc, "tiny") + 13;
+    NIcons.draw(dc, "locked", x, mid, 8, T.TEXT_1); x += 11;
+    dc.setColor(T.TEXT_1); dc.drawText(x, 22, "tiny", Labels.lock(NMOCK.lock), J.LEFT);
+    x += dc.getTextWidthInPixels(Labels.lock(NMOCK.lock), "tiny") + 12;
+    NIcons.draw(dc, "pluggedIn", x, mid, 8, T.TEXT_1);
+    // 4 px SoC bar
+    const bw = W - X - 6, fw = Math.round(bw * NMOCK.soc / 100);
+    if (fw < bw) { dc.setColor(T.RULE); dc.fillRectangle(X + fw, 55, bw - fw, 4); }
+    dc.setColor(T.TEXT_1); dc.fillRectangle(X, 55, fw, 4);
+  };
+  NG.glance = function (dc, o = {}) {
+    NG.chrome(dc);
+    dc.translate(70, 99); dc.setClip(0, 0, 171, 63);
+    NG.content(dc, o);
+    dc.clearClip(); dc.translate(-70, -99);
+  };
+
+  // ============================================================== NSet: settings
+  NSet.ORDER = [{ label: "Climate", sub: "Position 1", icon: "fan" }, { label: "Charging", sub: "Position 2", icon: "bolt" },
+    { label: "Find my car", sub: "Position 3", icon: "pin" }, { label: "Status", sub: "Position 4", icon: "list" }];
+  NSet.ORDER_MOVED = [{ label: "Charging", sub: "Position 1", icon: "bolt" }, { label: "Climate", sub: "Position 2", icon: "fan" },
+    { label: "Find my car", sub: "Position 3", icon: "pin" }, { label: "Status", sub: "Position 4", icon: "list" }];
+  NSet.order = (dc, focus = 0) => nmenu(dc, { title: "Tile order", items: NSet.ORDER, focus });
+  NSet.orderMoved = dc => nmenu(dc, { title: "Tile order", items: NSet.ORDER_MOVED, focus: 1 });
+  NSet.item = (dc, focus = 1) => nmenu(dc, { title: "Climate", items: [{ label: "Move up" }, { label: "Move down" }, { label: "Hide" }], focus });
+  NSet.temp = function (dc, v = NMOCK.targetTemp) {
+    blank(dc);
+    Ui.title(dc, "Target temperature", 48);       // 182 px: needs the chord at y 48, not 34
+    Ui.drawValueWithUnit(dc, 130, 130 - Math.floor(FM.numMed.h / 2), String(v), "°C");
+    Ui.drawBezelGlyph(dc, "up", "plus", T.TEXT_1);
+    Ui.drawBezelGlyph(dc, "down", "minus", T.TEXT_1);
+  };
+
+  // ============================================================== NO: onboarding (C7)
+  const GUIDE = "A key is created in the MyŠkoda app (v8.16+), not here. It only works for the vehicles you selected when you created it. Enter it in this app's phone settings.";
+  NO.TEXT = {
+    guide: GUIDE,
+    check: "Checking your key against your car…",
+    expiry: "Your key is probably close to expiring: this is an estimate, not a fact. If you would rather not be caught out, create a new one soon in the MyŠkoda app.",
+    expired: "Your API key has expired. " + GUIDE
+  };
+  // Wrap on chord widths (extra margin keeps the lines clear of the bezel glyphs), small when <= 4 lines, else xtiny.
+  NO.layout = function (dc, text, margin) {
+    for (const f of ["small", "xtiny"]) {
+      const lh = FM[f].h; let lines = [], count = 1;
+      for (let pass = 0; pass < 8; pass++) {
+        const top = 130 - Math.floor(count * lh / 2), widths = [];
+        for (let i = 0; i < count; i++) widths.push(Ui.usable(top + i * lh, top + (i + 1) * lh, margin));
+        lines = TB.wrap(text, widths, s => dc.getTextWidthInPixels(s, f));
+        if (lines.length <= count) break; count = lines.length;
+      }
+      if (f === "small" && lines.length > 4) continue;
+      return { f, lines, lh };
+    }
+  };
+  NO.text = function (dc, text, o = {}) {
+    blank(dc);
+    const margin = o.glyphs ? 26 : 12;
+    const { f, lines, lh } = NO.layout(dc, text, margin), top = 130 - Math.floor(lines.length * lh / 2);
+    dc.setColor(T.TEXT_1); lines.forEach((l, i) => dc.drawText(130, top + i * lh, f, l, J.CENTER));
+    if (o.menu) Ui.drawBezelGlyph(dc, "up", "menu", T.TEXT_1);              // hold UP = MENU: Onboarding menu
+    if (o.ok) Ui.drawBezelGlyph(dc, "start", "check", T.ACCENT, "accent");  // START = continue
+    return { f, lines: lines.length };
+  };
+  NO.menu = (dc, focus = 0) => nmenu(dc, { title: "Onboarding", items: [{ label: "Get a key" }, { label: "Clear stored data" }], focus });
+
+  // ============================================================== NGUI: Garmin UI gallery
+  const DEMO_ITEMS = [{ label: "Refresh", icon: "refresh" }, { label: "Charge limit", sub: "80%", icon: "bolt" }, { label: "Profiles", icon: "list" }];
+  NGUI.under = dc => { blank(dc); Ui.title(dc, "Status"); Ui.drawValueWithUnit(dc, 130, 93, "100", "%"); };
+  NGUI.underLow = dc => { blank(dc); Ui.drawValueWithUnit(dc, 130, 132, "100", "%"); };   // below the toast's rule at y 124
+  NGUI.hints = function (dc) {
+    blank(dc);
+    Ui.drawHintArc(dc, "up", "dark"); Ui.drawHintArc(dc, "start", "accent"); Ui.drawHintArc(dc, "back", "positive"); Ui.drawHintArc(dc, "down", "destructive");
+    dc.setColor(T.TEXT_2);
+    dc.drawText(40, 130, "xtiny", "dark", J.LEFT | J.VCENTER);
+    dc.drawText(196, 76, "xtiny", "accent", J.RIGHT | J.VCENTER);
+    dc.drawText(196, 184, "xtiny", "positive", J.RIGHT | J.VCENTER);
+    dc.drawText(62, 184, "xtiny", "destructive", J.LEFT | J.VCENTER);
+  };
+
+  // ============================================================== cards
+  const NAV_KEYS = { START: "Map", MENU: "Navigate / Refresh (ActionMenu)", BACK: "Home" };
+  CARDS.push(
+    { id: "glance-data", section: "entry", name: "Glance, with cached data",
+      neu: [{ label: "", draw: dc => NG.glance(dc, { data: true }), keys: { START: "Open app", "UP/DOWN": "Next glance" }, fitcheck: true }],
+      fixes: ["A16", "A17", "C6"],
+      changed: ["Three rows instead of one cut-off line: name and age, SoC + lock + plug, SoC bar.", "\"READY_FOR_CHARGING\" becomes a plug icon; \"LOCKED\" becomes \"Locked\".", "Age \"12 min\" now fits, right-aligned on row 1.", "\"Vozidlo\" grey, values white."],
+      notes: ["Chrome (neighbouring glances, separators, launcher icon) is the watch's own, same as OLD; only the 171 × 63 content area is ours.", "Climate icon joins the plug when climate is on (off in the mock).", "Bar fill white; accent only while charging, like the rings."] },
+    { id: "glance-empty", section: "entry", name: "Glance, nothing cached",
+      neu: [{ label: "", draw: dc => NG.glance(dc, { data: false }), keys: { START: "Open app" }, fitcheck: true }],
+      fixes: ["C6"], changed: ["\"Vozidlo\" on row 1, \"Open for your car\" in tiny grey on row 2."], notes: [] },
+
+    { id: "fc-parked", section: "findcar", name: "Parked (Example distance and bearing)",
+      neu: [{ label: "Example, compass heading", draw: dc => NF.parked(dc), keys: NAV_KEYS, fitcheck: true },
+        { label: "Example, no heading yet", draw: dc => NF.parked(dc, { heading: false }), keys: NAV_KEYS, fitcheck: true }],
+      fixes: ["A5", "A8", "A3", "A17", "C5"],
+      changed: ["No title: the screen opens from the Find my car tile.", "Bearing is an accent pointer on a ring track at the bezel, not a green arrow in the middle.", "Address wraps on two chord lines instead of a 40-character cut.", "\"240\" in the number font, \"m\" in medium grey.", "Hint line gone: accent arc at START (map)."],
+      notes: ["Mock address; 240 m and 35° are example values.", "Outline pointer while the watch has no compass heading (LocationMath falls back to north-up)."] },
+    { id: "fc-gps", section: "findcar", name: "Waiting for GPS",
+      neu: [{ label: "", draw: dc => NF.gps(dc), keys: { MENU: "Navigate / Refresh" }, fitcheck: true }],
+      fixes: ["A18", "C5"], changed: ["\"Acquiring GPS position...\" becomes \"Waiting for GPS\", one line, grey.", "No pointer until a fix arrives; ring track stays."], notes: [] },
+    { id: "fc-moving", section: "findcar", name: "Car is moving",
+      neu: [{ label: "", draw: dc => NF.moving(dc), keys: { MENU: "Refresh" }, fitcheck: true }],
+      fixes: ["A5", "A18", "C5"],
+      changed: ["\"Car is moving\" as a hero word in medium white (was small yellow).", "\"Last parked\" without colon; address wraps on two lines."],
+      notes: ["C5 says small at y 92; medium fits (167 px) and follows the hero rule (B4). Small is the fallback."] },
+    { id: "fc-menu", section: "findcar", name: "Find my car menu",
+      neu: [{ label: "ActionMenu", draw: dc => NF.menu(dc, 0), keys: { START: "Run", "UP/DOWN": "Move", BACK: "Close" }, fitcheck: true }],
+      fixes: ["B6"], changed: ["Native ActionMenu over the screen instead of a full Menu2 with a title.", "\"Navigate to car\" shortens to \"Navigate\" (the context is on screen)."],
+      notes: ["Full-screen list: nothing behind it gets cut off."] },
+    { id: "fc-nav", section: "findcar", name: "Navigate confirmation",
+      neu: [{ label: "", draw: dc => NF.nav(dc), keys: { START: "Yes: save waypoint, exit to navigation", DOWN: "No" }, fitcheck: true }],
+      fixes: ["A18"], changed: ["Text cut to \"Navigate to the car? This closes the app.\" (2 sentences, no dash)."],
+      notes: ["The system still asks again in exitTo; known Garmin bug: activity may start without the route."] },
+    { id: "fc-map", section: "findcar", name: "Map preview",
+      neu: [{ label: "Preview", draw: dc => NF.map(dc), keys: { START: "Browse (pan / zoom)", MENU: "Navigate to car", BACK: "Back" }, fitcheck: false },
+        { label: "Browse mode", draw: dc => NF.map(dc, { browse: true }), keys: { BACK: "Back to preview" }, fitcheck: false }],
+      fixes: ["B6"], changed: ["Unchanged map; a MENU handler is added (next card)."],
+      notes: ["Tiles, pins and browse controls are Garmin's MapView; only the labels Car and You are ours.", { flag: "fitcheck off for this card: the map tile colours trip the monochrome check." }, "Park stand-in colour 0xAAFF55 (0xAAFFAA is banned)."] },
+    { id: "fc-map-menu", section: "findcar", order: 406, name: "Map, MENU",
+      neu: [{ label: "", draw: dc => NF.mapMenu(dc), keys: { START: "Navigate (confirmation first)", BACK: "Map" }, fitcheck: true }],
+      fixes: ["B6"], changed: ["New: hold UP on the map opens a one-item Menu2 \"Navigate to car\"; OLD had no MENU handler."],
+      notes: ["Same confirmation as from the Find my car screen."] },
+
+    { id: "set-order", section: "settings", name: "Tile order",
+      neu: [{ label: "", draw: dc => NSet.order(dc), keys: { START: "Edit item", "UP/DOWN": "Move focus" }, fitcheck: true }],
+      fixes: ["B6"], changed: ["IconMenuItem with the category icons.", "\"Status detail\" becomes \"Status\"."], notes: ["Hidden categories show \"Hidden\" as sub-label."] },
+    { id: "set-order-item", section: "settings", name: "Tile order item",
+      neu: [{ label: "", draw: dc => NSet.item(dc), keys: { START: "Apply, back to the list" }, fitcheck: true }],
+      fixes: [], changed: ["Same Menu2; push SLIDE_LEFT, pop SLIDE_RIGHT."], notes: ["\"Hide\" reads \"Show\" for a hidden category."] },
+    { id: "set-order-moved", section: "settings", order: 503, name: "Tile order, after Move down",
+      neu: [{ label: "", draw: dc => NSet.orderMoved(dc), keys: { START: "Edit item" }, fitcheck: true }],
+      fixes: ["A20"], changed: ["New: focus follows the moved item, so \"Climate\" is focused at Position 2 (setFocus)."],
+      notes: ["OLD rebuilt the list with focus on row 1."] },
+    { id: "set-temp", section: "settings", name: "Target temperature",
+      neu: [{ label: "", draw: dc => NSet.temp(dc), keys: { UP: "+1, saved right away", DOWN: "−1", "Swipe up": "+1", BACK: "Done" }, fitcheck: true }],
+      fixes: ["A8", "A19"],
+      changed: ["Title \"Target temperature\" added.", "\"21\" in the number font, \"°C\" in medium grey.", "Hint line replaced by + at UP and − at DOWN."],
+      notes: ["The title is 182 px in tiny, so it sits at y 48 where the chord allows it (y 34 gives 158 px)."] },
+
+    { id: "ob-guide", section: "onboarding", name: "No key yet",
+      neu: [{ label: "", draw: dc => NO.text(dc, NO.TEXT.guide, { menu: true, glyphs: true }), keys: { MENU: "Onboarding menu", START: "Open the key page on the phone" }, fitcheck: true }],
+      fixes: ["A22", "C7"], changed: ["\"Menu for more.\" becomes a menu glyph at UP.", "Text in the larger font when it fits in 4 lines."],
+      notes: ["START opens the key page in guidance mode (OnboardingDelegate.onSelect); OLD card said Retry, which is the validating mode only.", { flag: "START has no glyph here: is a hint for \"open key page\" wanted?" }] },
+    { id: "ob-check", section: "onboarding", name: "Checking the key",
+      neu: [{ label: "", draw: dc => NO.text(dc, NO.TEXT.check), keys: {}, fitcheck: true }],
+      fixes: ["C7"], changed: ["Small font instead of xtiny (2 lines)."], notes: [] },
+    { id: "ob-expiry", section: "onboarding", name: "Key near expiry",
+      neu: [{ label: "", draw: dc => NO.text(dc, NO.TEXT.expiry, { ok: true, glyphs: true }), keys: { START: "Continue to home" }, fitcheck: true }],
+      fixes: ["A22", "C7"], changed: ["\"Select to continue.\" becomes a check glyph with accent arc at START."], notes: [] },
+    { id: "ob-expired", section: "onboarding", name: "Key expired",
+      neu: [{ label: "", draw: dc => NO.text(dc, NO.TEXT.expired, { menu: true, glyphs: true }), keys: { MENU: "Onboarding menu" }, fitcheck: true }],
+      fixes: ["A22", "C7"], changed: ["\"Menu for more.\" becomes a menu glyph at UP.", "Lines kept clear of the glyph (extra margin)."], notes: ["Longest onboarding text; stays in xtiny."] },
+    { id: "ob-menu", section: "onboarding", name: "Onboarding menu",
+      neu: [{ label: "", draw: dc => NO.menu(dc), keys: { START: "Open" }, fitcheck: true }],
+      fixes: ["A20"], changed: ["Same Menu2; push SLIDE_LEFT."], notes: ["Clear stored data always asks for confirmation."] },
+
+    // ---- Garmin UI gallery
+    { id: "gui-menu2", section: "garmin", order: 700, name: "Menu2",
+      neu: [{ label: "Title + first item", draw: dc => menu2(dc, { title: "Charging", items: DEMO_ITEMS, focus: 0 }), fitcheck: true },
+        { label: "Focus in the middle", draw: dc => menu2(dc, { title: "Charging", items: DEMO_ITEMS, focus: 1 }), fitcheck: true }],
+      fixes: [], changed: ["Title 78, focused row 87 (small + tiny sub), neighbours 55 (tiny grey), focus bar 3 × 57 at x 13."],
+      notes: ["From the fēnix 7 Pro device files (simulator.json layouts.menu2).", { flag: "Menu2 themes (MENU_THEME_DARK and friends) are not supported on this watch: always white on black." }] },
+    { id: "gui-menu2-items", section: "garmin", order: 701, name: "Menu2, toggle and check items",
+      neu: [{ label: "ToggleMenuItem", draw: dc => menu2(dc, { title: "Climate", items: [{ label: "Windscreen", sub: "Heat on", toggle: true }, { label: "Rear window", toggle: false }], focus: 0 }), fitcheck: true },
+        { label: "CheckboxMenuItem", draw: dc => menu2(dc, { title: "Charge mode", items: [{ label: "Manual", check: true }, { label: "Timer", check: false }, { label: "Preferred times", check: false }], focus: 0 }), fitcheck: true }],
+      fixes: [], changed: ["Toggle and check draw in the device's green; that green is Garmin's, not ours."], notes: ["Example labels."] },
+    { id: "gui-confirm", section: "garmin", order: 702, name: "Confirmation",
+      neu: [{ label: "", draw: dc => Native.confirmation(dc, "Clear stored data?"), keys: { START: "Yes", DOWN: "No" }, fitcheck: true }],
+      fixes: [], changed: ["Body box 52..208 in tiny; green check at START, red cross at DOWN (personality.mss)."], notes: [] },
+    { id: "gui-toast", section: "garmin", order: 703, name: "Toast",
+      neu: [{ label: "Success", draw: dc => Native.toast(dc, NGUI.underLow, { text: "Command sent", icon: "check" }), fitcheck: true },
+        { label: "Warning", draw: dc => Native.toast(dc, NGUI.underLow, { text: "Quota low", icon: "bang" }), fitcheck: true }],
+      fixes: [], changed: ["Partial banner from the top: icon at y 46, one line of small text."], notes: ["Example texts."] },
+    { id: "gui-actionmenu", section: "garmin", order: 704, name: "ActionMenu",
+      neu: [{ label: "", draw: dc => Native.actionMenu(dc, NGUI.under, { items: ["Refresh", "Charging", "Settings"], focus: 0 }), keys: { "UP/DOWN": "Move", START: "Run", BACK: "Close" }, fitcheck: false }],
+      fixes: [], changed: ["Panel x 147..260 with a 2 px white edge; selected entry at y 132."], notes: ["simulator.json actionMenu. Example entries.", "Garmin's panel cuts through the screen behind it; the redesign uses a full-screen list instead (not fit-checked here on purpose)."] },
+    { id: "gui-indicator", section: "garmin", order: 705, name: "ViewLoop page indicator",
+      neu: [{ label: "Native arc", draw: dc => { NGUI.under(dc); Ui.drawPageIndicator(dc, 1, 5, "arc"); }, decision: "D7", fitcheck: true },
+        { label: "Custom dots", draw: dc => { NGUI.under(dc); Ui.drawPageIndicator(dc, 1, 5, "dots"); }, decision: "D7", fitcheck: true }],
+      fixes: [], changed: ["Native: 6° white segments at r 116..124 on the left, current hollow.", "Dots: accent current, RULE others; means owning the paging."], notes: ["Page 2 of 5."] },
+    { id: "gui-hints", section: "garmin", order: 706, name: "Button hint arcs",
+      neu: [{ label: "", draw: dc => NGUI.hints(dc), fitcheck: true }],
+      fixes: [], changed: ["Personality hint arcs: 4 px band r 124..128, ±10° around the button."],
+      notes: ["Shown at UP (dark), START (accent), BACK (positive), DOWN (destructive); the kind is a colour, not a fixed button."] }
+  );
+
+  // ============================================================== simulator views
+  SIM_VIEWS["new:findCar"] = {
+    newDesign: true,
+    init(o) { return { sub: null, focus: 0 }; },
+    draw(dc, st) { if (st.sub === "action") NF.menu(dc, st.focus); else NF.parked(dc); },
+    key(k, st) {
+      if (st.sub === "action") {
+        const n = NF.MENU_ITEMS.length;
+        if (k === "UP" || k === "SWIPE_DOWN") { st.focus = (st.focus + n - 1) % n; return null; }
+        if (k === "DOWN" || k === "SWIPE_UP") { st.focus = (st.focus + 1) % n; return null; }
+        if (k === "BACK") { st.sub = null; return null; }
+        if (k === "START" || k === "TAP") {
+          const item = NF.MENU_ITEMS[st.focus]; st.sub = null; st.focus = 0;
+          if (item === "Navigate") {
+            const toast = { text: "Opening navigation", icon: "check" };
+            const then = () => ({ toast }); then.toast = toast;   // works whether the sim calls it or reads it
+            return { confirm: { text: NF.NAV_TEXT, then } };
+          }
+          return { toast: { text: "Refreshing", icon: "refresh" } };
+        }
+        return null;
+      }
+      if (k === "START" || k === "TAP") return { push: "new:mapPreview", o: {} };
+      if (k === "MENU") { st.sub = "action"; st.focus = 0; return null; }
+      if (k === "BACK") return { pop: true };
+      return null;
+    }
+  };
+  SIM_VIEWS["new:mapPreview"] = {
+    newDesign: true,
+    init(o) { return { browse: false, menu: false }; },
+    draw(dc, st) { if (st.menu) NF.mapMenu(dc); else NF.map(dc, { browse: st.browse }); },
+    key(k, st) {
+      if (st.menu) {
+        if (k === "BACK") { st.menu = false; return null; }
+        if (k === "START" || k === "TAP") {
+          st.menu = false;
+          const toast = { text: "Opening navigation", icon: "check" };
+          const then = () => ({ toast }); then.toast = toast;
+          return { confirm: { text: NF.NAV_TEXT, then } };
+        }
+        return null;
+      }
+      if (k === "MENU") { st.menu = true; return null; }
+      if (k === "START" || k === "TAP") { st.browse = !st.browse; return null; }
+      if (k === "BACK") { if (st.browse) { st.browse = false; return null; } return { pop: true }; }
+      return null;
+    }
+  };
+
+  Object.assign(window, { NF, NG, NSet, NO, NGUI });
+})();
+
+// Lead: readable names for the simulator caption, for views registered without a title.
+(function () {
+  const names = { "new:statusLoop": "Status", "new:chargingDetail": "Charging", "new:chargeLimit": "Charge limit", "new:chargingProfiles": "Charging profiles",
+    "new:findCar": "Find my car", "new:mapPreview": "Map", "new:homeGrid": "Home (grid)", "new:homeList": "Home (list)",
+    "old:home": "Home", "old:status": "Status", "old:charging": "Charging", "old:findCar": "Find my car" };
+  for (const k in names) if (SIM_VIEWS[k] && !SIM_VIEWS[k].title) SIM_VIEWS[k].title = names[k];
+})();
+
+// Lead: menus in the NEW design are drawn by the app itself in Škoda green (Ui.menu / Ui.actionMenu).
+(function () {
+  const MENU = "Menu in Škoda green: title and focused row green, black text on the focused row. On the watch a CustomMenu (Garmin's Menu2 cannot be recoloured on the fēnix 7 Pro), so scrolling and focus stay native.";
+  const ACTION = "Actions as a full-screen list in Škoda green instead of Garmin's ActionMenu panel, which cuts through the screen behind it and cannot be recoloured. On the watch a CustomMenu.";
+  const menus = ["home-more", "ch-menu", "ch-mode", "ch-limit", "ch-limit-care", "fc-map-menu", "set-order", "set-order-item", "set-order-moved", "ob-menu"];
+  const actions = ["st-actionmenu", "fc-menu"];
+  for (const c of CARDS) {
+    const line = menus.includes(c.id) ? MENU : actions.includes(c.id) ? ACTION : null;
+    if (!line) continue;
+    (c.changed = c.changed || []).unshift(line);
+    if (!(c.fixes || []).includes("B6")) (c.fixes = c.fixes || []).push("B6");
+  }
+})();
+// ================================================================ Interactive simulator (agent B)
+// Two watches (OLD | NEW), a view stack per watch, bezel buttons, touch, keyboard and #sim= replay.
+(function () {
+  const SIM = {};
+  const K = ["UP", "DOWN", "START", "BACK", "MENU", "SWIPE_UP", "SWIPE_DOWN", "TAP"];
+  const nextKey = k => k === "DOWN" || k === "SWIPE_UP", prevKey = k => k === "UP" || k === "SWIPE_DOWN";
+  const sent = () => ({ toast: { text: "Command sent", icon: "check" } });
+
+  // Moves a NEW list's focus; a step of one row slides (Ui.slideShift), a wrap or no move jumps.
+  // Ui.SLIDE_MS 0 (fitcheck) switches the slide off.
+  const slideTo = (s, focus) => {
+    const d = focus - s.focus;
+    s.slide = Math.abs(d) === 1 && Ui.SLIDE_MS > 0 ? { d, t0: performance.now() } : null;
+    s.focus = focus;
+  };
+
+  // ---------------------------------------------------------------- shared native views
+  // Menu2: o = {title, items: [{label, sub, icon, result}], focus}. START runs item.result (default: pop).
+  SIM_VIEWS["native:menu2"] = {
+    newDesign: false, title: "Menu2",
+    init(o = {}) { return { title: o.title || "", items: o.items || [], focus: o.focus || 0, style: o.style || "native" }; },
+    draw(dc, s) {
+      if (s.style === "new") Ui.menu(dc, { title: s.title, items: s.items, focus: s.focus, shift: Ui.slideShift(s.slide, performance.now()) });
+      else Native.menu2(dc, { title: s.title, items: s.items, focus: s.focus });
+    },
+    key(k, s) {
+      const n = s.items.length;
+      if (nextKey(k)) { slideTo(s, Math.min(n - 1, s.focus + 1)); return null; }
+      if (prevKey(k)) { slideTo(s, Math.max(0, s.focus - 1)); return null; }
+      if (k === "START" || k === "TAP") { const it = s.items[s.focus]; return (it && it.result) || { pop: true }; }
+      return undefined;
+    }
+  };
+
+  // ---------------------------------------------------------------- OLD views (faithful to the app)
+  const OLD_TILE_ORDER = [{ label: "Climate", sub: "Position 1" }, { label: "Charging", sub: "Position 2" }, { label: "Find my car", sub: "Position 3" }, { label: "Status detail", sub: "Position 4" }];
+  const oldMenu = (title, items) => ({ push: "native:menu2", o: { title, items } });
+  SIM_VIEWS["old:home"] = {
+    title: "Home (tiles)",
+    init() { return { focus: 0, scroll: 0, msg: null }; },
+    draw(dc, s) { controls(dc, { tiles: TILES_MOCK, hi: s.focus, scroll: s.scroll, msg: s.msg }); },
+    // ControlsView.onShow rebuilds the tiles: focus and scroll go back to the top; the message survives.
+    resume(s) { s.focus = 0; s.scroll = 0; },
+    key(k, s) {
+      const n = TILES_MOCK.length, rows = Math.ceil(n / 2);
+      if (k === "UP" || k === "DOWN") {
+        s.focus = Math.max(0, Math.min(n - 1, s.focus + (k === "DOWN" ? 1 : -1)));
+        s.scroll = NH.offsetFor(s.scroll, Math.floor(s.focus / 2), 3, rows); return null;
+      }
+      if (k === "SWIPE_DOWN") return { push: "old:charging" };
+      if (k === "SWIPE_UP") return { push: "old:status" };
+      if (k === "START" || k === "TAP") {
+        const label = TILES_MOCK[s.focus].replace(/\n/g, " ");
+        const fire = () => { s.msg = { text: "Command sent", err: false }; return sent(); };
+        if (label === "Stop charging") return { confirm: { text: "Stop charging?", then: fire } };
+        if (label === "Find my car") return { push: "old:findCar" };
+        if (label === "Status") return { push: "old:status" };
+        if (label === "Settings") return oldMenu("Tile order", OLD_TILE_ORDER);
+        return fire();
+      }
+      return undefined;
+    }
+  };
+  const OLD_PAGES = ["st-lock", "st-fuel", "st-charging", "st-odo", "st-ac"];
+  SIM_VIEWS["old:status"] = {
+    title: "Status pages",
+    init() { return { page: 0 }; },
+    draw(dc, s) { OLD_SCREENS[OLD_PAGES[s.page]].draw(dc); },
+    key(k, s) {
+      if (nextKey(k)) { s.page = (s.page + 1) % 5; return null; }
+      if (prevKey(k)) { s.page = (s.page + 4) % 5; return null; }
+      if (k === "START") return null;   // refresh: one request, page redraws with fresh data
+      return undefined;
+    }
+  };
+  SIM_VIEWS["old:charging"] = {
+    title: "Charging detail",
+    init() { return {}; },
+    draw(dc) { OLD_SCREENS["ch-detail"].draw(dc); },
+    key(k) {
+      if (k === "MENU") return oldMenu("Charging", [{ label: "Refresh" }, { label: "Set charge limit", result: { replace: "old:chargeLimit" } }, { label: "Charging profiles", result: { replace: "old:profiles" } }]);
+      if (k === "START") return null;   // refresh
+      if (k === "UP" || k === "DOWN") return null;   // nothing on this view
+      return undefined;
+    }
+  };
+  SIM_VIEWS["old:chargeLimit"] = {
+    title: "Charge limit",
+    init() { return { value: 80 }; },
+    draw(dc, s) { chargeLimit(dc, { value: s.value }); },
+    key(k, s) {
+      if (k === "UP" || k === "SWIPE_DOWN") { s.value = Math.min(100, s.value + 10); return null; }
+      if (k === "DOWN" || k === "SWIPE_UP") { s.value = Math.max(50, s.value - 10); return null; }
+      if (k === "START") return [{ pop: true }, { toast: { text: "Charge limit set", icon: "check" } }];
+      return undefined;
+    }
+  };
+  SIM_VIEWS["old:profiles"] = { title: "Charging profiles", init() { return {}; }, draw(dc) { OLD_SCREENS["ch-profiles"].draw(dc); }, key() { return undefined; } };
+  SIM_VIEWS["old:findCar"] = {
+    title: "Find my car",
+    init() { return {}; },
+    draw(dc) { findCar(dc, { mode: "parked", distance: "240 m", angle: 35, age: 12 }); },
+    key(k) {
+      if (k === "START") return { push: "old:map" };
+      if (k === "MENU") return oldMenu("Find my car", [
+        { label: "Navigate to car", result: [{ pop: true }, { confirm: { text: "Navigate to the car? This closes this app - starting navigation always exits to the system.", then: { toast: { text: "Exit to navigation", icon: "check" } } } }] },
+        { label: "Refresh" }]);
+      return undefined;
+    }
+  };
+  SIM_VIEWS["old:map"] = { title: "Map preview", init() { return {}; }, draw(dc) { mapPreview(dc); }, key() { return undefined; } };
+
+  // ---------------------------------------------------------------- NEW home views
+  const NEW_TILE_ORDER = [{ label: "Climate", sub: "Position 1", icon: "climate" }, { label: "Charging", sub: "Position 2", icon: "bolt" }, { label: "Find my car", sub: "Position 3", icon: "pin" }, { label: "Status", sub: "Position 4", icon: "list" }];
+  const opts = s => ({ variant: s.variant, d2: s.d2, d4: s.d4, d7: s.d7 });
+  const openCharging = s => s.d2 === "merged" ? { push: "new:statusLoop", o: Object.assign(opts(s), { page: "charging" }) } : { push: "new:chargingDetail", o: opts(s) };
+  const openStatus = s => ({ push: "new:statusLoop", o: Object.assign(opts(s), { page: "lock" }) });
+  // Shared action dispatch for both NEW variants; focus is kept (A11, A12).
+  function runNew(label, s) {
+    const fire = () => { s.msg = { text: "Sent", kind: "sent" }; return sent(); };
+    if (label === "Stop charging") return { confirm: { text: "Stop charging?", then: fire } };
+    if (label === "Charging") return openCharging(s);
+    if (label === "Status") return openStatus(s);
+    if (label === "Find my car") return { push: "new:findCar", o: opts(s) };
+    if (label === "Settings") return { push: "native:menu2", o: { title: "Tile order", items: NEW_TILE_ORDER, style: "new" } };
+    if (label === "More") return { push: "native:menu2", o: { style: "new", title: "More", items: NH.moreItems(s.all || NH.TILES).map(l => ({ label: l, icon: NH.ICON[l], result: [{ pop: true }, runNew(l, s)] })) } };
+    return fire();
+  }
+  const baseInit = (o = {}) => ({ variant: o.variant || "b", d2: o.d2 || "separate", d4: o.d4 || "refresh", d7: o.d7 || "arc", focus: 0, scroll: 0, msg: null });
+  SIM_VIEWS["new:homeGrid"] = {
+    newDesign: true, title: "Home (a) grid",
+    init(o) { const s = baseInit(o); s.tiles = NH.capGrid(NH.TILES); return s; },
+    draw(dc, s) { NH.grid(dc, { tiles: s.tiles, focus: s.focus, scroll: s.scroll, msg: s.msg }); },
+    key(k, s) {
+      const n = s.tiles.length, step = { UP: -1, DOWN: 1, SWIPE_UP: 2, SWIPE_DOWN: -2 }[k];
+      if (step) {   // buttons move focus by one tile; a swipe scrolls one row and takes the focus along (A13)
+        s.focus = Math.max(0, Math.min(n - 1, s.focus + step));
+        s.scroll = NH.offsetFor(s.scroll, Math.floor(s.focus / 2), NH.VISIBLE_ROWS, NH.rowsOf(n)); return null;
+      }
+      if (k === "START" || k === "TAP") return runNew(s.tiles[s.focus], s);
+      if (k === "MENU") return null;
+      return undefined;
+    }
+  };
+  SIM_VIEWS["new:homeList"] = {
+    newDesign: true, title: "Home (b) hero list",
+    init(o) { const s = baseInit(o); s.rows = NH.TILES.slice(); return s; },
+    draw(dc, s) { NH.hero(dc, { rows: s.rows, focus: s.focus, msg: s.msg, shift: Ui.slideShift(s.slide, performance.now()) }); },
+    key(k, s) {
+      const n = s.rows.length;
+      // The list wraps at both ends like Garmin's own menus (1.1.1; 1.1.0 opened Charging/Status past the ends).
+      if (k === "UP") { slideTo(s, (s.focus - 1 + n) % n); return null; }
+      if (k === "DOWN") { slideTo(s, (s.focus + 1) % n); return null; }
+      if (k === "SWIPE_UP") { slideTo(s, Math.min(n - 1, s.focus + 1)); return null; }
+      if (k === "SWIPE_DOWN") { slideTo(s, Math.max(0, s.focus - 1)); return null; }
+      if (k === "START" || k === "TAP") return runNew(s.rows[s.focus], s);
+      if (k === "MENU") return null;
+      return undefined;
+    }
+  };
+
+  // ---------------------------------------------------------------- engine (DOM-free)
+  const placeholder = name => ({
+    title: name + " (not built yet)", init() { return {}; },
+    draw(dc) { dc.setColor(T.TEXT_1, T.BG); dc.clear(); dc.setColor(T.TEXT_2); dc.drawText(130, 100, "small", "Not built yet", J.CENTER); dc.drawText(130, 136, "xtiny", Ui.fit(dc, name, "xtiny", 180), J.CENTER); },
+    key() { return undefined; }
+  });
+  const CONFIRM = {
+    title: "Confirmation", init(o) { return { text: o.text, then: o.then }; },
+    draw(dc, s) { Native.confirmation(dc, s.text); },
+    key(k) { return k === "START" ? "yes" : (k === "DOWN" || k === "BACK") ? "no" : null; }
+  };
+  const viewOf = name => name === "__confirm" ? CONFIRM : (SIM_VIEWS[name] || placeholder(name));
+  function countError(e) { window.__jsErrors = (window.__jsErrors || 0) + 1; try { document.body.dataset.jsErrors = window.__jsErrors; } catch (x) {} console.error(e); }
+  function makeEntry(name, o) {
+    const v = viewOf(name); let state;
+    try { state = v.init(o || {}); } catch (e) { countError(e); state = { __err: String(e && e.message || e) }; }
+    return { name, state };
+  }
+  // A watch: {side, stack, toast, last, note, root, opts}.
+  SIM.newWatch = (side, root, opts) => { const w = { side, root, opts: opts || {}, stack: [], toast: null, last: "", note: "", onChange: null }; SIM.reset(w); return w; };
+  SIM.reset = w => { w.stack = [makeEntry(w.root, w.opts)]; w.toast = null; w.last = ""; w.note = ""; };
+  SIM.top = w => w.stack[w.stack.length - 1];
+  function resume(w) { const t = SIM.top(w), v = viewOf(t.name); if (v.resume) try { v.resume(t.state); } catch (e) { countError(e); } }
+  function apply(w, res, from) {
+    if (!res) return;
+    if (Array.isArray(res)) { res.forEach(r => apply(w, r, from)); return; }
+    if (res.pop) { if (w.stack.length > 1) { w.stack.pop(); resume(w); } else w.note = "exit app"; }
+    if (res.replace) w.stack[w.stack.length - 1] = makeEntry(res.replace, Object.assign({}, w.opts, res.o));
+    if (res.push) w.stack.push(makeEntry(res.push, Object.assign({}, w.opts, res.o)));
+    if (res.confirm) w.stack.push({ name: "__confirm", state: { text: res.confirm.text, then: res.confirm.then } });
+    if (res.toast) w.toast = { text: res.toast.text, icon: res.toast.icon, at: Date.now() };
+  }
+  // Sends one input; returns true when a toast was raised (the DOM layer arms its 2 s timer).
+  SIM.send = (w, k) => {
+    w.last = k; w.note = "";
+    const hadToast = !!w.toast; w.toast = null;
+    const t = SIM.top(w), v = viewOf(t.name);
+    if (t.state && t.state.__err) { if (k === "BACK") apply(w, { pop: true }); return false; }
+    if (t.name === "__confirm") {
+      const r = CONFIRM.key(k);
+      if (r) {
+        const then = t.state.then; w.stack.pop(); resume(w);
+        if (r === "yes" && then) { try { apply(w, typeof then === "function" ? then(SIM.top(w).state) : then); } catch (e) { countError(e); } }
+      }
+      return !!w.toast;
+    }
+    let res;
+    try { res = v.key(k, t.state); } catch (e) { countError(e); t.state.__err = String(e && e.message || e); return false; }
+    if (k === "BACK" && res === undefined) res = { pop: true };
+    apply(w, res);
+    void hadToast;
+    return !!w.toast;
+  };
+  SIM.draw = (w, dc) => {
+    const t = SIM.top(w), v = viewOf(t.name);
+    const under = d => {
+      if (t.state && t.state.__err) throw new Error(t.state.__err);
+      d.setColor(T.TEXT_1, T.BG); v.draw(d, t.state);
+    };
+    try { if (w.toast) Native.toast(dc, under, w.toast); else under(dc); }
+    catch (e) {
+      if (!(t.state && t.state.__err)) { countError(e); t.state.__err = String(e && e.message || e); }
+      dc.clearClip && dc.clearClip(); dc.mono = false;
+      dc.setColor("#FFFFFF", "#AA0000"); dc.clear(); dc.setColor("#FFFFFF");
+      dc.drawText(130, 96, "small", "View error", J.CENTER);
+      dc.drawText(130, 132, "xtiny", Ui.fit(dc, t.name, "xtiny", 180), J.CENTER);
+      dc.drawText(130, 152, "xtiny", Ui.fit(dc, t.state.__err || String(e), "xtiny", 170), J.CENTER);
+    }
+  };
+  SIM.screenName = w => { const t = SIM.top(w), v = viewOf(t.name); return v.title && !t.name.startsWith("__") ? v.title + " · " + t.name : (v.title || t.name); };
+  SIM.parseReplay = hash => {
+    const out = { old: [], new: [], cfg: {} };
+    const m = /^#sim=(.*)$/.exec(hash || ""); if (!m) return null;
+    decodeURIComponent(m[1]).split(";").forEach(part => {
+      const i = part.indexOf(":"); if (i < 0) return;
+      const side = part.slice(0, i).trim().toLowerCase(), body = part.slice(i + 1);
+      if (side === "cfg") body.split(",").forEach(kv => { const [a, b] = kv.split("="); if (a && b) out.cfg[a.trim()] = b.trim(); });
+      else if (side === "old" || side === "new") out[side] = body.split(",").map(x => x.trim().toUpperCase()).filter(x => K.includes(x));
+    });
+    return out;
+  };
+
+  // ---------------------------------------------------------------- DOM layer
+  const CSS = `
+.sim-root { --sim-ink: var(--ink, #1d1f22); --sim-ink2: var(--ink-2, #565a60); --sim-rule: var(--rule, #d3d0ca); --sim-surface: var(--surface, #f7f6f3); --sim-accent: var(--accent, #0077b6);
+  border: 1px solid var(--sim-rule); background: var(--sim-surface); color: var(--sim-ink); border-radius: 10px; padding: 14px 16px; outline: none; max-width: 100%; box-sizing: border-box; }
+.sim-root:focus-visible { box-shadow: 0 0 0 2px var(--sim-accent); }
+.sim-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 13px; margin-bottom: 10px; }
+.sim-bar fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 8px; align-items: center; }
+.sim-bar legend { float: left; font-weight: 600; margin-right: 6px; padding: 0; color: var(--sim-ink2); }
+.sim-bar label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; white-space: nowrap; }
+.sim-bar button { font: inherit; padding: 3px 10px; border: 1px solid var(--sim-rule); border-radius: 6px; background: transparent; color: var(--sim-ink); cursor: pointer; }
+.sim-bar button:hover { border-color: var(--sim-accent); }
+.sim-watches { display: flex; flex-wrap: wrap; gap: 20px 32px; justify-content: center; }
+.sim-watch { margin: 0; display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+.sim-watch h4 { margin: 0 0 4px; font: 600 12px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; color: var(--sim-ink2); }
+.sim-watch.sim-active h4 { color: var(--sim-accent); }
+.sim-face { position: relative; flex: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sim-face svg.bezel { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-face canvas { position: absolute; border-radius: 50%; image-rendering: pixelated; background: #000; cursor: grab; }
+.sim-btn { position: absolute; border: 0; padding: 0; margin: 0; background: transparent; border-radius: 50%; cursor: pointer; }
+.sim-btn:hover, .sim-btn:focus-visible { background: rgba(0, 170, 255, .18); outline: none; }
+.sim-btn.sim-inert { cursor: default; }
+.sim-btn.sim-inert:hover { background: transparent; }
+.sim-cap { font: 12px/1.4 "JetBrains Mono", ui-monospace, monospace; color: var(--sim-ink2); margin-top: 4px; text-align: center; max-width: 100%; overflow-wrap: anywhere; }
+.sim-cap b { color: var(--sim-ink); font-weight: 500; }
+.sim-help { font-size: 12px; color: var(--sim-ink2); margin: 10px 0 0; }
+@media (max-width: 520px) { .sim-root { padding: 12px; } }
+`;
+  const BUTTONS = [{ k: "LIGHT", deg: 300 }, { k: "UP", deg: 270 }, { k: "DOWN", deg: 240 }, { k: "START", deg: 60 }, { k: "BACK", deg: 120 }];
+
+  SIM.mount = function () {
+    const host = document.getElementById("sim"); if (!host) return;
+    if (!document.getElementById("sim-style")) { const st = document.createElement("style"); st.id = "sim-style"; st.textContent = CSS; document.head.appendChild(st); }
+    const cfg = { variant: "b", d2: "separate", d4: "refresh", d7: "arc", linked: true, active: "new" };
+    const rp = SIM.parseReplay(location.hash);
+    if (rp) Object.assign(cfg, rp.cfg);
+
+    host.innerHTML = "";
+    const root = document.createElement("section"); root.className = "sim-root"; root.tabIndex = 0;
+    root.setAttribute("aria-label", "Interactive watches. Arrow up and down, Enter for START, Escape for BACK, M for MENU.");
+    const radio = (name, legend, opts) => `<fieldset><legend>${legend}</legend>${opts.map(([v, l]) => `<label><input type="radio" name="sim-${name}" value="${v}"${cfg[name] === v ? " checked" : ""}> ${l}</label>`).join("")}</fieldset>`;
+    root.innerHTML = `<div class="sim-bar">
+      <label><input type="checkbox" class="sim-link"${cfg.linked ? " checked" : ""}> Link inputs</label>
+      ${radio("variant", "NEW home", [["a", "a · grid"], ["b", "b · hero list"]])}
+      ${radio("d2", "D2", [["separate", "separate"], ["merged", "merged"]])}
+      ${radio("d4", "D4 START", [["refresh", "refresh"], ["menu", "menu"]])}
+      ${radio("d7", "D7", [["arc", "arc"], ["dots", "dots"]])}
+      <button type="button" class="sim-reset">Reset</button></div>
+      <div class="sim-watches"></div>
+      <p class="sim-help">Click the bezel buttons (hold UP 0.6 s = MENU) or drag on the screen (swipe up/down, short = tap). With this panel focused: ↑ ↓, Enter = START, Esc/Backspace = BACK, M = MENU.</p>`;
+    host.appendChild(root);
+    const wrapEl = root.querySelector(".sim-watches");
+    const newRoot = () => cfg.variant === "a" ? "new:homeGrid" : "new:homeList";
+    const newOpts = () => ({ variant: cfg.variant, d2: cfg.d2, d4: cfg.d4, d7: cfg.d7 });
+    const watches = { old: SIM.newWatch("old", "old:home", {}), new: SIM.newWatch("new", newRoot(), newOpts()) };
+    let replaying = false;
+
+    function render(w) {
+      const ctx = w.ctx; ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const dc = new Dc(ctx, 260, 260); dc.mono = w.side === "new" && !!OPT.mono;
+      ctx.save(); SIM.draw(w, dc); dc.clearClip(); ctx.restore(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (OPT.guides) guides(dc);
+      w.cap.innerHTML = `last input <b>${w.last || "none"}</b>${w.note ? ` · <b>${w.note}</b>` : ""}<br>screen <b>${SIM.screenName(w)}</b>`;
+      w.fig.classList.toggle("sim-active", !cfg.linked && cfg.active === w.side);
+      // Keep drawing while a list slides (Ui.slideShift); one frame per animation frame.
+      const st = SIM.top(w).state;
+      if (st && st.slide && performance.now() - st.slide.t0 < Ui.SLIDE_MS && !w.raf) {
+        w.raf = requestAnimationFrame(() => { w.raf = 0; render(w); });
+      }
+    }
+    function input(w, k) {
+      const toast = SIM.send(w, k);
+      if (toast && !replaying) {
+        clearTimeout(w.timer); const at = w.toast.at;
+        w.timer = setTimeout(() => { if (w.toast && w.toast.at === at) { w.toast = null; render(w); } }, 2000);
+      }
+      render(w);
+    }
+    function dispatch(k, side) {
+      if (cfg.linked) { input(watches.old, k); input(watches.new, k); }
+      else { cfg.active = side || cfg.active; input(watches[cfg.active], k); render(watches.old); render(watches.new); }
+    }
+
+    // Builds both watch faces at the current OPT.scale; watch state (stacks, toasts) is kept.
+    function buildFaces() {
+    const scale = OPT.scale && OPT.scale !== 1 ? OPT.scale : 1.25;
+    const d = Math.round(260 * scale), ring = d * 0.14, size = Math.round(d + ring * 2);
+    wrapEl.innerHTML = "";
+    for (const side of ["old", "new"]) {
+      const w = watches[side];
+      const fig = document.createElement("figure"); fig.className = "sim-watch";
+      fig.innerHTML = `<h4>${side.toUpperCase()}</h4>`;
+      const face = document.createElement("div"); face.className = "sim-face"; face.style.width = face.style.height = size + "px";
+      face.innerHTML = bezelSvg(d);
+      const cv = document.createElement("canvas"); cv.width = 260; cv.height = 260;
+      cv.style.width = cv.style.height = d + "px"; cv.style.left = cv.style.top = ring + "px";
+      cv.setAttribute("aria-label", side.toUpperCase() + " watch screen");
+      face.appendChild(cv);
+      // Buttons: same geometry as bezelSvg (deg clockwise from 12 o'clock).
+      const c = size / 2, rb = d / 2 + ring * 0.9 + d * 0.035, hit = Math.round(d * 0.17);
+      for (const b of BUTTONS) {
+        const a = (b.deg - 90) * Math.PI / 180, x = c + rb * Math.cos(a), y = c + rb * Math.sin(a);
+        const el = document.createElement("button"); el.type = "button"; el.className = "sim-btn" + (b.k === "LIGHT" ? " sim-inert" : "");
+        el.style.left = Math.round(x - hit / 2) + "px"; el.style.top = Math.round(y - hit / 2) + "px"; el.style.width = el.style.height = hit + "px";
+        el.title = b.k === "UP" ? "UP (hold for MENU)" : b.k === "LIGHT" ? "LIGHT (no action)" : b.k;
+        el.setAttribute("aria-label", el.title);
+        if (b.k !== "LIGHT") {
+          let held = null, fired = false;
+          el.addEventListener("pointerdown", e => {
+            e.preventDefault(); root.focus({ preventScroll: true }); fired = false;
+            if (b.k === "UP") held = setTimeout(() => { fired = true; dispatch("MENU", side); }, 600);
+          });
+          el.addEventListener("pointerup", e => {
+            e.preventDefault(); clearTimeout(held);
+            if (!(b.k === "UP" && fired)) dispatch(b.k, side);
+          });
+          el.addEventListener("pointerleave", () => clearTimeout(held));
+          el.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); dispatch(b.k, side); } });
+        }
+        face.appendChild(el);
+      }
+      // Screen: drag > 30 px = swipe, shorter = tap.
+      let y0 = null;
+      cv.addEventListener("pointerdown", e => { e.preventDefault(); y0 = e.clientY; try { cv.setPointerCapture(e.pointerId); } catch (x) {} root.focus({ preventScroll: true }); });
+      cv.addEventListener("pointerup", e => {
+        if (y0 == null) return; const dy = e.clientY - y0; y0 = null;
+        dispatch(Math.abs(dy) > 30 ? (dy < 0 ? "SWIPE_UP" : "SWIPE_DOWN") : "TAP", side);
+      });
+      cv.addEventListener("pointercancel", () => { y0 = null; });
+      const cap = document.createElement("div"); cap.className = "sim-cap";
+      fig.appendChild(face); fig.appendChild(cap); wrapEl.appendChild(fig);
+      Object.assign(w, { ctx: cv.getContext("2d"), cap, fig });
+    }
+    }
+    buildFaces();
+
+    root.addEventListener("keydown", e => {
+      if (e.target !== root) return;
+      const k = { ArrowUp: "UP", ArrowDown: "DOWN", Enter: "START", Escape: "BACK", Backspace: "BACK", m: "MENU", M: "MENU" }[e.key];
+      if (!k) return; e.preventDefault(); dispatch(k);
+    });
+    function resetAll() {
+      for (const w of Object.values(watches)) clearTimeout(w.timer);
+      SIM.reset(watches.old);
+      watches.new.root = newRoot(); watches.new.opts = newOpts(); SIM.reset(watches.new);
+      render(watches.old); render(watches.new);
+    }
+    root.querySelector(".sim-link").addEventListener("change", e => { cfg.linked = e.target.checked; render(watches.old); render(watches.new); });
+    root.querySelector(".sim-reset").addEventListener("click", resetAll);
+    root.querySelectorAll('.sim-bar input[type="radio"]').forEach(r => r.addEventListener("change", e => {
+      cfg[e.target.name.slice(4)] = e.target.value;
+      // NEW options reach every pushed view, so a change restarts the NEW watch from home.
+      clearTimeout(watches.new.timer); watches.new.root = newRoot(); watches.new.opts = newOpts(); SIM.reset(watches.new); render(watches.new);
+    }));
+
+    function replay(p) {
+      replaying = true;
+      try { for (const side of ["old", "new"]) for (const k of p[side]) input(watches[side], k); } finally { replaying = false; }
+    }
+    render(watches.old); render(watches.new);
+    if (rp) replay(rp);
+    window.addEventListener("hashchange", () => {
+      const p = SIM.parseReplay(location.hash); if (!p) return;
+      Object.assign(cfg, p.cfg);
+      root.querySelectorAll('.sim-bar input[type="radio"]').forEach(r => { r.checked = cfg[r.name.slice(4)] === r.value; });
+      resetAll(); replay(p);
+    });
+    SIM.watches = watches;
+    // Called by the page shell when toolbar options (scale, mono, guides) change.
+    SIM.refresh = () => { buildFaces(); render(watches.old); render(watches.new); };
+  };
+
+  window.SIM = SIM;
+})();
+// ================================================================ Board (agent E)
+// Builds the OLD | NEW rows from SECTION_ORDER, SECTION_META, OLD_SCREENS and CARDS, and wires the toolbar.
+// Exposes window.Board {build, renderWatch, wire, sync, save} plus window.build / window.renderWatch.
+(function () {
+  const OPT_KEY = "vozidlo-poc-opt";
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // Card text from the parts may carry simple inline HTML (<em>, <code>); keep it, line breaks become spaces.
+  const txt = s => String(s == null ? "" : s).replace(/\n/g, " ");
+
+  function countError(e) {
+    window.__jsErrors = (window.__jsErrors || 0) + 1;
+    if (document.body) document.body.dataset.jsErrors = window.__jsErrors;
+    console.error(e);
+  }
+
+  // One watch: bezel SVG + 260 × 260 canvas. Sizes are relative to the figure, so the watch
+  // shrinks with its column on narrow screens while the canvas keeps 260 internal pixels.
+  function renderWatch(draw, o = {}) {
+    const d = 260 * OPT.scale, ring = d * 0.14, size = OPT.bezel ? d + ring * 2 : d;
+    const fig = document.createElement("div"); fig.className = "watch" + (OPT.bezel ? "" : " flat");
+    fig.style.width = size + "px";
+    if (OPT.bezel) fig.innerHTML = bezelSvg(d);
+    const cv = document.createElement("canvas"); cv.width = 260; cv.height = 260;
+    if (OPT.bezel) { const p = (ring / size * 100) + "%", w = (d / size * 100) + "%"; cv.style.left = cv.style.top = p; cv.style.width = cv.style.height = w; }
+    cv.setAttribute("role", "img"); cv.setAttribute("aria-label", (o.label || "Watch screen") + ", 260 by 260 round screen");
+    const dc = new Dc(cv.getContext("2d"), 260, 260); dc.mono = !!o.mono;
+    try { draw(dc); }
+    catch (e) {
+      countError(e);
+      try { dc.clearClip(); } catch (e2) {}
+      dc.mono = false; dc.setColor("#FF0000", "#300000"); dc.clear();
+      dc.setColor("#FFFFFF"); dc.drawText(130, 112, "small", "Draw error", J.CENTER);
+      dc.drawText(130, 146, "xtiny", String(e && e.message || e).slice(0, 28), J.CENTER);
+    }
+    if (OPT.guides) guides(dc);
+    fig.appendChild(cv); return fig;
+  }
+
+  function placeholder(title, sub) {
+    const d = 260 * OPT.scale, size = OPT.bezel ? d * 1.28 : d;
+    const el = document.createElement("div"); el.className = "watch none"; el.style.width = size + "px";
+    el.innerHTML = `<div>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ""}</div>`;
+    return el;
+  }
+
+  const tagHtml = tags => (tags || []).filter(t => typeof TAGS !== "undefined" && TAGS[t])
+    .map(t => `<span class="tag ${TAGS[t][0]}">${TAGS[t][1]}</span>`).join("");
+  const keysHtml = keys => Object.entries(keys || {}).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${txt(v)}</dd>`).join("");
+  const notesHtml = notes => (notes || []).map(n => typeof n === "string" ? `<li>${txt(n)}</li>` : n && n.flag ? `<li class="flag">${txt(n.flag)}</li>` : "").join("");
+
+  // Merge OLD_SCREENS and CARDS by id, grouped per section and sorted by order.
+  function collect() {
+    const byId = new Map();
+    for (const id in OLD_SCREENS) byId.set(id, { id, old: OLD_SCREENS[id], card: null });
+    for (const c of CARDS) {
+      if (!c || !c.id) continue;
+      const e = byId.get(c.id) || { id: c.id, old: null, card: null };
+      e.card = c; byId.set(c.id, e);
+    }
+    const sections = new Map();
+    let seq = 0;
+    for (const e of byId.values()) {
+      e.section = (e.card && e.card.section) || (e.old && e.old.section) || "other";
+      e.order = e.old && e.old.order != null ? e.old.order : e.card && e.card.order != null ? e.card.order : 1e6;
+      e.seq = seq++;
+      if (!sections.has(e.section)) sections.set(e.section, []);
+      sections.get(e.section).push(e);
+    }
+    for (const list of sections.values()) list.sort((a, b) => a.order - b.order || a.seq - b.seq);
+    const order = SECTION_ORDER.slice();
+    for (const s of sections.keys()) if (!order.includes(s)) order.push(s);
+    return order.map(id => ({ id, meta: SECTION_META[id] || { title: id }, entries: sections.get(id) || [] }));
+  }
+
+  function renderEntry(e) {
+    const { old, card } = e, vars = (card && card.neu) || [];
+    const name = (card && card.name) || (old && old.name) || e.id;
+    const el = document.createElement("article"); el.className = "card"; el.id = e.id;
+    el.innerHTML = `<h3><a href="#${esc(e.id)}">${esc(name)}</a><span class="id">${esc(e.id)}</span></h3>`;
+
+    // .pair = Today figure + .neus (the proposal variants wrap among themselves, right of Today).
+    const pair = document.createElement("div"); pair.className = "pair";
+    const neus = document.createElement("div"); neus.className = "neus";
+    neus.style.minWidth = `min(100%, ${Math.ceil(260 * OPT.scale * (OPT.bezel ? 1.28 : 1))}px)`;
+    const fig = (cls, cap, watch, src) => {
+      const f = document.createElement("figure"); f.className = cls;
+      f.innerHTML = `<figcaption>${cap}</figcaption>`;
+      f.appendChild(watch);
+      if (src) f.insertAdjacentHTML("beforeend", `<div class="src">${esc(src)}</div>`);
+      (cls === "old" ? pair : neus).appendChild(f);
+    };
+    if (old) fig("old", `<span class="who">Today</span>${tagHtml(old.tags)}`, renderWatch(old.draw, { label: name + ", today" }), old.src);
+    else fig("old", `<span class="who">Today</span>`, placeholder("New state", "No screen for this today."));
+    if (vars.length) {
+      vars.forEach(v => {
+        const cap = `<span class="who">Proposal</span>` + (v.label ? `<span class="vl">${esc(v.label)}</span>` : "") +
+          (v.decision ? `<span class="dec" title="Open decision ${esc(v.decision)}">${esc(v.decision)}</span>` : "") + tagHtml(v.tags);
+        fig("neu", cap, renderWatch(v.draw, { mono: OPT.mono, label: name + (v.label ? ", " + v.label : "") + ", proposal" }));
+      });
+    } else {
+      fig("neu", `<span class="who">Proposal</span>`, placeholder("No change proposed", card ? "" : "Same screen in the new look, or not part of this proposal."));
+    }
+    pair.appendChild(neus); el.appendChild(pair);
+
+    // Info: what changed + fix ids | keys | notes
+    const cols = [];
+    const changed = (card && card.changed) || [], fixes = (card && card.fixes) || [];
+    if (changed.length || fixes.length) {
+      cols.push(`<div><h4>What changed</h4>${changed.length ? `<ul>${changed.map(c => `<li>${txt(c)}</li>`).join("")}</ul>` : ""}` +
+        (fixes.length ? `<div class="fixes" aria-label="Fix ids">${fixes.map(f => `<span class="fix">${esc(f)}</span>`).join("")}</div>` : "") + `</div>`);
+    }
+    const oldKeys = old ? keysHtml(old.keys) : "";
+    let newKeys = "";
+    const withKeys = vars.filter(v => v.keys && Object.keys(v.keys).length);
+    const sameKeys = withKeys.length > 1 && withKeys.every(v => JSON.stringify(v.keys) === JSON.stringify(withKeys[0].keys));
+    if (withKeys.length === 1 || sameKeys) newKeys = keysHtml(withKeys[0].keys);
+    else withKeys.forEach(v => { newKeys += `<div class="vh">${esc(v.label || "Variant")}</div>` + keysHtml(v.keys); });
+    if (oldKeys || newKeys) {
+      cols.push(`<div>` + (oldKeys ? `<h4>Keys today</h4><dl class="keys">${oldKeys}</dl>` : "") +
+        (newKeys ? `<h4>Keys in the proposal</h4><dl class="keys">${newKeys}</dl>` : "") + `</div>`);
+    }
+    const oldNotes = old ? notesHtml(old.notes) : "", newNotes = card ? notesHtml(card.notes) : "";
+    if (oldNotes || newNotes) {
+      cols.push(`<div>` + (oldNotes ? `<h4>Notes on today</h4><ul class="notes">${oldNotes}</ul>` : "") +
+        (newNotes ? `<h4>Notes on the proposal</h4><ul class="notes">${newNotes}</ul>` : "") + `</div>`);
+    }
+    if (cols.length) el.insertAdjacentHTML("beforeend", `<div class="info">${cols.join("")}</div>`);
+    return el;
+  }
+
+  function build() {
+    const board = document.getElementById("board"); if (!board) return;
+    board.innerHTML = "";
+    for (const sec of collect()) {
+      const m = sec.meta;
+      const el = document.createElement("section"); el.className = "area"; el.id = sec.id;
+      el.setAttribute("aria-labelledby", "h-" + sec.id);
+      el.innerHTML = `<h2 id="h-${esc(sec.id)}">${esc(m.title || sec.id)}${m.src ? ` <small>${esc(m.src)}</small>` : ""}</h2>` +
+        (m.blurb ? `<p>${txt(m.blurb)}</p>` : "") + (m.neu ? `<p class="neu">${txt(m.neu)}</p>` : "");
+      if (!sec.entries.length) el.insertAdjacentHTML("beforeend", `<p class="empty">No screens in this section yet.</p>`);
+      const list = document.createElement("div"); list.className = "cards";
+      for (const e of sec.entries) {
+        try { list.appendChild(renderEntry(e)); } catch (err) { countError(err); }
+      }
+      el.appendChild(list); board.appendChild(el);
+    }
+  }
+
+  function save() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} }
+  function sync() {
+    document.querySelectorAll("[data-scale]").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.scale === +OPT.scale)));
+    document.querySelectorAll("input[data-opt]").forEach(i => { i.checked = !!OPT[i.dataset.opt]; });
+  }
+  // Rebuild the board on a toolbar change; the simulator stays mounted (it may offer SIM.refresh()).
+  function changed() {
+    save(); sync();
+    try { build(); } catch (e) { countError(e); }
+    try { if (window.SIM && typeof SIM.refresh === "function") SIM.refresh(); } catch (e) { countError(e); }
+    document.body.dataset.jsErrors = window.__jsErrors || 0;
+  }
+  function wire() {
+    if (![1, 1.5, 2].includes(+OPT.scale)) OPT.scale = 1;
+    document.querySelectorAll("[data-scale]").forEach(b => b.addEventListener("click", () => { OPT.scale = +b.dataset.scale; changed(); }));
+    document.querySelectorAll("input[data-opt]").forEach(i => i.addEventListener("change", () => { OPT[i.dataset.opt] = i.checked; changed(); }));
+    sync();
+    // Keep anchors clear of the sticky toolbar.
+    const tb = document.getElementById("toolbar");
+    const setH = () => document.documentElement.style.setProperty("--tb-h", (tb ? tb.offsetHeight : 64) + "px");
+    setH();
+    if (tb && window.ResizeObserver) new ResizeObserver(setH).observe(tb);
+  }
+
+  window.Board = { build, renderWatch, wire, sync, save };
+  window.build = build; window.renderWatch = renderWatch;
+})();
+// ================================================================ Boot (agent E)
+// Error counter (also started in 00-head), fonts, calibrate, toolbar, board, simulator, deep link.
+window.__jsErrors = window.__jsErrors || 0;
+function __boot() {
+  const err = e => { window.__jsErrors++; console.error(e); };
+  try { calibrate(); } catch (e) { err(e); }
+  try { Board.wire(); } catch (e) { err(e); }
+  try { Board.build(); } catch (e) { err(e); }
+  try { if (window.SIM && typeof SIM.mount === "function") SIM.mount(); } catch (e) { err(e); }
+  window.__booted = true;
+  document.body.dataset.jsErrors = window.__jsErrors;
+  if (location.hash.length > 1) {
+    let t = null; try { t = document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (e) {}
+    if (t) requestAnimationFrame(() => t.scrollIntoView({ block: "start", behavior: "instant" }));
+  }
+}
+document.body.dataset.jsErrors = window.__jsErrors;
+Promise.all([
+  document.fonts.load("700 20px Roboto"), document.fonts.load("700 20px 'Roboto Condensed'"),
+  document.fonts.load("700 20px 'Barlow Semi Condensed'")
+]).catch(() => {}).finally(() => document.fonts.ready.then(__boot, __boot));
+</script>
+<script>
+// If a part threw before boot ran, say so on the page instead of showing an empty board.
+setTimeout(function () {
+  if (window.__booted) return;
+  var b = document.getElementById("board");
+  if (b && !b.children.length) b.insertAdjacentHTML("afterbegin", '<p class="bootfail">The screens did not load because a script failed. Errors: ' + (window.__jsErrors || 0) + '.</p>');
+}, 8000);
+</script>
+</body>
+</html>

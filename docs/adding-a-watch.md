@@ -13,9 +13,9 @@ Section 3 explains why, and it is the reason this guide exists.
 ```mermaid
 flowchart TD
     S([Your watch]) --> F{"1. deviceFamily<br>round-260x260?"}
-    F -->|no| FW["Bigger PR: make<br>ControlsView's grid<br>compute from the Dc"]
+    F -->|no| FW["Bigger PR: make the<br>bezel and page coordinates<br>compute from the Dc"]
     F -->|yes| K{"2. Five buttons,<br>with UP and DOWN?"}
-    K -->|no| KW["Bigger PR: touch<br>navigation across<br>five views"]
+    K -->|no| KW["Bigger PR: touch<br>navigation across<br>four views"]
     K -->|yes| A{"3. All four APIs<br>implemented?"}
     A -->|no| AW["Bigger PR: exclude the<br>dependent code<br>per product"]
     A -->|yes| T["Two-line change:<br>manifest + CI matrix"]
@@ -68,17 +68,19 @@ You want:
 | | |
 |---|---|
 | `deviceFamily` | `round-260x260` |
-| `watchApp` memory | comfortably above 256 KB: the app is about 255 KB |
+| `watchApp` memory | comfortably above 320 KB: the app is about 300 KB |
 | `glance` memory | 65,536 |
 | Connect IQ | 5.2.0 or higher, matching `minApiLevel` in `app/manifest.xml` |
 
-A different family is not a no. It means `ui/ControlsView.mc` needs work: its
-tile grid is plain constants (`_TILE_W = 90`, `_COL0_X = 35`, `_ROW0_Y = 52`)
-rather than geometry computed from the `Dc`. Making those adapt is a real but
-bounded change, and it would unlock several devices at once.
-
-Text is already fine at any size: `ui/TextBlock.mc` wraps to the chord
-available at each line's height, so it needs no per-device tuning.
+A different family is not a no. Most of the layout already adapts: every
+text line is fitted to the chord available at its height (`ui/Ui.mc`,
+`ui/TextBlock.mc`) using font metrics measured at runtime, and home is a
+`CustomMenu` whose rows the system lays out. What is still fixed to 260x260 is
+the bezel (`ui/Bezel.mc`: centre 130, ring at r 126, glyphs at r 108) and a
+few page coordinates taken from the design PoC (the lock chip grid in
+`ui/StatusPages.mc`, the home title height and screen centre in
+`ui/Theme.mc`). Making those compute from the `Dc` is a real but bounded
+change, and it would unlock several devices at once.
 
 ---
 
@@ -94,11 +96,13 @@ print([k['id'] for k in json.load(open(os.path.expanduser(
 Five keys (`enter, up, menu, down, esc`) means the existing navigation works
 unchanged.
 
-Fewer means an input redesign, not a tweak. `ControlsView`, `StatusView`,
-`ChargingLimitView`, `ChargingProfilesView` and `TargetTemperatureSettingsView`
-all handle `onPreviousPage`/`onNextPage`, and tile navigation uses
-`setKeyToSelectableInteraction`. For example the Venu 3 has three keys and the
-Venu 4 has two, neither with UP or DOWN, so both need touch navigation
+Fewer means an input redesign, not a tweak. Home reaches charging and status
+through rows in its list; the status pages (`ui/StatusPager.mc`),
+`ChargingProfilesView` and `TargetTemperatureSettingsView` handle
+`onPreviousPage`/`onNextPage`. Home and the menus already work by touch (rows
+for Charging and Status, a tap on the hero), but the pagers and the
+temperature picker are button-first. For example the Venu 3 has three keys and
+the Venu 4 has two, neither with UP or DOWN, so both need touch navigation
 throughout.
 
 ---
@@ -210,8 +214,8 @@ None of these is a refusal. They are all larger pull requests, and all of them
 are welcome: just say in the PR which one you are doing, so it gets reviewed
 as the change it is.
 
-**Wrong screen family.** Make `ControlsView`'s grid compute from the `Dc`
-instead of constants. This unlocks the 7S and 7X Pro and the 42 mm and 51 mm
+**Wrong screen family.** Make the bezel radii and the remaining page
+coordinates (section 1) compute from the `Dc` instead of constants. This unlocks the 7S and 7X Pro and the 42 mm and 51 mm
 fēnix 8 and 9 together, so it is the highest-value change on this list.
 
 **A missing API.** Move the dependent code behind an annotation and exclude it
@@ -220,11 +224,11 @@ per product in the jungle. For a device with no `MapView`, that means
 `WatchUi has :MapView` at runtime and falls back to bearing and distance, so
 the fallback path exists and works.
 
-**Too few buttons.** Add touch navigation to the five views listed in section 2.
+**Too few buttons.** Add touch navigation to the four views listed in section 2.
 This is the largest of the three, and it is what the Venu family needs.
 
 **Not enough memory.** Probably genuinely out of reach. The app is around
-255 KB and the glance arena is a hard 65,536 bytes.
+300 KB and the glance arena is a hard 65,536 bytes.
 
 ---
 
