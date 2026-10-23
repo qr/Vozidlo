@@ -143,8 +143,7 @@ module ControlTiles {
     }
 
     // Puts the primary action first within its group, keeping every other
-    // candidate in the fixed order. With the default TileOrder the primary
-    // is then the first row, so the hero stays fully visible at launch.
+    // candidate in the fixed order, so it is the first climate row.
     function orderedForDisplay(visible as Array<Candidate>, primary as Symbol?) as Array<Candidate> {
         if (primary == null) {
             return visible;

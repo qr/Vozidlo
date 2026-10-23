@@ -38,7 +38,9 @@ API actually exposes:
 - Odometer and fuel level, with both engines on a plug-in hybrid
 - Start and stop the air conditioning, with a target temperature
 - Start and stop charging, set the charge limit and the charge mode
-- Where the car is parked, with an address, a bearing, a map, and navigation to it
+- Where the car is parked, with an address, a distance and a bearing; on
+  watches with onboard maps also a map, and navigation to it where the watch
+  supports it
 
 ### What it cannot do
 
@@ -79,17 +81,50 @@ it is current.
 
 ### Getting to it quickly
 
-The fastest route is to make the app a favourite: hold MENU, go to Activities &
-Apps, select the app, and choose Set as Favourite. It then sits at the top of the
-list you reach by pressing START.
+The fastest route is to make the app a favourite in your watch's settings. On
+the fēnix and Forerunner watches: hold MENU, go to Activities & Apps, select the
+app, and choose Set as Favourite. On the Venu 3 and Venu 3S, hold BACK to reach
+the same settings. On the other watches, the favourites are in the watch's own
+settings menu. The app then sits at the top of the list you reach by pressing
+START.
+
+Inside the app, its menus open with MENU on the fēnix and Forerunner watches,
+by holding BACK on the Venu 3 and Venu 3S, and with a swipe left on the
+vívoactive 6, Venu 4 and Venu X1, where Garmin's action menu indicator at the
+right edge shows that there is one.
 
 There is also a glance showing charge, charging status and lock state, and four
 complications you can put on your own watch face.
 
 ## Requirements
 
-- Garmin fēnix 7 Pro, fēnix 7, fēnix 7 Pro Solar, fēnix 8 Solar 47mm,
-  fēnix 9 Pro Solar 47mm or Forerunner 955, with Connect IQ 5.2 or later
+<!-- devicelists begin -->
+<!-- products: fenix7pro="fēnix 7 Pro"; fenix7="fēnix 7"; fenix7pronowifi="fēnix 7 Pro Solar Edition (no Wi-Fi)"; fenix8solar47mm="fēnix 8 Solar 47mm"; fenix9prosolar47mm="fēnix 9 Pro Solar 47mm"; fr955="Forerunner 955"; venu3s="Venu 3S"; venu3="Venu 3"; vivoactive6="vívoactive 6"; venu441mm="Venu 4 41mm"; venu445mm="Venu 4 45mm"; venux1="Venu X1"; fenix7s="fēnix 7S"; fenix7spro="fēnix 7S Pro"; fenix7x="fēnix 7X"; fenix7xpro="fēnix 7X Pro"; fenix7xpronowifi="fēnix 7X Pro Solar Edition (no Wi-Fi)"; fenix8solar51mm="fēnix 8 Solar 51mm"; fenix9prosolar51mm="fēnix 9 Pro Solar 51mm"; fr255="Forerunner 255"; fr255m="Forerunner 255 Music"; enduro3="Enduro 3"; epix2pro42mm="epix Pro (Gen 2) 42mm"; marq2="MARQ (Gen 2)"; marq2aviator="MARQ (Gen 2) Aviator"; descentmk343mm="Descent Mk3 43mm"; fenix847mm="fēnix 8 47mm and 51mm"; fenix8pro47mm="fēnix 8 Pro 47mm and 51mm"; fenix947mm="fēnix 9 47mm and 51mm"; fenix9pro47mm="fēnix 9 Pro 47mm"; fr965="Forerunner 965"; fr970="Forerunner 970"; d2mach2="D2 Mach 2"; d2mach2pro="D2 Mach 2 Pro"; epix2pro51mm="epix Pro (Gen 2) 51mm"; descentmk351mm="Descent Mk3i 51mm"; fr255s="Forerunner 255S"; fr255sm="Forerunner 255S Music"; vivoactive5="vívoactive 5"; descentg2="Descent G2"; epix2pro47mm="epix Pro (Gen 2) 47mm"; fenix843mm="fēnix 8 43mm"; fr265="Forerunner 265" -->
+
+- One of these Garmin watches, with Connect IQ 5.1 or later:
+  - Forerunner 255S, Forerunner 255S Music
+  - fēnix 7S, fēnix 7S Pro
+  - fēnix 7 Pro (also Solar, Sapphire Solar and Sapphire Dual Power), fēnix
+    7 (also quatix 7 and Sapphire Dual Power), fēnix 7 Pro Solar Edition (no
+    Wi-Fi), fēnix 8 Solar 47mm, fēnix 9 Pro Solar 47mm, Forerunner 955 (also
+    955 Solar), Forerunner 255, Forerunner 255 Music
+  - fēnix 7X (also tactix 7, quatix 7X Solar and Enduro 2), fēnix 7X Pro,
+    fēnix 7X Pro Solar Edition (no Wi-Fi), fēnix 8 Solar 51mm (also tactix 8
+    Solar 51mm), fēnix 9 Pro Solar 51mm, Enduro 3
+  - epix Pro (Gen 2) 42mm, MARQ (Gen 2) (also Athlete, Adventurer, Captain,
+    Golfer, Carbon Edition and Commander Carbon Edition), MARQ (Gen 2)
+    Aviator, Descent Mk3 43mm (also Mk3i 43mm), Descent G2, Venu 3S,
+    vívoactive 5, vívoactive 6, Venu 4 41mm
+  - epix Pro (Gen 2) 47mm (also quatix 7 Pro), fēnix 8 43mm, Forerunner 265
+  - fēnix 8 47mm and 51mm (also tactix 8 and quatix 8), fēnix 8 Pro 47mm and
+    51mm (also MicroLED and quatix 8 Pro), fēnix 9 47mm and 51mm, fēnix 9
+    Pro 47mm, Forerunner 965, Forerunner 970, D2 Mach 2, D2 Mach 2 Pro, epix
+    Pro (Gen 2) 51mm (also D2 Mach 1 Pro and tactix 7 AMOLED Edition),
+    Descent Mk3i 51mm, Venu 3, Venu 4 45mm (also D2 Air X15)
+  - Venu X1
+<!-- devicelists end -->
+- The map in Find my car needs a watch with onboard maps; on the others Find
+  my car shows the address, distance and bearing
 - A Škoda with connected services active
 - The MyŠkoda app, version 8.16 or later, to create an API key
   (https://go.skoda.eu/api-keys)
@@ -122,18 +157,20 @@ Do not claim compatibility with anything we have not tested. The app is built an
 verified against one plug-in hybrid, and the API's own `operations[]` list decides what
 appears for other models, but that is not the same as having tried them.
 
-The same rule governs the watch side, with one deliberate softening. Six device
-ids are in the manifest; only the fēnix 7 Pro will be worn by anyone here. The
-other five are claimed on the strength of three checked facts rather than a
-hunch: identical device family and memory budgets in their own compiler.json,
-the full implementation of all four APIs we use in their own api.debug.xml, and
-a clean `-l 3 -w` build plus the unit suite in CI for each.
+The same rule governs the watch side, with one deliberate softening. 21 device
+ids are in the manifest; only the fēnix 7 Pro has been worn by anyone here. The
+other 20 are claimed on the strength of checked facts rather than a hunch: each
+is built locally with `tools/ciq verify`, with warnings fatal and the size
+checked against that watch's memory budget from its own compiler.json, and the
+unit tests run on one watch per screen family and input profile. The APIs the
+app requires are checked in each watch's own api.debug.xml; the map is optional
+and left out at build time where a watch has no MapView implementation. Every
+screen is checked per watch on the devices design page
+(`docs/design/vozidlo-devices.html`).
 
-That bar is what keeps the Forerunner 255 out. It passes the first and the
-third (same family, builds clean) and fails the second: no MapView
-implementation behind the type. A green build is not evidence of support, which
-is the same lesson the glance crash taught. `app/manifest.xml` carries the
-per-device reasoning.
+A green build is still not evidence of support, which is the lesson the glance
+crash taught and the reason the Forerunner 255 was kept out until the map could
+be left out of its build. `app/manifest.xml` carries the per-device reasoning.
 
 The description states the unlock limitation twice, once in the summary list and
 once under its own heading. That is deliberate. It costs a few installs and saves

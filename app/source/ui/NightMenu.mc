@@ -9,7 +9,7 @@ import Toybox.WatchUi;
 //   fenix8solar47mm  FONT_MEDIUM 39, SMALL 32, TINY 29, XTINY 21
 //   fr955            FONT_MEDIUM 39, SMALL 32, TINY 29, XTINY 21
 // Rows were FONT_MEDIUM + 16 then (53 / 55 px), which fitted five on screen
-// and ran the outer two into the round edge. Theme.rowHeight() is now a
+// and ran the outer two into the round edge. Geo.Display.rowH is now a
 // quarter of the display (65) and only the focused row and its two
 // neighbours are drawn (NightMenuLayout.isShown), so every list shows three.
 //   So Chips.height() is 21 on fenix7pro and 23 on the other two.
@@ -25,16 +25,17 @@ import Toybox.WatchUi;
 // dc size passed to CustomMenuItem.draw(), how much of a 120 px title shows at
 // focus 0 and at focus 2, and whether onShow() fires again after a pop are
 // open. Derived instead, assuming the focused row is centred (plan "Facts"):
-// at focus 0 the visible title is 130 - rowHeight / 2 = heroBottom() px
-// (98 with rows of 65), and Theme.HOME_TITLE_H is exactly that; at focus 1
-// the title bottom is at heroBottom() - rowHeight = 33, so from focus 1 on
+// at focus 0 the visible title is cy - rowH / 2 = Geo heroBottom px (98
+// with rows of 65), and the home title is exactly that tall; at focus 1
+// the title bottom is at heroBottom - rowH = 33, so from focus 1 on
 // the title is drawn blank, like a row two away from the focus. Check on the
 // watch; onShow() below refreshes the theme either way.
 //
 // Menus in Škoda green (B6 "Menus"): Menu2 cannot be recoloured on these
 // watches (themes unsupported), so every list is a CustomMenu drawn here. A
 // CustomMenu keeps Garmin's own scrolling, focus animation and key/touch
-// handling; only the pixels are ours. Matches Ui.menu in the PoC.
+// handling; only the pixels are ours. Matches Ui.menu in the PoC. Sizes
+// below are px of the 260 face, scaled with Geo.Display.px().
 class NightMenu extends WatchUi.CustomMenu {
 
     private var _title as String;
@@ -44,7 +45,7 @@ class NightMenu extends WatchUi.CustomMenu {
     private var _count as Number = 0;
 
     // titleHeight null keeps the platform default; the home passes
-    // Theme.HOME_TITLE_H because its hero lives in the title area. An option
+    // Geo.current().heroBottom because its hero lives in the title area. An option
     // with no value is left out rather than passed as null: the API types
     // allow null, but the new UI has not run on a watch yet, and a firmware
     // that checks option types would fail every list, home included.
@@ -55,20 +56,23 @@ class NightMenu extends WatchUi.CustomMenu {
         // because _focus did not exist yet; NightMenuFocusTests).
         _focus = new NightMenuFocus(focus);
         _title = title;
+        var rowH = Geo.current().rowH;
         if (titleHeight != null) {
-            CustomMenu.initialize(Theme.rowHeight(), Graphics.COLOR_BLACK, {
+            CustomMenu.initialize(rowH, Graphics.COLOR_BLACK, {
                 :focus => focus,
                 :titleItemHeight => titleHeight
             });
         } else {
-            CustomMenu.initialize(Theme.rowHeight(), Graphics.COLOR_BLACK, { :focus => focus });
+            CustomMenu.initialize(rowH, Graphics.COLOR_BLACK, { :focus => focus });
         }
     }
 
     // Monochrome flag is cached per onShow (A21), and a pop back onto a menu
-    // must pick up a flag flipped meanwhile.
+    // must pick up a flag flipped meanwhile. A menu never shows the action
+    // menu indicator, so the keep-out a view set before is cleared.
     function onShow() as Void {
         Theme.refresh();
+        Geo.setKeepOut(false);
         CustomMenu.onShow();
     }
 
@@ -81,22 +85,24 @@ class NightMenu extends WatchUi.CustomMenu {
         if (!titleShown()) {
             return;
         }
+        var g = Geo.current();
         var h = dc.getHeight();
         var w = dc.getWidth();
         var font = Graphics.FONT_TINY;
         var fh = dc.getFontHeight(font);
         var cy = h / 2;
-        // Screen y of this text at focus 0: the title's bottom is heroBottom().
-        var screenCy = Theme.heroBottom() - (h - cy);
-        var maxW = Ui.usable(screenCy - fh / 2, screenCy + fh / 2, Theme.MARGIN);
-        if (maxW > w - 2 * Theme.MARGIN) {
-            maxW = w - 2 * Theme.MARGIN;
+        // Screen y of this text at focus 0: the title's bottom is heroBottom.
+        var screenCy = g.heroBottom - (h - cy);
+        var maxW = g.usable(screenCy - fh / 2, screenCy + fh / 2, Theme.MARGIN);
+        var margin = g.px(Theme.MARGIN);
+        if (maxW > w - 2 * margin) {
+            maxW = w - 2 * margin;
         }
         var s = Ui.fit(_title, maxW, Ui.measurer(dc, font));
         dc.setColor(Theme.c(Theme.ACCENT), Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, cy, font, s, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.c(Theme.RULE), Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(w / 2 - 70, h - 2, 140, 1);
+        dc.fillRectangle(w / 2 - g.px(70), h - 2, g.px(140), 1);
     }
 
     // The focus as this menu last saw it (NightMenuFocus).
@@ -168,12 +174,14 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
     // Focus pill caps: 212 px wide (C1b "pill (24,120,212,40)"), at least
     // 3 px air above and below inside the 65 px row. The pill is sized from
     // its text and centred: a pill filling the row would read as a block,
-    // not a button.
+    // not a button. All in px of the 260 face, scaled when drawn.
     const PILL_MAX_W = 212;
     const PILL_INSET = 3;
     const PILL_PAD = 14;
     // Check column on an unfocused row: an 8 px gap plus the r 8 mark.
     const CHECK_W = 26;
+    // Widest unfocused row in the PoC.
+    const NEIGHBOUR_MAX_W = 193;
 
     private var _label as String;
     private var _sub as String?;
@@ -243,15 +251,16 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
     }
 
     function _drawFocused(dc as Dc) as Void {
+        var g = Geo.current();
         var w = dc.getWidth();
         var h = dc.getHeight();
         var sub = _sub;
         var ph = NightMenuLayout.pillHeight(h,
             sub != null ? dc.getFontHeight(Graphics.FONT_SMALL) + dc.getFontHeight(Graphics.FONT_XTINY) : dc.getFontHeight(Graphics.FONT_MEDIUM),
-            PILL_PAD, PILL_INSET);
-        var pw = w - 24;
-        if (pw > PILL_MAX_W) {
-            pw = PILL_MAX_W;
+            g.px(PILL_PAD), g.px(PILL_INSET));
+        var pw = w - g.px(24);
+        if (pw > g.px(PILL_MAX_W)) {
+            pw = g.px(PILL_MAX_W);
         }
         var px = (w - pw) / 2;
         var py = (h - ph) / 2;
@@ -259,14 +268,14 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
         dc.setColor(Theme.isMono() ? Theme.TEXT_1 : Theme.ACCENT, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);
 
-        var right = _checked != null ? 34 : 0;
-        var x = px + 20;
+        var right = _checked != null ? g.px(34) : 0;
+        var x = px + g.px(20);
         var icon = _icon;
         if (icon != null) {
-            NightIcons.draw(dc, icon, x + 8, mid, 9, Theme.BG);
-            x += 26;
+            NightIcons.draw(dc, icon, x + g.px(8), mid, g.px(9), Theme.BG);
+            x += g.px(26);
         }
-        var maxW = px + pw - 20 - right - x;
+        var maxW = px + pw - g.px(20) - right - x;
         var fonts = sub != null
             ? [Graphics.FONT_SMALL, Graphics.FONT_TINY] as Array<Graphics.FontType>
             : [Graphics.FONT_MEDIUM, Graphics.FONT_SMALL, Graphics.FONT_TINY] as Array<Graphics.FontType>;
@@ -286,11 +295,11 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
         var checked = _checked;
         if (checked != null) {
             if (checked) {
-                NightIcons.draw(dc, :check, px + pw - 30, mid, 9, Theme.BG);
+                NightIcons.draw(dc, :check, px + pw - g.px(30), mid, g.px(9), Theme.BG);
             } else {
                 dc.setColor(Theme.BG, Graphics.COLOR_TRANSPARENT);
-                dc.setPenWidth(2);
-                dc.drawRectangle(px + pw - 39, mid - 9, 18, 18);
+                dc.setPenWidth(g.px(2));
+                dc.drawRectangle(px + pw - g.px(39), mid - g.px(9), g.px(18), g.px(18));
                 dc.setPenWidth(1);
             }
         }
@@ -300,19 +309,21 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
     // "Position 3", "Hidden" and "Recommended" are the reason to scan the
     // list, and Menu2 showed them on every row.
     function _drawPlain(dc as Dc) as Void {
+        var g = Geo.current();
         var w = dc.getWidth();
         var mid = dc.getHeight() / 2;
         var font = Graphics.FONT_TINY;
-        var iconW = _icon != null ? 26 : 0;
+        var iconW = _icon != null ? g.px(26) : 0;
         var checked = _checked;
-        var checkW = checked != null ? CHECK_W : 0;
+        var checkW = checked != null ? g.px(CHECK_W) : 0;
         // An unfocused row that is on screen sits one row above or below the
         // centre (three rows per screen), so its text is fitted to the chord
-        // there; 193 = the PoC's widest unfocused row.
+        // there, and never wider than the PoC's widest unfocused row.
         var blockH = dc.getFontHeight(font) + (_sub != null ? dc.getFontHeight(Graphics.FONT_XTINY) : 0);
-        var maxW = NightMenuLayout.neighbourWidth(dc.getHeight(), blockH) - iconW - checkW;
-        if (maxW > 193 - iconW - checkW) {
-            maxW = 193 - iconW - checkW;
+        var maxW = NightMenuLayout.neighbourWidth(g, dc.getHeight(), blockH) - iconW - checkW;
+        var cap = g.px(NEIGHBOUR_MAX_W) - iconW - checkW;
+        if (maxW > cap) {
+            maxW = cap;
         }
         var label = Ui.fit(_label, maxW, Ui.measurer(dc, font));
         var textW = dc.getTextWidthInPixels(label, font);
@@ -333,7 +344,7 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
         var x0 = (w - (iconW + textW + checkW)) / 2;
         var icon = _icon;
         if (icon != null) {
-            NightIcons.draw(dc, icon, x0 + 9, mid, 8, Theme.c(Theme.ACCENT));
+            NightIcons.draw(dc, icon, x0 + g.px(9), mid, g.px(8), Theme.c(Theme.ACCENT));
         }
         var vjust = Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER;
         dc.setColor(Theme.c(Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
@@ -342,13 +353,14 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
             dc.drawText(x0 + iconW, subY, Graphics.FONT_XTINY, subText, vjust);
         }
         if (checked != null) {
-            var cx = x0 + iconW + textW + checkW - 9;
+            var cx = x0 + iconW + textW + checkW - g.px(9);
+            var r = g.px(8);
             if (checked) {
-                NightIcons.draw(dc, :check, cx, mid, 8, Theme.c(Theme.ACCENT));
+                NightIcons.draw(dc, :check, cx, mid, r, Theme.c(Theme.ACCENT));
             } else {
                 dc.setColor(Theme.c(Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
-                dc.setPenWidth(2);
-                dc.drawRectangle(cx - 8, mid - 8, 16, 16);
+                dc.setPenWidth(g.px(2));
+                dc.drawRectangle(cx - r, mid - r, 2 * r, 2 * r);
                 dc.setPenWidth(1);
             }
         }
@@ -372,8 +384,8 @@ module NightMenuLayout {
 
     // Vertical centres [label, sub] of an unfocused row with a sub-label:
     // the two lines stacked as one block centred in the row. FONT_TINY over
-    // FONT_XTINY is 48 to 50 px on the targets, inside the 65 px row
-    // (Theme.rowHeight()).
+    // FONT_XTINY is 48 to 50 px on the fēnix, inside the 65 px row
+    // (Geo.Display.rowH).
     function plainLines(rowH as Number, labelH as Number, subH as Number) as [Number, Number] {
         var top = (rowH - labelH - subH) / 2;
         return [top + labelH / 2, top + labelH + subH / 2];
@@ -387,11 +399,12 @@ module NightMenuLayout {
         return ph < max ? ph : max;
     }
 
-    // Usable text width of a row one row away from the centre of a round
-    // 260 px display, for a text block blockH tall centred in the row.
-    function neighbourWidth(rowH as Number, blockH as Number) as Number {
-        var centre = 130 + rowH;
-        return Ui.usable(centre - blockH / 2, centre + blockH / 2, Theme.MARGIN);
+    // Usable text width of a row one row below the centre of display g,
+    // for a text block blockH tall centred in the row (the row above is
+    // its mirror image).
+    function neighbourWidth(g as Geo.Display, rowH as Number, blockH as Number) as Number {
+        var centre = g.cy + rowH;
+        return g.usable(centre - blockH / 2, centre + blockH / 2, Theme.MARGIN);
     }
 
 }

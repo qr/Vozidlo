@@ -11,10 +11,78 @@ import Toybox.Time.Gregorian;
 module ChargingFormat {
 
     // Two xtiny rows fit between the state chip (y 134) and the age line
-    // (y 202) at a 20 px pitch (C3); a third would sit on the age.
+    // (y 202) on the fēnix 7 Pro (C3); a third would sit on the age.
+    // Slots.maxRows says how many fit on this watch.
     const MAX_DETAIL_ROWS = 2;
-    const ROW_PITCH = 20;
     const SEP = " · ";
+
+    // Vertical slots of the charging detail screen (spec DS.charging), from
+    // the title top used and the hero font height. On the fēnix 7 Pro:
+    // hero 58, chip 134, rows 160 at a 20 px pitch, age 202, no data 98 /
+    // 136.
+    class Slots {
+        public var heroTop as Number;
+        public var chipTop as Number;
+        public var rowsTop as Number;
+        public var pitch as Number;
+        public var ageTop as Number;
+        // Detail rows that end at least 2 px above the age line.
+        public var maxRows as Number;
+        public var noDataTop as Number;
+        public var noDataSubTop as Number;
+
+        function initialize(g as Geo.Display, tTop as Number, heroH as Number) {
+            var xt = g.fonts.xtinyH;
+            heroTop = ChargingFormat.heroTop(g, tTop);
+            chipTop = heroTop + heroH + g.px(2);
+            rowsTop = chipTop + g.chipH + g.px(5);
+            pitch = xt + g.px(1);
+            ageTop = g.chargingAgeTop;
+            maxRows = 0;
+            while (maxRows < MAX_DETAIL_ROWS && rowsTop + maxRows * pitch + xt <= ageTop - g.px(2)) {
+                maxRows += 1;
+            }
+            noDataTop = g.cy - g.px(32);
+            noDataSubTop = g.cy + g.px(6);
+        }
+    }
+
+    // Vertical slots of a charging profile card (spec DS.profile), under a
+    // title drawn at tTop (profileTitleTop(), or lower when it is long). On
+    // the fēnix 7 Pro: name 70, chip 108, facts 136 at a 19 px pitch,
+    // timers from 178 (4 px under the facts), last line by 216, states at
+    // 104 / 136 and errors at 112.
+    class ProfileSlots {
+        public var nameTop as Number;
+        public var chipTop as Number;
+        public var factsTop as Number;
+        public var pitch as Number;
+        public var timerGap as Number;
+        public var lastTop as Number;
+        public var stateTop as Number;
+        public var stateSubTop as Number;
+        public var errorTop as Number;
+
+        function initialize(g as Geo.Display, tTop as Number) {
+            nameTop = tTop + g.fonts.tinyH + g.px(1);
+            chipTop = nameTop + g.fonts.mediumH + g.px(1);
+            factsTop = chipTop + g.chipH + g.px(7);
+            pitch = g.fonts.xtinyH;
+            timerGap = g.px(4);
+            lastTop = g.h - g.px(44);
+            stateTop = g.cy - g.px(26);
+            stateSubTop = g.cy + g.px(6);
+            errorTop = g.cy - g.px(18);
+        }
+
+        // How many timer lines from timersTop still start by lastTop.
+        function timerRoom(timersTop as Number) as Number {
+            if (timersTop > lastTop) {
+                return 0;
+            }
+            return (lastTop - timersTop) / pitch + 1;
+        }
+    }
 
     // ------------------------------------------------------------ pure
 
@@ -128,10 +196,29 @@ module ChargingFormat {
         return null;
     }
 
+    // Hero top of the detail screen: tucked 5 px into the title's leading.
+    function heroTop(g as Geo.Display, tTop as Number) as Number {
+        return tTop + g.fonts.tinyH - g.px(5);
+    }
+
+    function slots(g as Geo.Display, tTop as Number, heroH as Number) as Slots {
+        return new Slots(g, tTop, heroH);
+    }
+
+    // The profiles title sits 6 px under the usual title top (y 40 on the
+    // fēnix 7 Pro), since it is the longest title in the app.
+    function profileTitleTop(g as Geo.Display) as Number {
+        return g.titleTop + g.px(6);
+    }
+
+    function profileSlots(g as Geo.Display, tTop as Number) as ProfileSlots {
+        return new ProfileSlots(g, tTop);
+    }
+
     // ------------------------------------------------------------ drawing
 
-    // Centred xtiny lines, each fitted to the chord at its own y with the
-    // ring margin (PoC `lines`): the ring at r 126 eats the outer 12 px.
+    // Centred xtiny lines, each fitted to the outline at its own y with the
+    // ring margin (PoC `lines`): the ring eats the outer 12 px (scaled).
     // Returns the y below the last line.
     function drawLines(dc as Dc, y0 as Number, pitch as Number, lines as Array<String>, color as Number) as Number {
         var font = Graphics.FONT_XTINY;

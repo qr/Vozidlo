@@ -199,7 +199,7 @@ module ControlTilesTests {
         var ops = ["startAirConditioning", "stopAirConditioning", "startCharging", "stopCharging"] as Array<String>;
         var rows = ControlTiles.rows(ops, false, ConfirmationPolicy.START_CLIMATE, true, true);
         var got = _labels(rows);
-        var want = "Start climate|Stop climate|Start charging|Stop charging|Charging|Find my car|Status|Settings";
+        var want = "Status|Find my car|Start climate|Stop climate|Start charging|Stop charging|Charging|Settings";
         if (!got.equals(want)) {
             logger.error("expected " + want + ", got " + got);
             return false;
@@ -264,8 +264,8 @@ module ControlTilesTests {
         return true;
     }
 
-    // US-037: focus at launch is the primary action's row, wherever the
-    // user's order put it; 0 when there is none.
+    // indexOf() finds the primary action's row wherever the user's order
+    // put it; 0 when there is none.
     (:test)
     function indexOfFindsThePrimaryRow(logger as Logger) as Boolean {
         TileOrder.clear();

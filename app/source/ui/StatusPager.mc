@@ -133,10 +133,14 @@ class StatusPager {
 class StatusPageView extends WatchUi.View {
 
     private var _pager as StatusPager;
+    // Garmin's action menu indicator, on watches without MENU (profile C).
+    // Every page is a new view (switchToView), so each one enables it.
+    private var _indicator as Boolean = false;
 
     function initialize(pager as StatusPager) {
         View.initialize();
         _pager = pager;
+        _indicator = Input.enableIndicator(self);
     }
 
     function pager() as StatusPager {
@@ -144,9 +148,11 @@ class StatusPageView extends WatchUi.View {
     }
 
     // Monochrome flag cached per onShow (A21); a pop back from the menu or
-    // the charging screen picks up new data here.
+    // the charging screen picks up new data here. Text keeps clear of the
+    // indicator while it shows (Geo keep-out; NightMenu clears it again).
     function onShow() as Void {
         Theme.refresh();
+        Geo.setKeepOut(_indicator);
         _pager.sync();
     }
 
@@ -177,6 +183,20 @@ class StatusPageDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
+        _pager.openActions();
+        return true;
+    }
+
+    // MENU (hold UP, or hold BACK on the Venu 3 / 3S) opens the same list:
+    // there is one list of things to do on these pages.
+    function onMenu() as Boolean {
+        _pager.openActions();
+        return true;
+    }
+
+    // The action menu (swipe left or the indicator) on watches without
+    // MENU; API 5.1.1, only called on the watches that have it.
+    function onActionMenu() as Boolean {
         _pager.openActions();
         return true;
     }

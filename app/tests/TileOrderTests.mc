@@ -15,8 +15,8 @@ module TileOrderTests {
         TileOrder.clear();
         var order = TileOrder.order();
         var expected = [
-            TileOrder.CATEGORY_CLIMATE, TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_CHARGING_DETAIL,
-            TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_STATUS_DETAIL, TileOrder.CATEGORY_SETTINGS
+            TileOrder.CATEGORY_STATUS_DETAIL, TileOrder.CATEGORY_FIND_MY_CAR, TileOrder.CATEGORY_CLIMATE,
+            TileOrder.CATEGORY_CHARGING, TileOrder.CATEGORY_CHARGING_DETAIL, TileOrder.CATEGORY_SETTINGS
         ] as Array<Symbol>;
         if (order.size() != expected.size()) {
             logger.error("expected all six categories with nothing persisted yet");
@@ -24,7 +24,7 @@ module TileOrderTests {
         }
         for (var i = 0; i < expected.size(); i += 1) {
             if (order[i] != expected[i]) {
-                logger.error("default order must be climate, charging, charging detail, find my car, status detail, settings");
+                logger.error("default order must be status detail, find my car, climate, charging, charging detail, settings");
                 return false;
             }
         }
@@ -57,18 +57,18 @@ module TileOrderTests {
     (:test)
     function moveUpAndMoveDownSwapNeighboursAndClampAtTheEnds(logger as Logger) as Boolean {
         TileOrder.clear();
-        // Default: climate, charging, chargingDetail, findMyCar, statusDetail, settings.
-        TileOrder.moveUp(TileOrder.CATEGORY_CLIMATE); // already first: no-op
+        // Default: statusDetail, findMyCar, climate, charging, chargingDetail, settings.
+        TileOrder.moveUp(TileOrder.CATEGORY_STATUS_DETAIL); // already first: no-op
         var order = TileOrder.order();
-        if (order[0] != TileOrder.CATEGORY_CLIMATE) {
+        if (order[0] != TileOrder.CATEGORY_STATUS_DETAIL) {
             logger.error("moving the first entry up must be a no-op");
             return false;
         }
 
-        TileOrder.moveDown(TileOrder.CATEGORY_CLIMATE);
+        TileOrder.moveDown(TileOrder.CATEGORY_STATUS_DETAIL);
         order = TileOrder.order();
-        if (order[0] != TileOrder.CATEGORY_CHARGING || order[1] != TileOrder.CATEGORY_CLIMATE) {
-            logger.error("moving climate down once must swap it with charging");
+        if (order[0] != TileOrder.CATEGORY_FIND_MY_CAR || order[1] != TileOrder.CATEGORY_STATUS_DETAIL) {
+            logger.error("moving status down once must swap it with find my car");
             return false;
         }
 
@@ -281,7 +281,7 @@ module TileOrderTests {
         var order = TileOrder.order();
         TileOrder.clear();
         if (order[0] != TileOrder.CATEGORY_CHARGING_DETAIL || order[2] != TileOrder.CATEGORY_CHARGING
-            || order[3] != TileOrder.CATEGORY_FIND_MY_CAR) {
+            || order[3] != TileOrder.CATEGORY_STATUS_DETAIL || order[4] != TileOrder.CATEGORY_FIND_MY_CAR) {
             logger.error("a stored charging detail position must be kept, the rest appended");
             return false;
         }

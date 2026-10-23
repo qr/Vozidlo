@@ -10,18 +10,28 @@
 # disposable.
 #
 # Commands:
-#   ciq sdkmanager   GUI to log in and download the device files
-#   ciq build        compile the app for the primary device
-#   ciq build --all  compile it for every product in the manifest
-#   ciq test         run the unit tests in the simulator
-#   ciq run          build, start the simulator and load the app
-#   ciq sim          start the simulator on its own
-#   ciq package      build a release .iq for the store (all products)
+#   ciq                  this help, with every product and whether its device files are present
+#   ciq sdkmanager       GUI to log in and download the device files
+#   ciq build            compile the app for the primary device
+#   ciq build --all      compile it for every product in the manifest
+#   ciq test             run the unit tests in the simulator on the primary device
+#   ciq test --all       run them on every product in the manifest
+#   ciq verify           the gate before every pull request: static checks, design
+#                        checks, every product built without warnings and within its
+#                        memory budget, unit tests on the verify devices. Exit 0 green,
+#                        1 red, 2 not run (something missing on this machine)
+#   ciq run              build, start the simulator and load the app
+#   ciq sim              start the simulator on its own
+#   ciq package          build a release .iq for the store (all products)
 #   ciq package --beta   same, but under the beta app id (private testing)
-#   ciq shell        bash in the container
+#   ciq shell            bash in the container
 #
 # The device list comes from app/manifest.xml, so it cannot drift from what
-# we actually ship. Override with CIQ_DEVICE=<id> for a one-off.
+# we actually ship. Override with CIQ_DEVICE=<id> for a one-off, or with
+# CIQ_DEVICES="a b" for the list `build --all` and `test` work through.
+# Compiler warnings fail a build (CONTRIBUTING: warnings are errors);
+# CIQ_ALLOW_WARNINGS=1 lets `build` through while iterating, `verify` ignores it.
+# Logs: app/bin/logs/ (build-<dev>.log, test-<dev>.log, verify-<time>.log).
 #
 set -uo pipefail
 
@@ -31,7 +41,7 @@ GARMIN="$HOME/.Garmin"
 # Products, in manifest order. The first is the primary: what `build`, `run`
 # and `test` use unless CIQ_DEVICE says otherwise. Parsed rather than repeated
 # here so adding a product to the manifest is the only edit needed.
-PROJECT_MANIFEST="$(cd "$(dirname "$0")/.." && pwd)/app/manifest.xml"
+PROJECT_MANIFEST="$PROJECT_ROOT/app/manifest.xml"
 mapfile -t DEVICES < <(grep -oE '<iq:product[[:space:]]+id="[^"]+"' "$PROJECT_MANIFEST" \
                        | sed -E 's/.*id="([^"]+)".*/\1/')
 [[ ${#DEVICES[@]} -gt 0 ]] || { echo "ERROR: no <iq:product> in $PROJECT_MANIFEST" >&2; exit 1; }
@@ -39,19 +49,54 @@ DEVICE="${CIQ_DEVICE:-${DEVICES[0]}}"
 APP_DIR=app
 APP_NAME=vozidlo
 KEY="$APP_DIR/developer_key.der"
+# Under app/bin/, which .gitignore covers, so logs can never be committed.
+LOG_DIR="$APP_DIR/bin/logs"
+
+# The devices `verify` runs the unit tests on: at least one device per screen
+# family, per input profile with and without the map (fr265 covers both the
+# 416 screen and five buttons without a map), and on the lowest Connect IQ
+# version we ship (descentmk351mm, 5.1), enforced by
+# tools/checks.py. Building runs on every product; the simulator is slow, so
+# tests run on this representative set.
+VERIFY_DEVICES=(fenix7pro fenix7s fenix7xpro fr255 fr255s venu3s venu445mm vivoactive6 venux1 descentmk351mm fr265)
+
+# FR255 and FR255S have 512 KB for a watch app. The app fits, but the test
+# binary carries every test on top of it and may not. Their Music models have
+# the same screen, the same buttons and no touch, with 768 KB, so they stand
+# in for the tests and the 512 KB watch is then marked "smoke: build only"
+# (its real build and memory budget are still checked in the build step).
+# One OOM_FALLBACK_<dev>=<stand-in> per watch; oom_fallbacks lists them.
+OOM_FALLBACK_fr255=fr255m
+OOM_FALLBACK_fr255s=fr255sm
+oom_fallbacks() { local v; for v in ${!OOM_FALLBACK_@}; do printf '%s\n' "${!v}"; done; }
 
 # Strict typing and warnings from the first commit. Retrofitting is far more
 # work than starting this way.
 TYPECHECK="-l 3 -w"
 
+# 1 lets a `build` through with compiler warnings. Nothing else honours it.
+ALLOW_WARNINGS="${CIQ_ALLOW_WARNINGS:-0}"
+
+# One simulator per machine, and every caller (several terminals, several
+# agents) talks to the same one: two test runs at once load their binaries
+# into it on top of each other. A lock file serialises its use.
+SIM_LOCK=/tmp/vozidlo-sim.lock
+SIM_LOCK_FD=""
+# monkeydo has no timeout of its own; a test that hangs would hang us.
+TEST_TIMEOUT=300
+
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 note() { printf '%s\n' "$*"; }
 
 # ------------------------------------------------------------------ container
-docker image inspect "$IMAGE" >/dev/null 2>&1 || die "image $IMAGE is missing. Build it with:
-  cd $(dirname \"$0\") && docker build \\
+image_msg() {
+  printf '%s' "image $IMAGE is missing. Build it with:
+  cd $(dirname "$0") && docker build \\
       --build-arg UID=\$(id -u) --build-arg GID=\$(id -g) \\
       --build-arg HOME_DIR=\"\$HOME\" -t $IMAGE ."
+}
+have_image() { docker image inspect "$IMAGE" >/dev/null 2>&1; }
+need_image() { have_image || die "$(image_msg)"; }
 
 # ------------------------------------------------------------------------ SDK
 sdk_root() {
@@ -61,28 +106,38 @@ sdk_root() {
   fi
 }
 SDK="${CIQ_SDK:-$(sdk_root)}"
-[[ -n "$SDK" && -x "$SDK/bin/monkeyc" ]] || die "no Connect IQ SDK found.
+have_sdk() { [[ -n "$SDK" && -x "$SDK/bin/monkeyc" ]]; }
+sdk_msg() {
+  printf '%s' "no Connect IQ SDK found.
 
 Expected: \$HOME/.Garmin/ConnectIQ/Sdks/<version>/bin/monkeyc
 Found:    ${SDK:-<nothing>}
 
 Install it with the SDK Manager, or point at it:
   CIQ_SDK=/path/to/connectiq-sdk $0 $*"
+}
+need_sdk() { have_sdk || die "$(sdk_msg "$@")"; }
+# "connectiq-sdk-lin-9.2.0-2026-06-09-92a1605b2" -> "9.2.0"
+sdk_version() {
+  local b; b="$(basename "$SDK")"
+  [[ "$b" =~ -([0-9]+\.[0-9]+\.[0-9]+)- ]] && printf '%s' "${BASH_REMATCH[1]}" || printf '%s' "$b"
+}
 
 have_device() { [[ -d "$GARMIN/ConnectIQ/Devices/${1:-$DEVICE}" ]]; }
-need_device() {
-  local d="${1:-$DEVICE}"
-  have_device "$d" || die "device files for '$d' are missing.
+missing_devices() { local d; for d in "$@"; do have_device "$d" || printf '%s ' "$d"; done; }
+# need_devices [dev...]: all of them, or die naming every missing one at once
+# (one round trip to the SDK Manager instead of one per device).
+need_devices() {
+  [[ $# -gt 0 ]] || set -- "$DEVICE"
+  local missing; missing="$(missing_devices "$@")"
+  [[ -z "$missing" ]] || die "device files missing for: ${missing% }
 
 They are only available through the SDK Manager, which needs a Garmin login:
   $0 sdkmanager
+Run $0 without arguments for the full list and what is present.
 
-Expected at: $GARMIN/ConnectIQ/Devices/$d"
+Expected under: $GARMIN/ConnectIQ/Devices/"
 }
-
-# A package build compiles every product, so all of them must be present or
-# the .iq silently ships fewer devices than the manifest claims.
-need_all_devices() { local d; for d in "${DEVICES[@]}"; do need_device "$d"; done; }
 
 # The signing key identifies us to the store. A different key than the previous
 # upload is rejected, so generate once and never lose it.
@@ -120,48 +175,133 @@ if [[ -n "${DISPLAY:-}" ]]; then
   fi
 fi
 
-run() {
+# docker_argv [name]: the `docker run` arguments up to the image. A name lets
+# us kill the container later: when `timeout` kills the docker client, the
+# container keeps running unless we do.
+docker_argv() {
+  DOCKER_ARGV=(run --rm)
   # -it only when there really is a terminal, so the same script works in CI.
-  local tty=(); [[ -t 0 && -t 1 ]] && tty=(-it)
-  docker run --rm "${tty[@]}" \
-    --net=host \
-    -v "$GARMIN:$GARMIN" \
-    -v "$PROJECT_ROOT:$PROJECT_ROOT" \
-    -w "$PROJECT_ROOT" \
-    -e "HOME=$HOME" \
-    "${x11_args[@]}" \
-    "$IMAGE" "$@"
+  [[ -t 0 && -t 1 ]] && DOCKER_ARGV+=(-it)
+  [[ -n "${1:-}" ]] && DOCKER_ARGV+=(--name "$1")
+  DOCKER_ARGV+=(--net=host
+    -v "$GARMIN:$GARMIN"
+    -v "$PROJECT_ROOT:$PROJECT_ROOT"
+    -w "$PROJECT_ROOT"
+    -e "HOME=$HOME"
+    "${x11_args[@]}"
+    "$IMAGE")
+}
+run() { docker_argv; docker "${DOCKER_ARGV[@]}" "$@"; }
+
+# ------------------------------------------------------------------- budgets
+# The watch-app memory limit of a device, from its compiler.json: the number
+# the store and the watch enforce. It differs per product (FR255: 512 KB,
+# fēnix 7 Pro: 768 KB), so a single hard-coded budget hides the tight ones.
+device_budget() {
+  python3 - "$GARMIN/ConnectIQ/Devices/$1/compiler.json" 2>/dev/null <<'PY'
+import json, sys
+j = json.load(open(sys.argv[1]))
+print(next(a["memoryLimit"] for a in j["appTypes"] if a.get("type") == "watchApp"))
+PY
 }
 
+# Per-device results, for the verify summary.
+declare -A R_BUILD R_WARN R_SIZE R_BUDGET R_TEST R_TESTNOTE
+
 report_size() {  # report_size <device> <prg path>
-  local prg="$PROJECT_ROOT/$2"
+  local dev="$1" prg="$PROJECT_ROOT/$2"
   [[ -f "$prg" ]] || return 0
-  local bytes; bytes=$(stat -c%s "$prg")
-  # The watch-app limit on this device, from compiler.json.
-  printf 'Built %s for %s: %s bytes (%d%% of the 786432 watch-app budget)\n' \
-      "$2" "$1" "$bytes" $(( bytes * 100 / 786432 ))
+  local bytes budget pct
+  bytes=$(stat -c%s "$prg")
+  budget="$(device_budget "$dev")"
+  R_SIZE[$dev]=$bytes
+  if [[ ! "$budget" =~ ^[0-9]+$ ]]; then
+    note "Built $2 for $dev: $bytes bytes (watch-app budget unknown: no compiler.json)"
+    return 0
+  fi
+  pct=$(( bytes * 100 / budget ))
+  R_BUDGET[$dev]=$budget
+  # The .prg holds code, resources and data that never all sit in memory at
+  # once, while the heap the app allocates at run time is not in it at all.
+  # It is a rough proxy that catches the trend, not a measurement.
+  note "Built $2 for $dev: $bytes bytes, $pct% of its $budget-byte watch-app memory budget"
+  note "  (.prg size is only a rough proxy for memory use)"
+  # Larger than the budget fails the build (and so verify): even as a rough
+  # proxy, an app bigger than the watch's whole watch-app memory cannot fit.
+  if (( bytes > budget )); then
+    note "FAILED: $dev: $bytes bytes is more than its $budget-byte watch-app budget"
+    R_BUILD[$dev]=over
+    return 1
+  fi
+  (( pct >= 80 )) && note "WARN: $dev is at $pct% of its budget; check peak memory in the simulator (File > View Memory)"
+  return 0
+}
+
+# compile <device> <out .prg> <log> [extra monkeyc flags...]
+# Output goes to the terminal and to the log; any WARNING line fails the
+# compile unless warnings are allowed. Sets R_BUILD/R_WARN for the device.
+compile() {
+  local dev="$1" out="$2" log="$3"; shift 3
+  mkdir -p "$PROJECT_ROOT/$LOG_DIR"
+  run bash -c "mkdir -p $APP_DIR/bin && '$SDK/bin/monkeyc' \
+      -d $dev -f $APP_DIR/monkey.jungle \
+      -o $out -y $KEY $TYPECHECK $*" 2>&1 | tee "$PROJECT_ROOT/$log"
+  local rc=${PIPESTATUS[0]} warns
+  warns=$(grep -c '^WARNING' "$PROJECT_ROOT/$log")
+  R_WARN[$dev]=$warns
+  if (( rc != 0 )); then
+    R_BUILD[$dev]=FAIL
+    note "FAILED: $dev did not compile (log: $log)"
+    return 1
+  fi
+  if (( warns > 0 )); then
+    if [[ "$ALLOW_WARNINGS" == 1 ]]; then
+      note "NOTE: $warns warning(s) for $dev let through by CIQ_ALLOW_WARNINGS=1 (log: $log)"
+    else
+      R_BUILD[$dev]=FAIL
+      note "FAILED: $warns compiler warning(s) for $dev; warnings are errors (CONTRIBUTING)."
+      note "  Log: $log. CIQ_ALLOW_WARNINGS=1 lets \`build\` through while you iterate."
+      return 1
+    fi
+  fi
+  R_BUILD[$dev]=ok
+}
+
+# app_prg <device>: where `build` writes a device's app and `run` loads it.
+# The primary device keeps the plain vozidlo.prg name, because the docs
+# expect it there; the others get a suffix so a build of all products
+# leaves one file per device to inspect.
+app_prg() {
+  if [[ "$1" == "${DEVICES[0]}" ]]; then printf '%s' "$APP_DIR/bin/$APP_NAME.prg"
+  else printf '%s' "$APP_DIR/bin/$APP_NAME-$1.prg"
+  fi
 }
 
 # build_one <device> [extra monkeyc flags...]
-# The primary device keeps the plain vozidlo.prg name, because `run` and
-# every doc reference expect it there; the others get a suffix so a build of
-# all products leaves one file per device to inspect.
 build_one() {
   local dev="$1"; shift
-  need_device "$dev"; need_key
-  local out="$APP_DIR/bin/$APP_NAME.prg"
-  [[ "$dev" == "${DEVICES[0]}" ]] || out="$APP_DIR/bin/$APP_NAME-$dev.prg"
-  run bash -c "mkdir -p $APP_DIR/bin && '$SDK/bin/monkeyc' \
-      -d $dev -f $APP_DIR/monkey.jungle \
-      -o $out -y $KEY $TYPECHECK $*" || return 1
+  need_devices "$dev"; need_key
+  local out; out="$(app_prg "$dev")"
+  compile "$dev" "$out" "$LOG_DIR/build-$dev.log" "$@" || return 1
   report_size "$dev" "$out"
 }
 
+# CIQ_DEVICES="a b" replaces the product list for `build --all` and `test`.
+selected_devices() {  # selected_devices <all|primary>
+  if [[ -n "${CIQ_DEVICES:-}" ]]; then read -ra SELECTED <<<"$CIQ_DEVICES"
+  elif [[ "$1" == all ]]; then SELECTED=("${DEVICES[@]}")
+  else SELECTED=("$DEVICE")
+  fi
+}
+
 build() {  # build [--all] [extra monkeyc flags...]
-  if [[ "${1:-}" == "--all" ]]; then
-    shift
+  local scope=primary
+  [[ "${1:-}" == "--all" ]] && { scope=all; shift; }
+  if [[ $scope == all || -n "${CIQ_DEVICES:-}" ]]; then
+    selected_devices "$scope"
+    need_devices "${SELECTED[@]}"
     local dev rc=0
-    for dev in "${DEVICES[@]}"; do
+    for dev in "${SELECTED[@]}"; do
       build_one "$dev" "$@" || rc=1
     done
     return $rc
@@ -169,53 +309,389 @@ build() {  # build [--all] [extra monkeyc flags...]
   build_one "$DEVICE" "$@"
 }
 
-start_simulator() {
-  pgrep -f "$SDK/bin/simulator" >/dev/null 2>&1 && { note "Simulator already running"; return 0; }
-  run "$SDK/bin/connectiq" >/dev/null 2>&1 &
-  note "Simulator starting, waiting for it..."
-  sleep 18   # it needs roughly 15s inside a container
+# --------------------------------------------------------------- simulator
+# lock_held_by_ancestor: true when a process above us already holds the
+# simulator lock, typically `flock -o /tmp/vozidlo-sim.lock tools/ciq test`.
+# Locking again would wait for our own parent forever. /proc/locks names the
+# pid that took each flock; we compare it with our chain of parents.
+lock_held_by_ancestor() {
+  [[ -e "$SIM_LOCK" && -r /proc/locks ]] || return 1
+  local ino holders p
+  ino=$(stat -c %i "$SIM_LOCK") || return 1
+  holders=$(awk -v ino="$ino" '$2 == "FLOCK" { n = split($6, a, ":"); if (a[n] == ino) print $5 }' /proc/locks)
+  [[ -n "$holders" ]] || return 1
+  p=$$
+  while [[ -n "$p" && "$p" -gt 1 ]]; do
+    grep -qx "$p" <<<"$holders" && return 0
+    p=$(awk '/^PPid:/ { print $2 }' "/proc/$p/status" 2>/dev/null)
+  done
+  return 1
 }
 
-case "${1:-help}" in
+# sim_lock: take the simulator lock for the rest of this run (released when
+# the script exits). Builds happen before it, so we hold it only while the
+# simulator is in use.
+sim_lock() {
+  [[ -n "$SIM_LOCK_FD" ]] && return 0
+  if lock_held_by_ancestor; then SIM_LOCK_FD=inherited; return 0; fi
+  exec {SIM_LOCK_FD}>>"$SIM_LOCK" || die "cannot open $SIM_LOCK"
+  if ! flock -n "$SIM_LOCK_FD"; then
+    note "Simulator in use by another run, waiting for $SIM_LOCK ..."
+    flock "$SIM_LOCK_FD" || die "could not lock $SIM_LOCK"
+  fi
+}
+
+# The simulator listens on the first free port from 1234 (monkeydo tries
+# 1234-1238). Until it does, monkeydo fails, so we poll for that instead of
+# guessing a sleep. Seen with `ss -ltnp` while it runs:
+#   LISTEN 0.0.0.0:1234 users:(("simulator",pid=...))
+sim_listening() {
+  ss -ltnpH 'sport >= :1234 and sport <= :1238' 2>/dev/null | grep -q '"simulator"'
+}
+
+start_simulator() {
+  if pgrep -f "$SDK/bin/simulator" >/dev/null 2>&1; then
+    note "Simulator already running"
+  else
+    note "Simulator starting, waiting for it..."
+    # The simulator outlives this script and inherits its file descriptors
+    # (through the docker client): with the lock among them, the lock would
+    # be held for as long as the simulator runs. Hence the lock fd is closed.
+    if [[ "$SIM_LOCK_FD" =~ ^[0-9]+$ ]]; then
+      run "$SDK/bin/connectiq" >/dev/null 2>&1 {SIM_LOCK_FD}>&- &
+    else
+      run "$SDK/bin/connectiq" >/dev/null 2>&1 &
+    fi
+  fi
+  if ! command -v ss >/dev/null; then
+    sleep 18   # no ss to poll with; it needs roughly 15s inside a container
+    return 0
+  fi
+  local i
+  for (( i = 0; i < 60; i++ )); do
+    if sim_listening; then
+      (( i > 0 )) && { note "Simulator ready after ${i}s"; sleep 2; }  # port first, app loading a moment later
+      return 0
+    fi
+    sleep 1
+  done
+  note "WARN: no simulator listening on ports 1234-1238 after 60s; trying anyway"
+}
+
+# ------------------------------------------------------------------- tests
+test_prg() { printf '%s' "$APP_DIR/bin/$APP_NAME-test-$1.prg"; }
+test_log() { printf '%s' "$LOG_DIR/test-$1.log"; }
+
+# test_build <dev>: compile the test binary. Warnings fail it as in a build:
+# the test build is the app plus the tests, so it is the same code.
+test_build() {
+  local dev="$1" saved="$ALLOW_WARNINGS" rc
+  # The build and warnings columns of the verify summary are about the app
+  # build; keep them from being overwritten by the test build.
+  local had_build="${R_BUILD[$dev]+set}" b="${R_BUILD[$dev]:-}" w="${R_WARN[$dev]:-}"
+  ALLOW_WARNINGS=0
+  compile "$dev" "$(test_prg "$dev")" "$(test_log "$dev")" -t; rc=$?
+  ALLOW_WARNINGS="$saved"
+  (( rc != 0 )) && R_TEST[$dev]="test build failed (${R_WARN[$dev]} warnings)"
+  if [[ -n "$had_build" ]]; then R_BUILD[$dev]="$b"; R_WARN[$dev]="$w"
+  else unset 'R_BUILD[$dev]' 'R_WARN[$dev]'
+  fi
+  return $rc
+}
+
+# test_run <dev>: run a built test binary in the simulator (lock held,
+# simulator started) and judge it by the summary line it prints:
+#   PASSED (passed=276, failed=0, errors=0)
+# monkeydo's exit code says nothing: it is 1 even when every test passes.
+# No summary line at all (crash, out of memory, timeout) is a failure.
+test_run() {
+  local dev="$1" log; log="$(test_log "$dev")"
+  local name="vozidlo-monkeydo-$$-$dev"
+  note "Running the unit tests on $dev..."
+  docker_argv "$name"
+  # -t, not /t: the Windows batch form in Garmin's docs is rejected by the
+  # Linux monkeydo script, which then silently launches the app instead.
+  timeout -k 10 "$TEST_TIMEOUT" docker "${DOCKER_ARGV[@]}" \
+      "$SDK/bin/monkeydo" "$(test_prg "$dev")" "$dev" -t 2>&1 | tee -a "$PROJECT_ROOT/$log"
+  local rc=${PIPESTATUS[0]}
+  if (( rc == 124 || rc == 137 )); then
+    docker kill "$name" >/dev/null 2>&1
+    note "TIMEOUT: tests on $dev did not finish within ${TEST_TIMEOUT}s" | tee -a "$PROJECT_ROOT/$log"
+  fi
+  local summary
+  summary="$(grep -E '^(PASSED|FAILED) \(passed=[0-9]+, failed=[0-9]+, errors=[0-9]+\)' "$PROJECT_ROOT/$log" | tail -1)"
+  if [[ "$summary" =~ ^(PASSED|FAILED)\ \(passed=([0-9]+),\ failed=([0-9]+),\ errors=([0-9]+)\) ]]; then
+    local verdict=${BASH_REMATCH[1]} p=${BASH_REMATCH[2]} f=${BASH_REMATCH[3]} e=${BASH_REMATCH[4]}
+    R_TEST[$dev]="$p passed, $f failed, $e errors"
+    if [[ $verdict == PASSED && $f == 0 && $e == 0 && $p -gt 0 ]]; then
+      R_TEST[$dev]="$p passed"
+      note "OK: $dev $summary"
+      return 0
+    fi
+    note "FAILED: $dev $summary (log: $log)"
+    return 1
+  fi
+  if grep -qi 'out of memory' "$PROJECT_ROOT/$log"; then
+    R_TEST[$dev]="out of memory"
+    note "FAILED: $dev ran out of memory running the test binary (log: $log)"
+  else
+    R_TEST[$dev]="no summary"
+    note "FAILED: $dev printed no test summary; crashed, hung or never started (log: $log)"
+  fi
+  return 1
+}
+
+# test_on <dev>: build and run the unit tests on one device.
+test_on() {
+  local dev="$1"
+  need_devices "$dev"; need_key
+  test_build "$dev" || return 1
+  sim_lock; start_simulator
+  test_run "$dev"
+}
+
+# test_devices <dev...>: build every test binary first (no lock needed),
+# then hold the simulator once for all runs. Returns 1 if any device fails.
+# A device with an OOM_FALLBACK_<dev> that runs out of memory hands its
+# tests to the fallback device and is marked "smoke: build only".
+test_devices() {
+  local dev rc=0 fb
+  local -a built=()
+  for dev in "$@"; do
+    if test_build "$dev"; then built+=("$dev"); else rc=1; fi
+  done
+  (( ${#built[@]} )) || return 1
+  sim_lock; start_simulator
+  for dev in "${built[@]}"; do
+    test_run "$dev" && continue
+    fb="OOM_FALLBACK_$dev"; fb="${!fb:-}"
+    if [[ "${R_TEST[$dev]}" == "out of memory" && -n "$fb" ]]; then
+      note "FALLBACK: $dev has too little memory for the test binary; running the tests on $fb (same screen and input)."
+      if ! have_device "$fb"; then
+        note "FAILED: fallback device files for $fb are missing; run $0 sdkmanager"
+        rc=1; continue
+      fi
+      if test_build "$fb" && test_run "$fb"; then
+        R_TEST[$dev]="smoke: build only"
+        R_TESTNOTE[$dev]="test binary out of memory; tests ran on $fb"
+        R_TESTNOTE[$fb]="stands in for $dev"
+        continue
+      fi
+    fi
+    rc=1
+  done
+  return $rc
+}
+
+# ------------------------------------------------------------------ verify
+# Each group runs completely, then verify stops if anything in it failed, so
+# a red static check does not cost a ten-minute build.
+V_STEP=""
+verify_fail_step() { V_STEP="$1"; }
+
+verify_check() {  # verify_check <label> <command...>; output stays in the log
+  local label="$1"; shift
+  note ""
+  note "-- $label"
+  if "$@"; then note "   ok: $label"; return 0; fi
+  note "   FAILED: $label"
+  return 1
+}
+
+verify_preflight() {
+  local problems=() missing
+  have_image || problems+=("$(image_msg)")
+  have_sdk || problems+=("no Connect IQ SDK under $GARMIN/ConnectIQ/Sdks (or CIQ_SDK)")
+  missing="$(missing_devices "${DEVICES[@]}" "${VERIFY_DEVICES[@]}")"
+  [[ -z "$missing" ]] || problems+=("device files missing for: ${missing% } (run: $0 sdkmanager)")
+  [[ -n "${DISPLAY:-}" ]] || problems+=("DISPLAY is not set; the simulator needs an X display")
+  command -v python3 >/dev/null || problems+=("python3 not found")
+  python3 -c 'import fontTools' 2>/dev/null || problems+=("python3 cannot import fontTools (pip install fonttools)")
+  command -v node >/dev/null || problems+=("node not found")
+  command -v flock >/dev/null || problems+=("flock not found (util-linux)")
+  command -v timeout >/dev/null || problems+=("timeout not found (coreutils)")
+  if (( ${#problems[@]} )); then
+    local p; for p in "${problems[@]}"; do note "   MISSING: $p"; done
+    return 1
+  fi
+  local fb
+  for fb in $(oom_fallbacks); do
+    have_device "$fb" || note "   note: $fb (a test fallback) is missing; only needed if the watch it stands in for runs out of memory"
+  done
+  note "   ok: docker image, SDK $(sdk_version), ${#DEVICES[@]} products, display, python3 + fontTools, node"
+}
+
+# A table row per product, then any verify device outside the manifest.
+verify_summary() {
+  local result="$1" dev size test warns
+  local -a rows=("${DEVICES[@]}")
+  for dev in "${VERIFY_DEVICES[@]}" $(oom_fallbacks); do
+    [[ " ${rows[*]} " == *" $dev "* ]] || [[ -z "${R_TEST[$dev]:-}" ]] || rows+=("$dev")
+  done
+  # Before the build step there is nothing per device to show.
+  if (( ${#R_BUILD[@]} > 0 || ${#R_TEST[@]} > 0 )); then
+  note ""
+  note "== Summary"
+  printf '%-22s %-6s %-8s %-24s %s\n' device build warnings "size/budget" tests
+  for dev in "${rows[@]}"; do
+    size="-"
+    if [[ -n "${R_SIZE[$dev]:-}" ]]; then
+      if [[ -n "${R_BUDGET[$dev]:-}" ]]; then
+        size="${R_SIZE[$dev]}/${R_BUDGET[$dev]} $(( ${R_SIZE[$dev]} * 100 / ${R_BUDGET[$dev]} ))%"
+      else
+        size="${R_SIZE[$dev]}/?"
+      fi
+    fi
+    test="${R_TEST[$dev]:--}"
+    [[ -n "${R_TESTNOTE[$dev]:-}" ]] && test="$test (${R_TESTNOTE[$dev]})"
+    warns="${R_WARN[$dev]:--}"
+    printf '%-22s %-6s %-8s %-24s %s\n' "$dev" "${R_BUILD[$dev]:--}" "$warns" "$size" "$test"
+  done
+  fi
+
+  # The paste block for the pull request: enough to tell which code and which
+  # SDK this ran against, and what it covered.
+  local head dirty clean=0 counts=() tested=0 tests
+  head="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  dirty=""; [[ -n "$(git -C "$PROJECT_ROOT" status --porcelain 2>/dev/null)" ]] && dirty=" (dirty: uncommitted changes)"
+  for dev in "${DEVICES[@]}"; do
+    [[ "${R_BUILD[$dev]:-}" == ok && "${R_WARN[$dev]:-0}" == 0 ]] && clean=$((clean + 1))
+  done
+  for dev in "${!R_TEST[@]}"; do
+    [[ "${R_TEST[$dev]}" =~ ^([0-9]+)\ passed$ ]] || continue
+    tested=$((tested + 1)); counts+=("${BASH_REMATCH[1]}")
+  done
+  tests="$(printf '%s\n' "${counts[@]}" | sort -un | paste -sd/)"
+  note ""
+  note "== For the pull request"
+  note '```'
+  note "tools/ciq verify: $result${V_STEP:+ (stopped at: $V_STEP)}"
+  note "SDK $(sdk_version), commit $head$dirty"
+  note "$clean/${#DEVICES[@]} builds clean, ${tests:-0} tests x $tested devices"
+  note '```'
+}
+
+verify() {
+  # Not CIQ_ALLOW_WARNINGS, not CIQ_DEVICES: the gate is the same for everyone.
+  ALLOW_WARNINGS=0
+  local stamp vlog
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  vlog="$LOG_DIR/verify-$stamp.log"
+  mkdir -p "$PROJECT_ROOT/$LOG_DIR"
+  exec > >(tee -a "$PROJECT_ROOT/$vlog") 2>&1
+  note "tools/ciq verify, $(date '+%Y-%m-%d %H:%M:%S'), log: $vlog"
+  cd "$PROJECT_ROOT" || die "cannot enter $PROJECT_ROOT"
+
+  note ""
+  note "== 0 preflight"
+  if ! verify_preflight; then
+    note ""
+    note "verify NOT RUN: fix the above first. Log: $vlog"
+    exit 2
+  fi
+
+  note ""
+  note "== 1 static checks"
+  if ! verify_check "tools/checks.py" python3 tools/checks.py; then
+    verify_fail_step "1 static checks"; verify_summary RED; exit 1
+  fi
+
+  note ""
+  note "== 2 design checks"
+  local ok=1
+  verify_check "tools/ui/build.sh --check" tools/ui/build.sh --check || ok=0
+  verify_check "tools/ui/build-devices.sh --check" tools/ui/build-devices.sh --check || ok=0
+  verify_check "fitcheck" node tools/ui/fitcheck.mjs || ok=0
+  verify_check "fitcheck --devices" node tools/ui/fitcheck.mjs --devices || ok=0
+  verify_check "devdata.py --check" python3 tools/ui/devices/devdata.py --check || ok=0
+  if command -v google-chrome >/dev/null || command -v chromium >/dev/null || command -v chromium-browser >/dev/null; then
+    verify_check "devices page (shoot.sh)" tools/ui/devices/shoot.sh || ok=0
+  else
+    note ""
+    note "-- devices page (shoot.sh): SKIPPED, no google-chrome or chromium"
+  fi
+  if (( !ok )); then verify_fail_step "2 design checks"; verify_summary RED; exit 1; fi
+
+  note ""
+  note "== 3 build every product (warnings are errors)"
+  need_key
+  local dev
+  ok=1
+  for dev in "${DEVICES[@]}"; do
+    note ""
+    note "-- build $dev"
+    build_one "$dev" || ok=0
+  done
+  if (( !ok )); then verify_fail_step "3 build"; verify_summary RED; exit 1; fi
+
+  note ""
+  note "== 4 unit tests on: ${VERIFY_DEVICES[*]}"
+  if ! test_devices "${VERIFY_DEVICES[@]}"; then
+    verify_fail_step "4 unit tests"; verify_summary RED; exit 1
+  fi
+
+  verify_summary GREEN
+  note ""
+  note "Log: $vlog"
+  exit 0
+}
+
+# ------------------------------------------------------------------- main
+cmd="${1:-help}"
+# Everything but the help and verify (whose preflight reports it as "not
+# run") needs the image and the SDK; say so before doing anything else.
+case "$cmd" in
+  help|-h|--help|verify) ;;
+  *) need_image; need_sdk "$@" ;;
+esac
+
+case "$cmd" in
 
   sdkmanager|manager)
     [[ -x "$GARMIN/sdk-manager/bin/sdkmanager" ]] || die "SDK Manager not found in $GARMIN/sdk-manager"
-    note "SDK Manager starting. Log in with your Garmin account and add 'fenix 7'"
-    note "under Devices. Close the window when you're done."
+    note "SDK Manager starting. Log in with your Garmin account and, under Devices,"
+    note "add every device listed by \`$0\`. Close the window when you're done."
     run "$GARMIN/sdk-manager/bin/sdkmanager"
-    have_device && note "OK: device '$DEVICE' is now on the host." \
-                || note "NOTE: '$DEVICE' not found yet under $GARMIN/ConnectIQ/Devices"
+    missing="$(missing_devices "${DEVICES[@]}" "${VERIFY_DEVICES[@]}")"
+    if [[ -z "$missing" ]]; then note "OK: all device files are now on the host."
+    else note "NOTE: still missing under $GARMIN/ConnectIQ/Devices: ${missing% }"
+    fi
     ;;
 
   build)   shift; build "$@" ;;
 
   test)
-    need_device; need_key
-    run bash -c "
-      set -e
-      mkdir -p $APP_DIR/bin
-      '$SDK/bin/monkeyc' -d $DEVICE -f $APP_DIR/monkey.jungle \
-          -o $APP_DIR/bin/$APP_NAME-test.prg -y $KEY $TYPECHECK -t
-    " || die "test build failed"
-    start_simulator
-    # -t, not /t: the Windows batch form in Garmin's docs is rejected by the
-    # Linux monkeydo script, which then silently launches the app instead.
-    run "$SDK/bin/monkeydo" "$APP_DIR/bin/$APP_NAME-test.prg" "$DEVICE" -t
+    shift
+    scope=primary
+    [[ "${1:-}" == "--all" ]] && { scope=all; shift; }
+    selected_devices "$scope"
+    need_devices "${SELECTED[@]}"; need_key
+    test_devices "${SELECTED[@]}"; rc=$?
+    if (( ${#SELECTED[@]} > 1 )); then
+      note ""
+      for d in "${SELECTED[@]}"; do
+        printf '%-22s %s\n' "$d" "${R_TEST[$d]:--}${R_TESTNOTE[$d]:+ (${R_TESTNOTE[$d]})}"
+      done
+    fi
+    exit $rc
     ;;
+
+  verify)  verify ;;
 
   run)
     build || die "build failed"
+    sim_lock
     start_simulator
-    run "$SDK/bin/monkeydo" "$APP_DIR/bin/$APP_NAME.prg" "$DEVICE"
+    run "$SDK/bin/monkeydo" "$(app_prg "$DEVICE")" "$DEVICE"
     ;;
 
   sim)
-    need_device
+    need_devices
     run "$SDK/bin/connectiq"
     ;;
 
   package)
-    need_all_devices; need_key
+    need_devices "${DEVICES[@]}"; need_key
     out="$APP_NAME.iq"
     if [[ "${2:-}" == "--beta" ]]; then
       need_beta_id
@@ -243,11 +719,17 @@ case "${1:-help}" in
 
   *)
     sed -n '/^# Commands/,/^#$/p' "$0" | sed 's/^# \?//'
-    note "SDK:     $SDK"
+    have_sdk && note "SDK:     $SDK" || note "SDK:     (not found: $(sdk_msg | head -1))"
+    have_image || note "Image:   $(image_msg)"
     note "Devices: (primary first, from app/manifest.xml)"
     for d in "${DEVICES[@]}"; do
-      note "  $d $(have_device "$d" && echo '(present)' || echo '(MISSING - run: '"$0"' sdkmanager)')"
+      v=""; [[ " ${VERIFY_DEVICES[*]} " == *" $d "* ]] && v=" [verify]"
+      note "  $d$v $(have_device "$d" && echo '(present)' || echo '(MISSING - run: '"$0"' sdkmanager)')"
     done
+    for d in "${VERIFY_DEVICES[@]}"; do
+      [[ " ${DEVICES[*]} " == *" $d "* ]] || note "  $d [verify, not in manifest] $(have_device "$d" && echo '(present)' || echo '(MISSING)')"
+    done
+    note "[verify] = unit tests run on it in \`$0 verify\`; every product is built."
     note "Project: $PROJECT_ROOT"
     ;;
 esac

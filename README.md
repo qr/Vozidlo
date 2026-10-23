@@ -15,10 +15,13 @@ belongs in a compatibility statement, not in a product name.
 
 ## Status
 
-**Tested on one watch, a fēnix 7 Pro.** The other five supported devices are
-verified in the simulator and against the included mock server, and nothing
-more. They are claimed on the strength of identical device family, memory
-budgets and API implementations rather than on anyone having worn one.
+**Worn on one watch, a fēnix 7 Pro.** The other 20 supported watches are
+built and unit-tested with `tools/ciq verify` (the unit tests run on one watch
+per screen family and input profile) and checked screen by screen on the
+[devices design page](docs/design/vozidlo-devices.html), and nothing more.
+Their memory budgets and the APIs the app needs are read from each watch's own
+device files rather than assumed from the model name, but nobody here has worn
+one.
 
 1.1.0 redraws every screen, and 1.2.0 checks the car once after a command.
 Both are covered by the unit tests and the design checks in `tools/ui/`, and
@@ -35,13 +38,13 @@ It is a spare-time project. Issues get answered in days, not hours.
 | Start and stop the air conditioning | Yes, with a target temperature |
 | Start and stop charging | Yes, plus charge limit and mode |
 | Check that a command took effect | Yes, one read of the car 15 s later (a setting, on by default) |
-| Find where the car is parked | Yes, address, bearing, map, navigation |
+| Find where the car is parked | Yes, address, distance and bearing; a map on watches with onboard maps; navigation where the watch supports it |
 | Glance and complications | Yes, on an existing watch face |
 | **Lock or unlock the car** | **No.** The API has no such endpoint |
 
 <p align="center">
   <img src="docs/design/style/screen-home.png" width="200"
-       alt="Home: a ring showing 100 percent charge, Locked and Plugged in chips, and the actions as a list with Start climate focused">
+       alt="Home: a ring showing 100 percent charge, Locked and Plugged in chips, and the list opened on Status, with Find my car below">
   <img src="docs/design/style/screen-status.png" width="200"
        alt="Status, Lock and doors: page dots on the left, Locked, and a grid of doors, windows, bonnet, trunk and lights">
   <img src="docs/design/style/screen-charging.png" width="200"
@@ -54,9 +57,10 @@ Home is a list. The state of charge, lock and charging state and the age of
 the data sit at the top, every action is a row below, and START runs the
 focused one. Status has a page per part of the car, with dots showing where you
 are; charging detail and find my car are one row away. One accent colour,
-words instead of raw API values, and every line fits the round screen. These
-pictures are drawn from the design reference in [docs/design](docs/design/style-guide.md);
-captures from the watch replace them once 1.1.0 is signed off.
+words instead of raw API values, and every line fits the screen. These
+pictures are fēnix 7 Pro renders drawn from the design reference in
+[docs/design](docs/design/style-guide.md); every screen on every other watch is
+on [docs/design/vozidlo-devices.html](docs/design/vozidlo-devices.html).
 
 ## How it reaches the car
 
@@ -90,23 +94,74 @@ And two consequences of the solid links:
 
 ## Supported watches
 
-| Device | Connect IQ | |
-|---|---|---|
-| fēnix 7 Pro | 5.2.0 | incl. Solar, Sapphire Solar, Sapphire Dual Power |
-| fēnix 7 | 5.2.0 | incl. quatix 7, Sapphire Dual Power |
-| fēnix 7 Pro Solar (no Wi-Fi) | 5.2.0 | |
-| fēnix 8 Solar 47mm | 6.0.2 | |
-| fēnix 9 Pro Solar 47mm | 6.0.3 | |
-| Forerunner 955 | 5.2.0 | incl. 955 Solar |
+Grouped by screen. Input is how the app is driven: five buttons with UP and
+DOWN, or a touchscreen with BACK and START, where the app's menus open by
+holding BACK (Venu 3 and 3S) or, on watches without a MENU button, with a swipe
+left, shown by Garmin's action menu indicator at the right edge.
 
-All six are device family `round-260x260`, which is why one set of layouts
-covers them. **Adding another watch is often a two-line change**:
-[docs/adding-a-watch.md](docs/adding-a-watch.md) is the full procedure, and
-pull requests adding devices are the most welcome kind.
+<!-- devicelists begin -->
+| Watch | Device id | Screen | Input | Map | Connect IQ |
+|---|---|---|---|---|---|
+| Forerunner 255S | `fr255s` | 218 round, MIP | Five buttons | No | 5.2.0 |
+| Forerunner 255S Music | `fr255sm` | 218 round, MIP | Five buttons | No | 5.2.0 |
+| fēnix 7S | `fenix7s` | 240 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 7S Pro | `fenix7spro` | 240 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 7 Pro, incl. Solar, Sapphire Solar, Sapphire Dual Power | `fenix7pro` | 260 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 7, incl. quatix 7, Sapphire Dual Power | `fenix7` | 260 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 7 Pro Solar Edition (no Wi-Fi) | `fenix7pronowifi` | 260 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 8 Solar 47mm | `fenix8solar47mm` | 260 round, MIP | Five buttons, touch | Yes | 6.0.2 |
+| fēnix 9 Pro Solar 47mm | `fenix9prosolar47mm` | 260 round, MIP | Five buttons, touch | Yes | 6.0.3 |
+| Forerunner 955, incl. 955 Solar | `fr955` | 260 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| Forerunner 255 | `fr255` | 260 round, MIP | Five buttons | No | 5.2.0 |
+| Forerunner 255 Music | `fr255m` | 260 round, MIP | Five buttons | No | 5.2.0 |
+| fēnix 7X, incl. tactix 7, quatix 7X Solar, Enduro 2 | `fenix7x` | 280 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 7X Pro | `fenix7xpro` | 280 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 7X Pro Solar Edition (no Wi-Fi) | `fenix7xpronowifi` | 280 round, MIP | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 8 Solar 51mm, incl. tactix 8 Solar 51mm | `fenix8solar51mm` | 280 round, MIP | Five buttons, touch | Yes | 6.0.2 |
+| fēnix 9 Pro Solar 51mm | `fenix9prosolar51mm` | 280 round, MIP | Five buttons, touch | Yes | 6.0.3 |
+| Enduro 3 | `enduro3` | 280 round, MIP | Five buttons, touch | Yes | 6.0.2 |
+| epix Pro (Gen 2) 42mm | `epix2pro42mm` | 390 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| MARQ (Gen 2), incl. Athlete, Adventurer, Captain, Golfer, Carbon Edition, Commander Carbon Edition | `marq2` | 390 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| MARQ (Gen 2) Aviator | `marq2aviator` | 390 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| Descent Mk3 43mm, incl. Mk3i 43mm | `descentmk343mm` | 390 round, AMOLED | Five buttons, touch | Yes | 5.1.0 |
+| Descent G2 | `descentg2` | 390 round, AMOLED | Five buttons, touch | No | 5.1.0 |
+| Venu 3S | `venu3s` | 390 round, AMOLED | Touch, MENU is hold BACK | No | 5.2.0 |
+| vívoactive 5 | `vivoactive5` | 390 round, AMOLED | Touch, MENU is hold BACK | No | 5.2.0 |
+| vívoactive 6 | `vivoactive6` | 390 round, AMOLED | Touch, no MENU: swipe left | No | 6.0.2 |
+| Venu 4 41mm | `venu441mm` | 390 round, AMOLED | Touch, no MENU: swipe left | No | 6.0.2 |
+| epix Pro (Gen 2) 47mm, incl. quatix 7 Pro | `epix2pro47mm` | 416 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| fēnix 8 43mm | `fenix843mm` | 416 round, AMOLED | Five buttons, touch | Yes | 6.0.2 |
+| Forerunner 265 | `fr265` | 416 round, AMOLED | Five buttons, touch | No | 5.2.0 |
+| fēnix 8 47mm and 51mm, incl. tactix 8, quatix 8 | `fenix847mm` | 454 round, AMOLED | Five buttons, touch | Yes | 6.0.2 |
+| fēnix 8 Pro 47mm and 51mm, incl. MicroLED, quatix 8 Pro | `fenix8pro47mm` | 454 round, AMOLED | Five buttons, touch | Yes | 6.0.2 |
+| fēnix 9 47mm and 51mm | `fenix947mm` | 454 round, AMOLED | Five buttons, touch | Yes | 6.0.3 |
+| fēnix 9 Pro 47mm | `fenix9pro47mm` | 454 round, AMOLED | Five buttons, touch | Yes | 6.0.3 |
+| Forerunner 965 | `fr965` | 454 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| Forerunner 970 | `fr970` | 454 round, AMOLED | Five buttons, touch | Yes | 6.0.2 |
+| D2 Mach 2 | `d2mach2` | 454 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| D2 Mach 2 Pro | `d2mach2pro` | 454 round, AMOLED | Five buttons, touch | Yes | 6.0.0 |
+| epix Pro (Gen 2) 51mm, incl. D2 Mach 1 Pro, tactix 7 AMOLED Edition | `epix2pro51mm` | 454 round, AMOLED | Five buttons, touch | Yes | 5.2.0 |
+| Descent Mk3i 51mm | `descentmk351mm` | 454 round, AMOLED | Five buttons, touch | Yes | 5.1.0 |
+| Venu 3 | `venu3` | 454 round, AMOLED | Touch, MENU is hold BACK | No | 5.2.0 |
+| Venu 4 45mm, incl. D2 Air X15 | `venu445mm` | 454 round, AMOLED | Touch, no MENU: swipe left | No | 6.0.2 |
+| Venu X1 | `venux1` | 448×486 rectangle, AMOLED | Touch, no MENU: swipe left | Yes | 6.0.2 |
+<!-- devicelists end -->
 
-The Forerunner 255 is deliberately excluded even though it builds perfectly.
-That is not an oversight, and the reason is the single most useful thing in that
-guide.
+The layouts are computed from each watch's screen size and the fonts it
+reports, so the fēnix 7 Pro draws exactly as before and the others follow
+their own screen and fonts.
+
+The map is optional. Where the watch has no onboard maps, the app is built
+without it, and Find my car shows the address, distance and bearing, with
+START opening the Find my car list (Navigate, Refresh). Navigate itself is
+hidden on a watch without waypoint support, which the app checks at runtime.
+
+The Forerunner 255 used to be left out because it builds clean but has no map
+implementation behind the type: a green build is not evidence of support. It
+now ships with the map left out at build time.
+[docs/adding-a-watch.md](docs/adding-a-watch.md) is the full procedure for
+another watch, including how a missing API is handled, and pull requests adding
+devices are the most welcome kind.
 
 ## Installing
 
@@ -129,13 +184,15 @@ cd tools && docker build \
 
 tools/ciq sdkmanager     # once: sign in, download the device files
 tools/ciq run            # build and launch in the simulator
-tools/ciq test           # 276 unit tests
+tools/ciq test           # the unit tests on the primary watch, the fēnix 7 Pro
 tools/ciq build --all    # every supported device
+tools/ciq verify         # the check before every pull request
 tools/ciq                # no arguments: prints the commands and device list
 
 mock/run.sh              # the mock server to develop against
 
-tools/ui/build.sh --check && node tools/ui/fitcheck.mjs   # the screens fit the round display
+tools/ui/build.sh --check && node tools/ui/fitcheck.mjs   # the screens fit the fēnix 7 Pro display
+node tools/ui/fitcheck.mjs --devices                      # and on every supported watch
 ```
 
 The toolchain runs in a container because the Connect IQ SDK Manager and
@@ -172,7 +229,8 @@ rather than reasoned about:
 | [docs/adding-a-watch.md](docs/adding-a-watch.md) | How to support another device |
 | [docs/decisions.md](docs/decisions.md) | Why the code is shaped this way, including the bugs that shipped |
 | [docs/design/style-guide.md](docs/design/style-guide.md) | How screens look, read and behave: colours, type, components, copy |
-| [tools/ui/](tools/ui/README.md) | The design reference and the checks that keep screens on the round display |
+| [docs/design/vozidlo-devices.html](docs/design/vozidlo-devices.html) | Every screen on every supported watch |
+| [tools/ui/](tools/ui/README.md) | The design reference and the checks that keep screens on each display |
 | [docs/best-practices/garmin-connect-iq.md](docs/best-practices/garmin-connect-iq.md) | Connect IQ rules, from official Garmin sources |
 | [docs/requirements.md](docs/requirements.md) | What the `US-nnn` ids in the comments mean |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to help |

@@ -14,13 +14,30 @@ import Toybox.Time;
 // below with the already-extracted values; that keeps this module correct
 // and independently testable regardless of how those values were obtained.
 //
+// On a watch that means a 429 is the only signal there is: production calls
+// recordHeaders(null, null, null) after a success and recordRateLimited(type,
+// null) after a 429. A rate-limit-exceeded therefore blocks requests until a
+// reset time: the RateLimit-Reset or Retry-After when one is ever known, else
+// an hour after the 429, since the budget is per hour and every request
+// counted against it is gone from the window by then. Before 1.3.0 the zero
+// had no end, and the app never asked again until the user cleared all data.
+//
 // State survives a restart (US-040) because every mutation is written
-// straight to Application.Storage rather than cached in memory: there is no
-// module-level variable here to go stale or reset.
+// straight to Application.Storage rather than cached in memory: the only
+// module-level variable is the tests' clock.
 module Quota {
 
     const STORAGE_KEY = "quota";
     const LOW_WATERMARK = 3; // "fewer than three remain": US-040
+    const WINDOW_SECONDS = 3600; // the budget is per hour: US-040
+
+    // Seconds since the epoch to use instead of the real clock; null in the
+    // app. Tests set it to step through an hour without waiting for one.
+    var nowOverride as Number? = null;
+
+    function _now() as Number {
+        return nowOverride != null ? nowOverride as Number : Time.now().value();
+    }
 
     function _load() as Dictionary {
         var stored = Storage.getValue(STORAGE_KEY);
@@ -49,7 +66,7 @@ module Quota {
             state.put("remaining", remaining);
         }
         if (resetSeconds != null) {
-            state.put("resetAt", Time.now().value() + resetSeconds);
+            state.put("resetAt", _now() + resetSeconds);
         }
         state.put("retryAfterUntil", null);
         _save(state);
@@ -65,15 +82,36 @@ module Quota {
     //   - vehicle-not-accepting-requests is a DIFFERENT, vehicle-side
     //     throttle; our own remaining count is untouched.
     // Either way, Retry-After is honoured identically: no request before it.
+    // The forced 0 lasts until resetAt: a known reset still ahead is kept,
+    // otherwise Retry-After, otherwise WINDOW_SECONDS from now.
     function recordRateLimited(problemType as String?, retryAfterSeconds as Number?) as Void {
         var state = _load();
+        var now = _now();
         if (retryAfterSeconds != null) {
-            state.put("retryAfterUntil", Time.now().value() + retryAfterSeconds);
+            state.put("retryAfterUntil", now + retryAfterSeconds);
         }
         if (ProblemDetail.typeIs(problemType, "rate-limit-exceeded")) {
             state.put("remaining", 0);
+            var reset = state.get("resetAt") as Number?;
+            if (reset == null || reset <= now) {
+                state.put("resetAt", now + (retryAfterSeconds != null ? retryAfterSeconds : WINDOW_SECONDS));
+            }
         }
         _save(state);
+    }
+
+    // `remaining` as it stands now: a count of 0 or less whose window has
+    // turned over (resetAt passed, or never known, as in the state 1.2.0
+    // left behind) no longer counts, so it reads as unknown.
+    function _remainingNow(state as Dictionary) as Number? {
+        var value = state.get("remaining") as Number?;
+        if (value != null && value <= 0) {
+            var reset = state.get("resetAt") as Number?;
+            if (reset == null || _now() >= reset) {
+                return null;
+            }
+        }
+        return value;
     }
 
     function limit() as Number? {
@@ -81,7 +119,7 @@ module Quota {
     }
 
     function remaining() as Number? {
-        return _load().get("remaining") as Number?;
+        return _remainingNow(_load());
     }
 
     // Seconds-since-epoch the current hourly window resets, or null when
@@ -95,16 +133,17 @@ module Quota {
         return _load().get("retryAfterUntil") as Number?;
     }
 
-    // US-040: "given zero remain, then request-making actions are disabled",
-    // and a live Retry-After gate blocks a request regardless of `remaining`.
+    // US-040: "given zero remain, then request-making actions are disabled"
+    // until the window resets, and a live Retry-After gate blocks a request
+    // regardless of `remaining`.
     function canSpend() as Boolean {
         var state = _load();
-        var remainingValue = state.get("remaining") as Number?;
+        var remainingValue = _remainingNow(state);
         if (remainingValue != null && remainingValue <= 0) {
             return false;
         }
         var retryUntil = state.get("retryAfterUntil") as Number?;
-        if (retryUntil != null && Time.now().value() < retryUntil) {
+        if (retryUntil != null && _now() < retryUntil) {
             return false;
         }
         return true;
@@ -127,7 +166,7 @@ module Quota {
         if (reset == null) {
             return null;
         }
-        var remainingSeconds = reset - Time.now().value();
+        var remainingSeconds = reset - _now();
         if (remainingSeconds > 0) {
             return remainingSeconds;
         }

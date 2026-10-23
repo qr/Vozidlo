@@ -1,0 +1,21 @@
+<svg width="54" height="54" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!--
+    The launcher icon of resources/drawables/launcher_icon.svg, drawn at
+    54x54 for the watches with a 54 px launcher icon: the same 40-unit drawing and colours, only the
+    width and height differ, so the viewBox scales it as vectors before the
+    compiler rasterises it. That file is the master and carries the design
+    notes; change it first and copy the shapes below into every
+    resources-launcher-<size>/drawables/launcher_icon.svg.
+-->
+
+<!-- Rim: outer edge at r 18, inner edge at r 13. -->
+<circle cx="20" cy="20" r="15.5" stroke="#55FFAA" stroke-width="5" fill="none"/>
+
+<!-- Spokes. -->
+<path d="M6 18.25 L14.5 17 L14.5 23 L6 21.75 Z" fill="#55FFAA"/>
+<path d="M34 18.25 L25.5 17 L25.5 23 L34 21.75 Z" fill="#55FFAA"/>
+<path d="M17.75 34 L22.25 34 L23.25 25.5 L16.75 25.5 Z" fill="#55FFAA"/>
+
+<!-- Hub: Emerald face, 3 px green edge (outer radius 6). -->
+<circle cx="20" cy="20" r="4.5" fill="#005555" stroke="#55FFAA" stroke-width="3"/>
+</svg>

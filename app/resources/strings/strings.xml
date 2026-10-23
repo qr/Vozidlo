@@ -18,7 +18,7 @@
     <string id="SettingSpinHelp">Optional: only needed to start auxiliary heating. Connect IQ stores app settings unencrypted on the watch, so only set this if you accept that trade-off.</string>
 
     <!-- Task 7 (US-018): whole degrees, in the unit chosen above. Also editable
-         on-device, see ui/TargetTemperatureSettingsView.mc. -->
+         on-device, see ui/TemperatureMenu.mc. -->
     <string id="SettingTargetTemperatureTitle">Climate target temperature</string>
     <string id="SettingTargetTemperatureHelp">Whole degrees, in the unit above. Leave at 0 to use the value your car last reported.</string>
     <string id="SettingTargetTemperatureError">Enter a whole number, or 0 to use the car's last reported value.</string>

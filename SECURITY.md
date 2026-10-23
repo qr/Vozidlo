@@ -3,8 +3,9 @@
 ## Reporting
 
 Use **GitHub's private vulnerability reporting** on this repository (Security
-tab, "Report a vulnerability"). Please do not open a public issue for anything
-that would expose someone's vehicle or credentials before it is fixed.
+tab, "Report a vulnerability"), or e-mail dev@soepel.it if you cannot use
+GitHub. Please do not open a public issue for anything that would expose
+someone's vehicle or credentials before it is fixed.
 
 Say what you found, how to reproduce it, and what an attacker gets. You will
 get an answer. This is a spare-time project by one person, so "promptly" means

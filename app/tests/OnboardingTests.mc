@@ -277,36 +277,107 @@ module OnboardingTests {
         return out;
     }
 
-    // The layout a screen draws: every line sits inside the chord of the slot
-    // it is drawn in, with the glyph margin and without, and no word is lost.
-    (:test)
-    function onboardingLinesFitTheChordOfTheirSlot(logger as Logger) as Boolean {
+    // Every line sits inside the slot it is drawn in, with the glyph margin
+    // and without, and no word is lost unless the text had to be cut with
+    // "…" (allowed off the fēnix 7 Pro only). Stand-in fonts per display:
+    // the fēnix 7 Pro widths above, scaled to the fixture's font heights.
+    // Being wider than the real fonts, they cut the longest text on more
+    // screens than the devices page does with the real ones (only vívoactive
+    // 6 and Venu 4 there); the guarantee tested is that nothing runs off.
+    function _fitsOn(logger as Logger, name as String, g as Geo.Display, mayCut as Boolean) as Boolean {
         var texts = _copy();
-        var small = (new CharWidth(SMALL_PX)).method(:width);
-        var xtiny = (new CharWidth(XTINY_PX)).method(:width);
+        var smallH = g.fonts.smallH;
+        var xtinyH = g.fonts.xtinyH;
+        var small = (new CharWidth((SMALL_PX * smallH + SMALL_H - 1) / SMALL_H)).method(:width);
+        var xtiny = (new CharWidth((XTINY_PX * xtinyH + XTINY_H - 1) / XTINY_H)).method(:width);
         var margins = [OnboardingLayout.MARGIN, OnboardingLayout.GLYPH_MARGIN] as Array<Number>;
         for (var t = 0; t < texts.size(); t += 1) {
             for (var m = 0; m < margins.size(); m += 1) {
-                var result = OnboardingLayout.choose(texts[t], margins[m], SMALL_H, small, XTINY_H, xtiny);
+                var result = OnboardingLayout.choose(g, texts[t], margins[m], smallH, small, xtinyH, xtiny);
                 var lines = result[0];
-                var lh = result[2] ? SMALL_H : XTINY_H;
+                var lh = result[2] ? smallH : xtinyH;
                 var measure = result[2] ? small : xtiny;
-                var widths = OnboardingLayout.widths(result[1], lh, margins[m]);
+                var widths = OnboardingLayout.widths(g, result[1], lh, margins[m]);
                 if (lines.size() > result[1]) {
-                    logger.error("more lines than slots for text " + t);
+                    logger.error(name + ": more lines than slots for text " + t);
+                    return false;
+                }
+                if (OnboardingLayout.top(g, result[1], lh) < 0
+                    || OnboardingLayout.top(g, result[1], lh) + result[1] * lh > g.h) {
+                    logger.error(name + ": text " + t + " runs off the screen");
                     return false;
                 }
                 for (var i = 0; i < lines.size(); i += 1) {
                     if (measure.invoke(lines[i]) > widths[i]) {
-                        logger.error("text " + t + " line " + i + " is " + measure.invoke(lines[i])
+                        logger.error(name + ": text " + t + " line " + i + " is " + measure.invoke(lines[i])
                             + " px in a " + widths[i] + " px chord: '" + lines[i] + "'");
                         return false;
                     }
                 }
                 if (!_join(lines).equals(texts[t])) {
-                    logger.error("text " + t + " lost words: '" + _join(lines) + "'");
-                    return false;
+                    var last = lines.size() > 0 ? lines[lines.size() - 1] : "";
+                    var cut = last.length() > 0
+                        && (last.substring(last.length() - 1, last.length()) as String).equals(Labels.ELLIPSIS);
+                    if (!mayCut || !cut) {
+                        logger.error(name + ": text " + t + " lost words: '" + _join(lines) + "'");
+                        return false;
+                    }
+                    logger.debug(name + ": text " + t + " cut to " + lines.size() + " xtiny lines");
                 }
+            }
+        }
+        return true;
+    }
+
+    (:test)
+    function onboardingLinesFitTheChordOfTheirSlot(logger as Logger) as Boolean {
+        return _fitsOn(logger, "fenix7pro", GeoTests.fenix7pro(), false);
+    }
+
+    // 218 px (Forerunner 255S), 240 px (fēnix 7S) and 390 px (Venu 3S, and
+    // vívoactive 6 with the action menu indicator's keep-out on, as the
+    // onboarding views set it).
+    (:test)
+    function onboardingLinesFitOnOtherScreens(logger as Logger) as Boolean {
+        var va6 = GeoTests.vivoactive6();
+        va6.keepOut = true;
+        return _fitsOn(logger, "fr255s", GeoTests.fr255s(), true)
+            && _fitsOn(logger, "fenix7s", GeoTests.fenix7s(), true)
+            && _fitsOn(logger, "venu3s", GeoTests.venu3s(), true)
+            && _fitsOn(logger, "vivoactive6", va6, true);
+    }
+
+    // Text that runs past the outline even in FONT_XTINY fills the most
+    // slots that fit and ends in "…" instead of running off the screen.
+    (:test)
+    function overlongTextIsCutWithAnEllipsis(logger as Logger) as Boolean {
+        var g = GeoTests.fenix7pro();
+        var text = "";
+        for (var i = 0; i < 40; i += 1) {
+            text += (i == 0 ? "" : " ") + "overlong";
+        }
+        var xtiny = (new CharWidth(XTINY_PX)).method(:width);
+        var result = OnboardingLayout.choose(g, text, OnboardingLayout.GLYPH_MARGIN,
+            SMALL_H, (new CharWidth(SMALL_PX)).method(:width), XTINY_H, xtiny);
+        var lines = result[0];
+        if (result[2] || lines.size() == 0 || lines.size() > result[1]) {
+            logger.error("expected xtiny lines within their slots, got " + lines.size() + " in " + result[1]);
+            return false;
+        }
+        if (OnboardingLayout.top(g, result[1], XTINY_H) < g.minDigitTop) {
+            logger.error("the cut block starts above the ring");
+            return false;
+        }
+        var last = lines[lines.size() - 1];
+        if (!(last.substring(last.length() - 1, last.length()) as String).equals(Labels.ELLIPSIS)) {
+            logger.error("the last line must end in an ellipsis: '" + last + "'");
+            return false;
+        }
+        var widths = OnboardingLayout.widths(g, result[1], XTINY_H, OnboardingLayout.GLYPH_MARGIN);
+        for (var j = 0; j < lines.size(); j += 1) {
+            if (xtiny.invoke(lines[j]) > widths[j]) {
+                logger.error("line " + j + " overruns its slot");
+                return false;
             }
         }
         return true;
@@ -316,21 +387,35 @@ module OnboardingTests {
     // text (the longest) does not fit four small lines and drops to xtiny.
     (:test)
     function shortCopyUsesSmallAndTheLongestFallsBackToXtiny(logger as Logger) as Boolean {
+        var g = GeoTests.fenix7pro();
         var texts = _copy();
         var small = (new CharWidth(SMALL_PX)).method(:width);
         var xtiny = (new CharWidth(XTINY_PX)).method(:width);
-        var check = OnboardingLayout.choose(texts[1], OnboardingLayout.MARGIN, SMALL_H, small, XTINY_H, xtiny);
+        var check = OnboardingLayout.choose(g, texts[1], OnboardingLayout.MARGIN, SMALL_H, small, XTINY_H, xtiny);
         if (!check[2]) {
             logger.error("'Checking your key...' must fit four small lines");
             return false;
         }
-        var expired = OnboardingLayout.choose(texts[3], OnboardingLayout.GLYPH_MARGIN, SMALL_H, small, XTINY_H, xtiny);
+        var expired = OnboardingLayout.choose(g, texts[3], OnboardingLayout.GLYPH_MARGIN, SMALL_H, small, XTINY_H, xtiny);
         if (expired[2]) {
             logger.error("the expired-key text must not be squeezed into small");
             return false;
         }
         if (OnboardingLayout.useSmall(5) || !OnboardingLayout.useSmall(4)) {
             logger.error("the small-font cut-off is four lines");
+            return false;
+        }
+        return true;
+    }
+
+    // A glyph on screen widens the margin; the check in progress has none.
+    (:test)
+    function glyphsWidenTheMargin(logger as Logger) as Boolean {
+        if (OnboardingLayout.marginFor(false, false) != OnboardingLayout.MARGIN
+            || OnboardingLayout.marginFor(true, false) != OnboardingLayout.GLYPH_MARGIN
+            || OnboardingLayout.marginFor(false, true) != OnboardingLayout.GLYPH_MARGIN
+            || OnboardingLayout.marginFor(true, true) != OnboardingLayout.GLYPH_MARGIN) {
+            logger.error("glyph margin only while a glyph is shown");
             return false;
         }
         return true;
@@ -352,7 +437,8 @@ module OnboardingTests {
 
     (:test)
     function emptyTextHasNoLinesAndNoSlots(logger as Logger) as Boolean {
-        var result = OnboardingLayout.wrap("", SMALL_H, OnboardingLayout.MARGIN, 4, (new CharWidth(SMALL_PX)).method(:width));
+        var result = OnboardingLayout.wrap(GeoTests.fenix7pro(), "", SMALL_H, OnboardingLayout.MARGIN, 4,
+            (new CharWidth(SMALL_PX)).method(:width));
         if (result[0].size() != 0 || result[1] != 0) {
             logger.error("empty text must produce no lines and no slots");
             return false;

@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         If you own the watch and can run a couple of commands, you are most of
-        the way to a pull request: [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md)
+        the way to a pull request: [docs/adding-a-watch.md](../blob/main/docs/adding-a-watch.md)
         has the whole procedure and it is short. Send that instead if you can;
         it will be merged faster than this issue will be read.
 
@@ -58,8 +58,10 @@ body:
       label: API implementation counts
       description: |
         This is the step that decides it. A device can build perfectly and
-        still be missing the implementation behind an API: that is why the
-        Forerunner 255 is not supported.
+        still be missing the implementation behind an API. The Forerunner 255
+        builds clean but has no MapView implementation, which is why it ships
+        with the map left out of its build. Complications, PersistedContent
+        and GlanceView are required; MapView is optional.
 
         ```bash
         f=$HOME/.Garmin/ConnectIQ/Devices/<id>/<id>.api.debug.xml
@@ -72,19 +74,49 @@ body:
     validations:
       required: false
 
+  - type: textarea
+    id: keys
+    attributes:
+      label: Buttons and touch
+      description: |
+        If you have the SDK installed, this decides the input profile:
+
+        ```bash
+        python3 -c "
+        import json; s=json.load(open('$HOME/.Garmin/ConnectIQ/Devices/<id>/simulator.json'))
+        print('touch :', bool(s['display'].get('isTouch')))
+        print('keys  :', [k['id'] + ('/hold' if k.get('isHold') else '') + ' ' + k['behavior'] for k in s['keys']])
+        print('hint  :', 'actionMenuHint' in json.dumps(s['layouts']))"
+        ```
+      render: text
+    validations:
+      required: false
+
   - type: dropdown
     id: buttons
     attributes:
-      label: How many physical buttons does it have
+      label: Which buttons does it have
       description: >
-        Five with UP and DOWN means the existing navigation works. Fewer means
-        an input redesign, which is a much larger change: worth knowing up
-        front.
+        The app knows three input profiles, and every action is reachable in
+        each. A watch that fits none of them needs a new one, which is a much
+        larger change: worth knowing up front. If yours has something else,
+        pick "Not sure" and describe it under Anything else.
       options:
-        - "Five (UP, DOWN, START, BACK, LIGHT), like a fēnix"
-        - "Three"
-        - "Two, touch-first, like a Venu"
-        - "I am not sure"
+        - "Five buttons (UP, DOWN, START, BACK, LIGHT), like a fēnix or Forerunner"
+        - "START and BACK, with MENU on a long press of BACK, like a Venu 3"
+        - "START and BACK, no MENU at all, like a vívoactive 6, Venu 4 or Venu X1"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: touch
+    attributes:
+      label: Does it have a touchscreen
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
     validations:
       required: true
 

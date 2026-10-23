@@ -92,13 +92,21 @@ Upload the new `.iq` over the same beta entry. No review, no waiting.
 ## Sideloading, and why it is only half useful
 
 Sideloading shows you real screens on the real panel, which is genuinely worth
-doing: the simulator's contrast is far more forgiving than a memory-in-pixel
-display outdoors. It cannot do anything that needs a key, for the reason at the
-top of this page.
+doing: the simulator is far more forgiving than the real panel, whether that is
+a memory-in-pixel display outdoors or an AMOLED one at low brightness. It
+cannot do anything that needs a key, for the reason at the top of this page.
+
+Build for your own watch, by its device id (the table in
+[README.md](README.md#supported-watches) has them):
 
 ```bash
-tools/ciq build                       # writes app/bin/vozidlo.prg
+tools/ciq build                            # the fēnix 7 Pro: writes app/bin/vozidlo.prg
+CIQ_DEVICE=venu3s tools/ciq build          # any other: writes app/bin/vozidlo-venu3s.prg
 ```
+
+The first product in the manifest, the fēnix 7 Pro, keeps the plain
+`vozidlo.prg`; every other watch gets its id in the file name. A `.prg` is
+built for one device, so copy the one for your watch.
 
 Connect the watch by USB; it appears as an MTP device. On Linux you may need the
 backend:
@@ -109,13 +117,19 @@ sudo apt install gvfs-backends        # if it is not
 ```
 
 Copy the `.prg` into the watch's `GARMIN/APPS/` directory and unplug. The app
-appears in the activity list.
+appears in the list of activities and apps.
 
 ## Reaching it quickly
 
-Hold MENU, go to Activities & Apps, select the app, and choose **Set as
-Favourite**. It then sits at the top of the list you reach by pressing START,
-about two presses from the watch face.
+Make the app a favourite in the watch's settings. It then sits at the top of
+the list you reach by pressing START, about two presses from the watch face.
+
+- **fēnix and Forerunner:** hold MENU, go to Activities & Apps, select the app,
+  and choose **Set as Favourite**.
+- **Venu 3 and Venu 3S:** the same, but you reach the settings by holding BACK.
+- **vívoactive 6, Venu 4 and Venu X1:** these have no MENU button; the
+  favourites are in the watch's own settings, reached with the watch's own
+  controls.
 
 That is the shortest route the platform allows. The Controls menu and the
 press-and-hold hot keys are closed to third-party apps, verified on hardware,

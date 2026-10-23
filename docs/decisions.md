@@ -179,6 +179,11 @@ width. On a 260-pixel face that is 260 pixels across the middle and about 84
 near the bottom edge. Anything positioned by a constant y, and sized as though
 the screen were square, is wrong somewhere.
 
+The one rectangular watch, the Venu X1 (448×486, since 1.3.0), is not a
+rectangle either: its corners are rounded, so near the top and bottom the
+usable width is the width inside the corner curve, not the screen width. The
+rule below is the same for both shapes: measure against the outline.
+
 **Three bugs, one cause**, and all three were found by wearing the watch. The
 simulator's bezel is more forgiving and had shown every one of these screens as
 fine:
@@ -197,12 +202,17 @@ fine:
   1.1.0 there are no text hints at all; the bezel carries arcs and glyphs.
 - **Paragraphs**, which is `WatchUi.Text` not wrapping, above.
 
-So the rule: **any text or box placed at a constant y must have its width
-checked against the chord at that y.** The arithmetic already exists and is
-tested. Use it rather than guessing a margin: `halfChord()`, `lineWidth()` and
-`fittedLineY()` in `ui/TextBlock.mc`, and `fit()`, `usable()` and `wrapFit()`
-in `ui/Ui.mc`, which measure with the fonts the watch actually has (fēnix 8
-and 9 scale them).
+So the rule: **any text or box must have its width checked against the
+outline at its own y**: the chord on a round screen, the width inside the
+corners on the X1. Since 1.3.0 nothing is placed at a constant y either (see
+[Layouts follow the screen, measured from the Dc](#layouts-follow-the-screen-measured-from-the-dc)).
+The arithmetic already exists and is tested. Use it rather than guessing a
+margin: `halfChord()` and `usable()` in `ui/Geometry.mc` (`Geo`), which know
+both shapes; `halfChord()`, `lineWidth()` and `fittedLineY()` in
+`ui/TextBlock.mc`; and `fit()`, `usable()` and `wrapFit()` in `ui/Ui.mc`.
+They measure with the fonts the watch actually has: fēnix 8 and 9 scale them,
+and on the vívoactive 6, Venu 4 and Venu X1 the owner can set the font size
+up to 1.4× in the watch's settings.
 
 A corollary worth stating, because it caught us twice: a screen that looks
 correct in the simulator has not been checked. The simulator draws a generous
@@ -211,9 +221,14 @@ bezel and clips less than the hardware does.
 ### Connect IQ exposes no response headers.
 
 Not one. `X-API-Key-Expires-At` and `RateLimit-*` exist on the wire and are
-unreadable from a watch app. Hence local quota counting with a `429` as the
-authoritative correction, and a key-expiry *estimate*: presented as an
-estimate, rather than the exact date the header carries.
+unreadable from a watch app. Hence a `429` as the only quota signal, and a
+key-expiry *estimate*: presented as an estimate, rather than the exact date
+the header carries. After a `rate-limit-exceeded` the app does not ask again
+for an hour, the length of the quota window, and says so as an estimate
+("resets in ~60 min"); nothing else could ever tell it the window turned
+over, and up to 1.2.0 it stayed blocked until the user cleared all data. The
+app does not count its own requests, so the "nearly spent" warning
+(`Quota.isLow()`) only fires on header values it cannot read yet.
 
 ### `Application.Storage` limits are 8 KB per key, 128 KB total.
 
@@ -253,11 +268,45 @@ the grid, decided per the options in
   `StatusPager.SWITCH_VIEWS`, should switching views misbehave on a watch.
 - **All menus are `CustomMenu`s in the accent.** `Menu2` cannot be recoloured
   on these watches, so a native menu would have drawn the system colour next
-  to our green. Only confirmations and toasts stay native.
+  to our green. Only confirmations and toasts stay native, and since 1.3.0
+  Garmin's action menu indicator on the watches without MENU (see
+  [Three input profiles](#three-input-profiles-and-every-action-reachable-in-each)).
 - **Stale data is amber**, `! 17 h ago`, not red. This amends US-009: red is
   kept for errors, so an old reading no longer looks like a failure.
 
-The round-display chord rule above applies to all of it.
+The outline rule above (the chord, on a round screen) applies to all of it,
+on every watch.
+
+### Target temperature is a list, on every watch.
+
+Up to 1.2 the target temperature was a stepper: UP and DOWN changed it by one
+degree, with + and − glyphs next to those buttons. The Venu watches have no UP
+or DOWN, so since 1.3.0 it is a list titled "Temperature", like the charge
+limit: 16 to 30 °C, or 60 to 86 °F, focused on the current value. One screen
+for every watch is less code than a stepper with a touch fallback, and it
+works the same with buttons, swipes and taps. Decided 2026-10-10 by the
+owner.
+
+### On-screen copy names the action, not the button.
+
+Empty states used to say "START to refresh" and, on Find my car, "MENU to
+refresh". On a watch without MENU the second was an instruction nobody could
+follow, and the right button differs per input profile. Since 1.3.0 the copy
+says "Refresh from the menu" and "Try again from the menu" on every watch,
+the wording Charging already used. Capitals stay reserved for button names,
+which on-screen copy no longer uses. Decided 2026-10-10 by the owner.
+
+### Home opens on its first row.
+
+Up to 1.2 the default order put climate first and home focused the primary
+action, so it opened on "Start climate" with the hero in view. Since 1.3.0
+the default order is Status, Find my car, then the rest (climate, charging,
+Charging, Settings), and home focuses its first row, so it opens on Status
+with the hero in view: the hero is only drawn while row 0 has the focus. A
+stray START now opens a screen instead of sending a command. This amends
+US-037: the primary action still comes first within the climate rows, two
+rows down by default. An order the user saved is kept. Decided 2026-10-10 by
+the owner.
 
 ---
 
@@ -265,28 +314,130 @@ The round-display chord rule above applies to all of it.
 
 ### Support is evidence-based, and a clean build is not evidence.
 
-The procedure for adding one is in [CONTRIBUTING.md](../CONTRIBUTING.md).
+The procedure for adding one is in [adding-a-watch.md](adding-a-watch.md).
 
 The short version, and the reason it exists: the Forerunner 255 is the same
 device family as the fēnix 7, the same Connect IQ version, and it **builds
-clean at `-l 3 -w`**. It is excluded because its `api.debug.xml` contains zero
-`Toybox_WatchUi_MapView` implementation entries against nine on every supported
-device. The type resolves; the implementation is absent. Those watches have no
-onboard maps, and `ui/MapPreviewView.mc` extends `WatchUi.MapView` at class
-level.
+clean at `-l 3 -w`**. Up to 1.2 it was excluded, because its `api.debug.xml`
+contains zero `Toybox_WatchUi_MapView` implementation entries against nine on
+every watch that has the map. The type resolves; the implementation is
+absent. Those watches have no onboard maps, and `ui/MapPreviewView.mc`
+extends `WatchUi.MapView` at class level.
 
 That is the same shape as the glance crash: it compiled, and it would not have
 run.
 
-### One device family, so one set of layouts.
+Since 1.3.0 the FR255 and FR255 Music ship, with the map left out of their
+build (see [The map is optional](#the-map-is-optional-and-left-out-per-product-where-it-is-missing)).
+That changed the code, not the lesson: they were added because the device
+files showed what was missing and the code was changed to match, not because
+the build was clean.
 
-Every supported device is `round-260x260`. Text geometry already follows the
-chord and the font metrics measured at runtime, but the bezel (`ui/Bezel.mc`:
-ring, glyphs, page dots) and a few page coordinates from the design PoC are
-plain constants for 260×260. Supporting a 240×240 or 280×280 device means
-making those adapt: real work, but bounded and welcome. Supporting a Venu
-additionally means an input redesign: those have two or three buttons and no
-UP/DOWN, and three views here depend on `onPreviousPage`/`onNextPage`.
+### Layouts follow the screen, measured from the Dc.
+
+Up to 1.2 every supported watch was `round-260x260`, and the bezel
+(`ui/Bezel.mc`) and the page coordinates were plain constants for that face.
+Since 1.3.0 the app runs on round screens of 218, 240, 260 and 280 px
+(memory-in-pixel), round 390, 416 and 454 (AMOLED), and the 448×486
+rectangle of the Venu X1. The per-watch design is
+[docs/design/vozidlo-devices.html](design/vozidlo-devices.html).
+
+There is one layout, not one per screen. It is drawn in a logical frame 260
+wide and scaled by s = width / 260, but only the positions that belong to the
+screen scale: the title starts 34·s from the top (20·s on the rectangle), the
+status line ends 29·s above the bottom, and everything in between is stacked
+from the font heights the watch reports. Every width comes from the outline
+at its y, and the bezel parts sit at R − k·s. A title too wide for its chord
+moves down, up to 20·s, rather than shrinking. `ui/Geometry.mc` (`Geo`)
+computes these tokens once from `System.getDeviceSettings()` and
+`Graphics.getFontHeight()`, without a Dc, so tests can run any watch's
+numbers on one simulator. Each watch also gets one hero number font: the
+larger of `FONT_NUMBER_MEDIUM` and `FONT_NUMBER_MILD` that fits the Charging
+screen's worst case, never `FONT_NUMBER_HOT`.
+
+Scaling the 260 numbers would not have worked, because fonts do not scale
+with the screen: the Venu 3S's fonts are taller for its width than the
+fēnix's, and stacked at 1.5× they overlap. Constants per screen would have
+been six tables to keep in step, and even within one family the fonts differ:
+on the fēnix 7, 8, 9 and FR955 the age and status lines overlapped, because
+the constants were measured with the fēnix 7 Pro's fonts. Their positions
+now follow their own fonts, and the fēnix 7 Pro, the primary watch, stays
+pixel-identical (`GeoTests` pins its tokens).
+
+On the X1 the layout uses the full rectangle: the ring becomes a frame along
+the display edge, hint arcs become short bars next to the keys, and the page
+dots keep their arc formula, which there gives a near-vertical column.
+Decided 2026-10-10 by the owner.
+
+### Three input profiles, and every action reachable in each.
+
+The new watches have fewer buttons, and three views depended on UP, DOWN and
+MENU. Find my car hid Refresh and Navigate behind MENU and said "MENU to
+refresh", which the watches without a MENU key could never do. Since 1.3.0
+the app knows three profiles, chosen from the watch's `inputButtons`
+(`Geo.inputFrom()`; `ui/InputProfile.mc` handles the indicator):
+
+- **A, five buttons and touch** (fēnix, epix, MARQ, Descent Mk3, Enduro 3,
+  D2 Mach 2, FR955, FR965, FR970). MENU is a long press on UP.
+  **A0** is the same five buttons without touch: the FR255, or a fēnix with
+  touch switched off. Everything works with the buttons alone.
+- **B, START, BACK and touch, MENU as a long press on BACK** (Venu 3, Venu 3S).
+- **C, START, BACK and touch, no MENU** (vívoactive 6, Venu 4, Venu X1).
+  Garmin's action menu indicator (`setActionMenuIndicator`) takes MENU's
+  place: a left swipe or a tap on it calls `onActionMenu`. It only fires while
+  the indicator is on, so every view with an action list turns it on.
+
+The rule: **every action is reachable in every profile**, and touch is an
+extra, never the only route. The menu route opens the same list START opens,
+unless START has a primary action of its own (the map, retry, continue). A
+left swipe means nothing else anywhere. The app only uses Garmin's behaviours
+(`BehaviorDelegate`: select, back, next and previous page, menu,
+`onActionMenu`), so the same code serves all three profiles.
+
+Three consequences. On the Venu 3 and 3S a long press on BACK is the
+platform's menu route, so there is no left swipe there, and the menu glyph
+sits at BACK only where MENU is the only route (Onboarding). A tap that would
+spend quota is consumed (Charging profiles' retry, Onboarding's retry and
+Blocked), which fixes it on the fēnix too. The native
+`WatchUi.Confirmation` stays: on touch that is one tap on Yes, as on the
+touch fēnix already. Decided 2026-10-10 by the owner.
+
+### Connect IQ 5.1 is the floor, because nothing needs more.
+
+Up to 1.3.0 `minApiLevel` was 5.2.0, the level of the fēnix 7 Pro, with no
+API behind the choice. The Descent Mk3 and Mk3i run Connect IQ 5.1 (their
+device files and Garmin's compatible devices list agree), so 5.2.0 kept them
+out for nothing. Built against their own API lists at `-l 3 -w`, with the
+minimum at 5.1.0, the app compiles clean and every unit test passes, so the
+floor is 5.1.0 since 2026-10-23. What is newer than 5.1.0 (the action menu
+indicator, `showToast`) was already guarded with `has`. The lowest version we
+ship always has a device in `VERIFY_DEVICES`, enforced by `tools/checks.py`,
+so a 5.1-only gap would show up in `tools/ciq verify`. Decided 2026-10-23 by
+the owner.
+
+### The map is optional, and left out per product where it is missing.
+
+The map preview extends `WatchUi.MapView`, which the five-button watches
+(except the FR255 and FR255 Music) and the Venu X1 implement. The FR255, FR255
+Music, Venu 3, Venu 3S, vívoactive 6 and both Venu 4 sizes do not (see
+[Support is evidence-based](#support-is-evidence-based-and-a-clean-build-is-not-evidence)).
+Leaving those watches out for a convenience would be a poor trade, so the map
+is left out of their build instead:
+
+- `ui/MapPreviewView.mc` and its delegates carry `(:map)`, and
+  `app/monkey.jungle` excludes `map` for each product without MapView and
+  `nomap` for the rest. `ui/LocationView.mc` has a `(:map)`/`(:nomap)` pair
+  for the one place that opens the map.
+- The runtime check `WatchUi has :MapView` stays as a second guard.
+- On Find my car, START opens the map when the car is parked and the watch
+  has one; otherwise it opens the Find my car list.
+- Navigate is hidden where `PersistedContent.saveWaypoint` is unavailable,
+  checked at run time, because the Venu 3S's device files list it only
+  partly.
+
+`tools/checks.py` keeps the jungle in step with the device facts, so a new
+watch without the map cannot be added with the map still linked in. Decided
+2026-10-10 by the owner.
 
 ---
 
@@ -294,7 +445,8 @@ UP/DOWN, and three views here depend on `onPreviousPage`/`onNextPage`.
 
 ### Strict type checking from the first commit.
 
-`-l 3 -w`, and warnings are errors in CI. Retrofitting strict typing onto a
+`-l 3 -w`, and a warning fails `tools/ciq build` and `tools/ciq verify`
+(CI does not build the app; see below). Retrofitting strict typing onto a
 Monkey C codebase is far more work than starting with it.
 
 One gotcha: chained boolean expressions over nullable method calls can make the
@@ -324,6 +476,66 @@ fails on any unexplained high-precision coordinate, street-address pattern, or
 `msk_`-prefixed key anywhere in the repository. Copy a real response for its
 **shape**, never for its **values**.
 
+### The devices page and the lists of watches are generated.
+
+Up to 1.3.0 the devices design page had its columns, the watches each covered,
+and every list of watches in its copy written by hand, so each new watch meant
+editing JavaScript and prose in several places, and the copy went stale (the
+decisions it called open were long taken). Since 2026-10-23 `devdata.py`
+also writes the columns: products share one when they share screen family,
+input profile, MapView and font technology, drawn as the product the unit
+tests run on. Lists of watches in the page's copy are filled from the facts,
+and what differs per watch because of the layout (hero font, home chips,
+lock grid, onboarding parts) is computed by drawing it and shown in the watch
+table, not written into notes. Adding a watch no longer touches the page's
+sources.
+
+The same holds for the other lists of watches. `tools/devicelists.py` writes
+the README and guide tables, the store listing's requirements, the product
+block of the manifest comment, and the jungle's per-product lines (the map
+exclusion and the launcher icon folder, one `resources-launcher-<size>` per
+icon size instead of a copy per watch) from the manifest and the device
+facts, and `tools/checks.py` fails when one is out of date. The manifest's
+product list is the only list edited by hand. Decided 2026-10-23 by the
+owner.
+
+### Device facts are committed, so CI can check them without the SDK.
+
+Garmin's device files come only through the SDK Manager, behind a Garmin
+login, so a CI runner cannot have them. The facts the repository depends on
+are therefore read once, locally, and committed:
+`tools/ui/devices/devdata.py` reads the SDK's device and font files and
+writes `tools/ui/devices/11-devdata.js`, with every product in the manifest:
+its screen, keys and input profile, touch, MapView, memory budget, launcher
+icon size, glance area and font metrics.
+
+From that file CI can check what used to be checked by hand: that the
+manifest, the README, the store listing and the devices design page name the
+same watches, and that every watch without MapView has the map excluded in
+the jungle. The devices page and `node tools/ui/fitcheck.mjs --devices` draw
+and check every screen with those metrics. `devdata.py --check` regenerates
+the file and compares; it needs the SDK, so it runs in `tools/ciq verify`,
+not in CI.
+
+### CI checks consistency; the app is built and tested locally with tools/ciq verify.
+
+CI cannot compile Monkey C (no device files, no signing key; the reasons are
+at the top of `.github/workflows/build.yml`). What it runs is everything that
+needs no SDK: the mock server's tests, `tools/checks.py` (links and anchors,
+the device lists agreeing, the map exclusion, cited decisions existing,
+privacy) and the design checks (`tools/ui/build.sh --check`,
+`tools/ui/build-devices.sh --check`, `node tools/ui/fitcheck.mjs` with and
+without `--devices`). A green CI says the repository is consistent; it does
+not say the app builds.
+
+`tools/ciq verify` is the gate for that, run locally before a pull request
+that touches `app/`: the checks, the design pages and the device facts, then
+`tools/ciq build --all` with warnings fatal and every product within its
+memory budget, then the unit tests on one watch per screen family and input
+profile. It exits non-zero on any failure. A CI that claimed to build would
+either fail on every run or pretend; saying plainly which half runs where is
+the honest version.
+
 ---
 
 ## Branding
@@ -350,9 +562,18 @@ The colour is the owner's decision of 2026-10-07: Škoda Electric Green
 single accent colour. The logo, the Škoda typeface and the plain-word name rule
 above are unchanged.
 
+The AMOLED watches added in 1.3.0 can show `#78FAAE` exactly, but they get
+`0x55FFAA` too, so one token is one colour on every watch and the palette
+stays a single table. Whether to use the true brand green on AMOLED is still
+open.
+
 ### Colour is never the only signal.
 
 64 colours on a memory-in-pixel panel, read outdoors, often in sunlight. Where
 red and green appear together, an icon or shape distinguishes them too. The
 check is cheap and decisive: render the screen without colour and every state
 must still be identifiable.
+
+The AMOLED watches show far more colours, and the rule stays there all the
+same: the screens are the same on every watch, and a colour-blind owner reads
+a Venu no better than a fēnix.

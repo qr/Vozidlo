@@ -1,6 +1,7 @@
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
+import Toybox.System;
 import Toybox.Time;
 import Toybox.WatchUi;
 
@@ -11,7 +12,7 @@ import Toybox.WatchUi;
 // doc says it is "prohibited from using page control functionality", so
 // this file only draws, it never acts. Selecting the glance in the
 // carousel falls straight through to AppBase.getInitialView(), which
-// lands on the home screen with the primary action focused (US-037);
+// lands on the home screen with its first row focused;
 // there is nothing to wire for that here, only not to break it.
 //
 // HARD CONSTRAINT: no web request, in any code path, ever (US-034). Every
@@ -134,15 +135,80 @@ module GlanceFormat {
 
 }
 
+// Where the three rows go in the glance's own area, from its height, the
+// watch's scale and its two font heights; pure, so GlanceTests pins the
+// numbers without a Dc. Paddings scale with s = screenWidth / 260 (the
+// fēnix 7 Pro's 260 px face is s = 1, where every value is today's); the
+// fonts are the watch's own, so rows stack by font height.
+//
+// Five-button watches keep the layout the fēnix has always had: row 1 at the
+// top of the area, the bar pinned near its bottom. On START + BACK watches
+// (vívoactive 6, Venu, X1) the system's glance area is far taller than the
+// rows, so the block of rows centres in it instead, the bar following row 2
+// rather than the bottom edge (tools/ui/devices/30-native.js, glance()).
+//
+// The scale is computed here and not taken from Geo: Geo, Bezel, Ui and
+// Chips are app scope and absent from the glance binary.
+(:glance)
+module GlanceLayout {
+
+    // The width of the 260 px face this layout was drawn at.
+    const BASE_W = 260.0;
+    // Row 1 top and the bar's distance from the bottom on five-button
+    // watches; the gap between row 2 and the bar on centred ones.
+    const ROW1_Y = 2;
+    const BAR_BOTTOM_GAP = 8;
+    const BAR_GAP = 6;
+    const BAR_H = 4;
+
+    // This watch's scale against the 260 px face.
+    function scale() as Float {
+        return System.getDeviceSettings().screenWidth / BASE_W;
+    }
+
+    // True on watches without an UP button: the rows centre in the area.
+    function centred() as Boolean {
+        return (System.getDeviceSettings().inputButtons & System.BUTTON_INPUT_UP) == 0;
+    }
+
+    // k px on the 260 face, in device px. Exact at s = 1.
+    function px(k as Numeric, s as Float) as Number {
+        return Math.round(k * s).toNumber();
+    }
+
+    // [row 1 top, row 2 top, bar top, bar height] in the area's own px.
+    function rows(h as Number, s as Float, xtinyH as Number, tinyH as Number,
+                  centred as Boolean) as Array<Number> {
+        var barH = px(BAR_H, s);
+        if (barH < BAR_H) {
+            barH = BAR_H;
+        }
+        var top = px(ROW1_Y, s);
+        var bottom = h - px(BAR_BOTTOM_GAP, s);
+        if (!centred) {
+            return [top, top + xtinyH + 1, bottom, barH];
+        }
+        var rowsH = xtinyH + 1 + tinyH + px(BAR_GAP, s) + barH;
+        var y1 = Math.round((h - rowsH) / 2.0).toNumber();
+        if (y1 < top) {
+            y1 = top;
+        }
+        var y2 = y1 + xtinyH + 1;
+        var barY = y2 + tinyH + px(BAR_GAP, s);
+        if (barY > bottom) {
+            barY = bottom;
+        }
+        return [y1, y2, barY, barH];
+    }
+
+}
+
 (:glance)
 class VozidloGlanceView extends WatchUi.GlanceView {
 
-    // Side padding inside the 171 px content area (PoC NG.content X = 6).
+    // Side padding inside the content area (PoC NG.content X = 6), in px
+    // on the 260 face; scaled by GlanceLayout's s in initialize().
     private const PAD = 6;
-    // Row 1 top and the SoC bar (C6: row 1 y 2, 4 px bar 8 px above the bottom).
-    private const ROW1_Y = 2;
-    private const BAR_H = 4;
-    private const BAR_BOTTOM_GAP = 8;
     // Row 2 icons: r 8, centre 13 px after the SoC, text 11 px after the
     // lock icon's centre, 12 px between the label and the next icon (PoC).
     private const ICON_R = 8;
@@ -167,8 +233,25 @@ class VozidloGlanceView extends WatchUi.GlanceView {
     private var _chargeIcon as Symbol? = null;
     private var _climateIcon as Symbol? = null;
 
+    // This watch's scale and the paddings above at it, worked out once.
+    private var _s as Float = 1.0;
+    private var _centred as Boolean = false;
+    private var _pad as Number = PAD;
+    private var _iconR as Number = ICON_R;
+    private var _iconGap as Number = ICON_GAP;
+    private var _iconText as Number = ICON_TEXT;
+    private var _iconStep as Number = ICON_STEP;
+
     function initialize() {
         GlanceView.initialize();
+        var s = GlanceLayout.scale();
+        _s = s;
+        _centred = GlanceLayout.centred();
+        _pad = GlanceLayout.px(PAD, s);
+        _iconR = GlanceLayout.px(ICON_R, s);
+        _iconGap = GlanceLayout.px(ICON_GAP, s);
+        _iconText = GlanceLayout.px(ICON_TEXT, s);
+        _iconStep = GlanceLayout.px(ICON_STEP, s);
     }
 
     function onLayout(dc as Dc) as Void {
@@ -212,37 +295,43 @@ class VozidloGlanceView extends WatchUi.GlanceView {
     //   row 3  4 px SoC bar: track RULE, fill white, accent while charging
     // Empty cache: the name and "Open for your car" (US-034: never blank).
     // Row heights come from the fonts, so fēnix 8/9 font scaling moves row 2
-    // down instead of overlapping row 1.
+    // down instead of overlapping row 1; GlanceLayout places the rows.
     function onUpdate(dc as Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
         var xtiny = Graphics.FONT_XTINY;
         var tiny = Graphics.FONT_TINY;
-        var row2Y = ROW1_Y + dc.getFontHeight(xtiny) + 1;
-        var right = w - PAD;
+        var rows = GlanceLayout.rows(h, _s, dc.getFontHeight(xtiny), dc.getFontHeight(tiny), _centred);
+        var row1Y = rows[0];
+        var row2Y = rows[1];
+        var pad = _pad;
+        var right = w - pad;
 
         dc.setColor(Theme.c(Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(PAD, ROW1_Y, xtiny, APP_NAME, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(pad, row1Y, xtiny, APP_NAME, Graphics.TEXT_JUSTIFY_LEFT);
 
         if (!_hasData) {
-            var invite = GlanceFormat.truncated(INVITATION, right - PAD, (new GlanceMetrics(dc, tiny)).method(:width));
-            dc.drawText(PAD, row2Y, tiny, invite, Graphics.TEXT_JUSTIFY_LEFT);
+            // FONT_TINY when the whole invitation fits, else FONT_XTINY:
+            // the larger fonts of the AMOLED watches would otherwise cut it.
+            var font = (dc.getTextWidthInPixels(INVITATION, tiny) <= right - pad) ? tiny : xtiny;
+            var invite = GlanceFormat.truncated(INVITATION, right - pad, (new GlanceMetrics(dc, font)).method(:width));
+            dc.drawText(pad, row2Y, font, invite, Graphics.TEXT_JUSTIFY_LEFT);
             return;
         }
 
         // Row 1: the age, right-aligned, never over the name.
         if (_ageText.length() > 0) {
             var nameW = dc.getTextWidthInPixels(APP_NAME, xtiny);
-            var age = GlanceFormat.truncated(_ageText, right - PAD - nameW - 6,
+            var age = GlanceFormat.truncated(_ageText, right - pad - nameW - pad,
                 (new GlanceMetrics(dc, xtiny)).method(:width));
             dc.setColor(Theme.c(_stale ? Theme.WARNING : Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
-            dc.drawText(right, ROW1_Y, xtiny, age, Graphics.TEXT_JUSTIFY_RIGHT);
+            dc.drawText(right, row1Y, xtiny, age, Graphics.TEXT_JUSTIFY_RIGHT);
         }
 
         // Row 2: SoC, lock icon + word, then the charging and climate icons.
         var mid = row2Y + dc.getFontHeight(tiny) / 2;
         dc.setColor(Theme.c(Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(PAD, row2Y, tiny, _socText, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(pad, row2Y, tiny, _socText, Graphics.TEXT_JUSTIFY_LEFT);
 
         var trailing = 0;
         if (_chargeIcon != null) {
@@ -252,42 +341,43 @@ class VozidloGlanceView extends WatchUi.GlanceView {
             trailing += 1;
         }
         // Room the trailing icons need right of the label: each takes a 12 px
-        // gap plus its 8 px half-size, i.e. one ICON_STEP.
-        var trailingW = trailing * ICON_STEP;
+        // gap plus its 8 px half-size, i.e. one ICON_STEP (all scaled).
+        var trailingW = trailing * _iconStep;
 
-        var x = PAD + dc.getTextWidthInPixels(_socText, tiny) + ICON_GAP;
+        var x = pad + dc.getTextWidthInPixels(_socText, tiny) + _iconGap;
         // Unlocked/open in amber with its own icon shape (B3: never colour alone).
         var lockColor = Theme.c(_insecure ? Theme.WARNING : Theme.TEXT_1);
-        StateIcons.draw(dc, _lockIcon, x, mid, ICON_R, lockColor);
-        x += ICON_TEXT;
+        StateIcons.draw(dc, _lockIcon, x, mid, _iconR, lockColor);
+        x += _iconText;
         var lock = GlanceFormat.truncated(_lockText, right - trailingW - x,
             (new GlanceMetrics(dc, tiny)).method(:width));
         dc.setColor(lockColor, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x, row2Y, tiny, lock, Graphics.TEXT_JUSTIFY_LEFT);
-        x += dc.getTextWidthInPixels(lock, tiny) + (ICON_STEP - ICON_R);
+        x += dc.getTextWidthInPixels(lock, tiny) + (_iconStep - _iconR);
 
         var white = Theme.c(Theme.TEXT_1);
         var chargeIcon = _chargeIcon;
         if (chargeIcon != null) {
-            StateIcons.draw(dc, chargeIcon, x, mid, ICON_R, white);
-            x += ICON_STEP;
+            StateIcons.draw(dc, chargeIcon, x, mid, _iconR, white);
+            x += _iconStep;
         }
         var climateIcon = _climateIcon;
         if (climateIcon != null) {
-            StateIcons.draw(dc, climateIcon, x, mid, ICON_R, white);
+            StateIcons.draw(dc, climateIcon, x, mid, _iconR, white);
         }
 
         // Row 3: SoC bar. Fill white, accent only while charging, like the rings.
-        var barY = h - BAR_BOTTOM_GAP;
-        var barW = right - PAD;
+        var barY = rows[2];
+        var barH = rows[3];
+        var barW = right - pad;
         var fill = GlanceFormat.barFill(_socRaw, barW);
         if (fill < barW) {
             dc.setColor(Theme.c(Theme.RULE), Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(PAD + fill, barY, barW - fill, BAR_H);
+            dc.fillRectangle(pad + fill, barY, barW - fill, barH);
         }
         if (fill > 0) {
             dc.setColor(Theme.c(_charging ? Theme.ACCENT : Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(PAD, barY, fill, BAR_H);
+            dc.fillRectangle(pad, barY, fill, barH);
         }
     }
 

@@ -60,9 +60,9 @@ what ships: say so in an issue and it will get fixed in one place or the other.
 
 - **US-028**: See where the car is parked
 - **US-029**: Know how far away it is and in which direction
-- **US-030**: See the car on a map
-- **US-031**: Explore the map around the car
-- **US-032**: Navigate to the car
+- **US-030**: See the car on a map (watches with onboard maps: fēnix, FR955, Venu X1; elsewhere START opens the Find my car list)
+- **US-031**: Explore the map around the car (watches with onboard maps: fēnix, FR955, Venu X1; elsewhere START opens the Find my car list)
+- **US-032**: Navigate to the car (hidden where the watch lacks waypoint support, checked at runtime)
 - **US-033**: Handle a car that has no position
 
 ## Fast access
@@ -70,9 +70,9 @@ what ships: say so in an issue and it will get fixed in one place or the other.
 - **US-034**: See my car's state in the glance carousel
 - **US-035**: Go straight from the glance into the actions
 - **US-036**: Land on the controls, not on a status page
-- **US-037**: Trigger my most-used action in one press
+- **US-037**: Trigger my most-used action in one press (since 1.3.0 home opens on Status and the primary action is the first climate row, two rows down by default; see decisions.md "Home opens on its first row.")
 - **US-038**: Show my car's state on my own watch face
-- **US-039**: Learn how to reach the app in two presses
+- **US-039**: Learn how to reach the app in two presses (the route depends on the input profile: hold MENU on fēnix and Forerunner, hold BACK on Venu 3 and 3S, the watch's own settings on vívoactive 6, Venu 4 and Venu X1)
 - **US-061**: Put the controls in my own order
 
 ## Reliability and quota
@@ -102,6 +102,6 @@ what ships: say so in an issue and it will get fixed in one place or the other.
 
 - **US-056**: Have our own icon
 - **US-057**: Name and describe the app honestly
-- **US-058**: Be readable on the actual display
+- **US-058**: Be readable on the actual display (MIP and AMOLED; round 240, 260, 280, 390 and 454 px and the 448×486 Venu X1 rectangle; user font scaling up to 1.4× on vívoactive 6, Venu 4 and Venu X1)
 - **US-059**: Recognise states without reading
-- **US-060**: Work for users who cannot rely on colour
+- **US-060**: Work for users who cannot rely on colour (the monochrome test is kept on every panel, MIP and AMOLED)

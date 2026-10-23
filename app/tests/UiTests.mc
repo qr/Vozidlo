@@ -78,16 +78,23 @@ module UiTests {
 
     // The rows above and below the focus sit one row off the centre, where the
     // circle is narrower: a TINY label there gets the chord at y 181..209, not
-    // the full 193 px.
+    // the full 193 px (fēnix 7 Pro). On the Venu 3S the row is cy + rowH.
     (:test)
     function neighbourRowsFitTheChord(logger as Logger) as Boolean {
-        var w = NightMenuLayout.neighbourWidth(65, 29);
-        if (w <= 0 || w >= 193 || w != Ui.usable(181, 209, Theme.MARGIN)) {
+        var g = GeoTests.fenix7pro();
+        var w = NightMenuLayout.neighbourWidth(g, g.rowH, 29);
+        if (w <= 0 || w >= 193 || w != Ui.usableIn(g, 181, 209, Theme.MARGIN)) {
             logger.error("unexpected neighbour width " + w);
             return false;
         }
-        if (NightMenuLayout.neighbourWidth(65, 48) >= w) {
+        if (NightMenuLayout.neighbourWidth(g, g.rowH, 48) >= w) {
             logger.error("a taller block (label + sub) must get less width");
+            return false;
+        }
+        var v = GeoTests.venu3s();
+        var centre = v.cy + v.rowH;
+        if (NightMenuLayout.neighbourWidth(v, v.rowH, 40) != Ui.usableIn(v, centre - 20, centre + 20, Theme.MARGIN)) {
+            logger.error("the Venu 3S neighbour row must be measured one row below its centre");
             return false;
         }
         return true;
@@ -144,20 +151,55 @@ module UiTests {
         return true;
     }
 
-    // C8 step 2: usable = chord minus margins, wider margin narrows it.
+    // C8 step 2: usable = chord minus margins, wider margin narrows it; the
+    // margin is in px of the 260 face and scales with the screen.
     (:test)
     function usableFollowsTheChordAndMargin(logger as Logger) as Boolean {
-        var mid = Ui.usable(120, 140, 8);
+        var g = GeoTests.fenix7pro();
+        var mid = Ui.usableIn(g, 120, 140, 8);
         if (mid != TextBlock.lineWidth(130, 130, 120, 140)) {
             logger.error("margin 8 must equal TextBlock.lineWidth");
             return false;
         }
-        if (Ui.usable(120, 140, 12) != mid - 8) {
+        if (Ui.usableIn(g, 120, 140, 12) != mid - 8) {
             logger.error("margin 12 must take 4 px more from each side");
             return false;
         }
-        if (Ui.usable(250, 270, 12) != 0) {
+        if (Ui.usableIn(g, 250, 270, 12) != 0) {
             logger.error("a box outside the circle has no room, not a negative width");
+            return false;
+        }
+        var v = GeoTests.venu3s();
+        if (Ui.usableIn(v, 185, 205, 8) != 2 * TextBlock.halfChord(195, 10) - 2 * 12) {
+            logger.error("on the Venu 3S the margin of 8 must scale to 12 px");
+            return false;
+        }
+        return true;
+    }
+
+    // SG §5: a title that does not fit moves down 2 px at a time, at most
+    // px(20), and stays put when it fits.
+    (:test)
+    function titleMovesDownBeforeItIsCut(logger as Logger) as Boolean {
+        var g = GeoTests.fenix7pro();
+        if (Ui.titleTop(g, 100, 34) != 34) {
+            logger.error("a title that fits must stay at y 34");
+            return false;
+        }
+        if (Ui.titleTop(g, 1000, 34) != 54) {
+            logger.error("a title that never fits moves down 20 px, no more");
+            return false;
+        }
+        // 190 px of TINY: does not fit at 40 (170 px there), fits a little lower.
+        var t = Ui.titleTop(g, 190, 40);
+        if (t <= 40 || t >= 60 || Ui.usableIn(g, t, t + 29, Theme.MARGIN) < 190
+            || Ui.usableIn(g, t - 2, t + 27, Theme.MARGIN) >= 190) {
+            logger.error("expected the first y where 190 px fit, got " + t.toString());
+            return false;
+        }
+        var v = GeoTests.venu3s();
+        if (Ui.titleTop(v, 2000, 51) != 51 + 30) {
+            logger.error("on the Venu 3S the 20 px limit scales to 30");
             return false;
         }
         return true;
@@ -188,30 +230,32 @@ module UiTests {
         return true;
     }
 
-    // Every list shows three rows (Theme.rowHeight()), close together: the
+    // Every list shows three rows (Geo.Display.rowH), close together: the
     // three fit with room to spare, and the rows two away, whose text would
     // still land inside the circle at this pitch, are not drawn. The home
     // hero has the whole area above the focused row. The values are logged
     // per device.
     (:test)
     function listsShowThreeRows(logger as Logger) as Boolean {
-        var h = Theme.rowHeight();
+        var g = Geo.current();
+        var h = g.rowH;
         var screen = System.getDeviceSettings().screenHeight;
         logger.debug(System.getDeviceSettings().partNumber + ": FONT_MEDIUM " + Graphics.getFontHeight(Graphics.FONT_MEDIUM).toString()
             + ", screen " + screen.toString()
-            + " -> rowHeight " + h.toString() + ", heroBottom " + Theme.heroBottom().toString());
+            + " -> rowH " + h.toString() + ", heroBottom " + g.heroBottom.toString());
         if (3 * h > screen * 4 / 5) {
             logger.error("three rows of " + h.toString() + " should take at most four fifths of " + screen.toString());
             return false;
         }
         var block = Graphics.getFontHeight(Graphics.FONT_TINY) + Graphics.getFontHeight(Graphics.FONT_XTINY);
-        var pill = NightMenuLayout.pillHeight(h, Graphics.getFontHeight(Graphics.FONT_SMALL) + Graphics.getFontHeight(Graphics.FONT_XTINY), 14, 3);
+        var pill = NightMenuLayout.pillHeight(h, Graphics.getFontHeight(Graphics.FONT_SMALL) + Graphics.getFontHeight(Graphics.FONT_XTINY),
+            g.px(14), g.px(3));
         if (h - block / 2 < pill / 2 + 4) {
             logger.error("a neighbour's text would run into the focus pill");
             return false;
         }
-        if (Theme.heroBottom() != screen / 2 - h / 2 || Theme.HOME_TITLE_H != Theme.heroBottom()) {
-            logger.error("heroBottom must be the centre minus half a row, and the home title that tall");
+        if (g.heroBottom != screen / 2 - h / 2) {
+            logger.error("heroBottom must be the centre minus half a row");
             return false;
         }
         return true;

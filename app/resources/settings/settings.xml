@@ -36,7 +36,7 @@
     </setting>
 
     <!-- US-018: also editable on the watch itself via AppBase.getSettingsView()
-         (source/ui/TargetTemperatureSettingsView.mc): this is the phone-side half of
+         (source/ui/TemperatureMenu.mc): this is the phone-side half of
          the same value. min/max span both plausible unit ranges (10-40 C, up to 100 F)
          since the same property is used whichever unit TemperatureUnit names. -->
     <setting propertyKey="@Properties.TargetTemperature" title="@Strings.SettingTargetTemperatureTitle" prompt="@Strings.SettingTargetTemperatureHelp">

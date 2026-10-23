@@ -22,12 +22,15 @@ travel only between your watch, your phone, and Škoda.
   position, so the app can show something without a network request
 - **Small amounts of app state**, such as your tile order and a count of requests
   made in the current hour
+- **Your car's parking position as a saved location**, named "Skoda Connect
+  Car", only after you use Navigate, so the watch can navigate to it
 
 All of it lives in Connect IQ's own storage on the watch. Connect IQ stores app
 settings unencrypted, so anyone with physical access to your unlocked watch could
 in principle read the key and the S-PIN. That is a property of the platform, not
 a choice this app makes, but you should know it. The app has a "Clear stored
-data" action that removes everything listed above.
+data" action that removes everything listed above: in Settings, and in the menu
+during setup.
 
 ## Where your data goes
 
@@ -60,8 +63,10 @@ on. Concretely:
 
 - **Access and portability**: everything the app knows is on your watch. There is
   no copy of it anywhere I control.
-- **Erasure**: use "Clear stored data" in the app, or uninstall it. Both remove
-  everything.
+- **Erasure**: use "Clear stored data" in the app's Settings, or uninstall it.
+  Both remove everything the app stores; the saved location for Navigate may
+  stay among the watch's saved locations after an uninstall, where you can
+  delete it, so clear the data first.
 - **Rectification and objection**: there is no processing on my side to correct
   or object to.
 

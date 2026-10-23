@@ -37,6 +37,22 @@ module TextBlock {
         return Math.sqrt(r2 - d2).toNumber();
     }
 
+    // The same for a rounded rectangle (Venu X1): halfW wide either side of
+    // the centre and halfH above and below it, with corners of radius
+    // `corner`. Full width between the corners, the corner circle's chord
+    // inside them, 0 outside, truncated like halfChord().
+    function roundedRectHalfChord(halfW as Number, halfH as Number, corner as Number, dy as Number) as Number {
+        if (dy >= halfH) {
+            return 0;
+        }
+        var d = halfH - dy;
+        if (d >= corner) {
+            return halfW;
+        }
+        var e = corner - d;
+        return (halfW - corner + Math.sqrt(corner * corner - e * e)).toNumber();
+    }
+
     // Usable width for a line whose glyph box spans `top`..`bottom`, measured
     // from the top of the display, on a circle of `radius` centred at
     // `centerY`.

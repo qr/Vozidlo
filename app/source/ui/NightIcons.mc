@@ -81,11 +81,6 @@ module NightIcons {
         } else if (name == :bang) {
             dc.fillRectangle(_t(cx - r * 0.17), cy - r, _min2(r * 0.34), _t(r * 1.25));
             dc.fillRectangle(_t(cx - r * 0.17), _t(cy + r * 0.55), _min2(r * 0.34), _min2(r * 0.38));
-        } else if (name == :plus) {
-            dc.fillRectangle(cx - r, _t(cy - r * 0.18), 2 * r, _min2(r * 0.36));
-            dc.fillRectangle(_t(cx - r * 0.18), cy - r, _min2(r * 0.36), 2 * r);
-        } else if (name == :minus) {
-            dc.fillRectangle(cx - r, _t(cy - r * 0.18), 2 * r, _min2(r * 0.36));
         } else if (name == :menu) {
             for (var i = -1; i <= 1; i += 1) {
                 dc.fillCircle(cx, _t(cy + i * r * 0.7), _min1(r * 0.22));

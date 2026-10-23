@@ -379,12 +379,29 @@ module CarNavigation {
         return name.equals(WAYPOINT_NAME);
     }
 
+    // M13: whether this watch can save the waypoint navigation starts
+    // from. Every product's API lists it, but the firmware decides, so
+    // Navigate is offered only when it is really there.
+    function isAvailable() as Boolean {
+        return PersistedContent has :saveWaypoint;
+    }
+
     function start(location as Position.Location) as Void {
         _removeExisting();
         PersistedContent.saveWaypoint(location, { :name => WAYPOINT_NAME });
         var saved = _findExisting();
         if (saved != null) {
             System.exitTo((saved as PersistedContent.Content).toIntent());
+        }
+    }
+
+    // "Clear stored data" (StoredData.clearAll()): the waypoint holds where
+    // the car was parked, so it goes with everything else. Guarded with
+    // `has`, like isAvailable(): on a watch without waypoint support there
+    // is nothing to remove.
+    function removeSaved() as Void {
+        if (PersistedContent has :getAppWaypoints) {
+            _removeExisting();
         }
     }
 

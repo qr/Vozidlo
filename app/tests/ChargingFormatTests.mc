@@ -1,3 +1,4 @@
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Test;
 
@@ -142,6 +143,71 @@ module ChargingFormatTests {
             }
         }
         return true;
+    }
+
+    // ------------------------------------------------------------ layout
+
+    function _heroH(g as Geo.Display) as Number {
+        return g.heroFont == Graphics.FONT_NUMBER_MEDIUM ? g.fonts.numMedH : g.fonts.numMildH;
+    }
+
+    // C3 on the fēnix 7 Pro, today's numbers: title 34, hero 58, chip 134,
+    // rows from 160 at a 20 px pitch, age 202, no data 98 / 136.
+    (:test)
+    function fenix7proChargingSlotsAreToday(logger as Logger) as Boolean {
+        var g = GeoTests.fenix7pro();
+        var sl = ChargingFormat.slots(g, g.titleTop, _heroH(g));
+        return GeoTests._eq(logger, "heroTop", sl.heroTop, 58)
+            && GeoTests._eq(logger, "chipTop", sl.chipTop, 134)
+            && GeoTests._eq(logger, "rowsTop", sl.rowsTop, 160)
+            && GeoTests._eq(logger, "pitch", sl.pitch, 20)
+            && GeoTests._eq(logger, "ageTop", sl.ageTop, 202)
+            && GeoTests._eq(logger, "maxRows", sl.maxRows, 2)
+            && GeoTests._eq(logger, "noDataTop", sl.noDataTop, 98)
+            && GeoTests._eq(logger, "noDataSubTop", sl.noDataSubTop, 136);
+    }
+
+    // M1: the hero font was picked so both detail rows clear the age line,
+    // so every watch keeps two; a taller FONT_XTINY drops the second one
+    // rather than overlapping the age.
+    (:test)
+    function chargingRowsClearTheAgeOnEveryFixture(logger as Logger) as Boolean {
+        var all = GeoTests.all();
+        for (var i = 0; i < all.size(); i += 1) {
+            var g = all[i] as Geo.Display;
+            var sl = ChargingFormat.slots(g, g.titleTop, _heroH(g));
+            if (sl.maxRows != 2) {
+                logger.error(GeoTests.describe(g) + ": expected two detail rows, got " + sl.maxRows.toString());
+                return false;
+            }
+        }
+        var tall = Geo.make(260, 260, true, Geo.INPUT_A, true, new Geo.Fonts(24, 29, 32, 37, 60, 74));
+        var t = ChargingFormat.slots(tall, tall.titleTop, _heroH(tall));
+        return GeoTests._eq(logger, "tall xtiny rows", t.maxRows, 1);
+    }
+
+    // PoC NC.profile on the fēnix 7 Pro, today's numbers: title 40, name
+    // 70, chip 108, facts 136 at 19 px, timers from 178 with room for
+    // three by 216, states 104 / 136, errors 112.
+    (:test)
+    function fenix7proProfileSlotsAreToday(logger as Logger) as Boolean {
+        var g = GeoTests.fenix7pro();
+        var tTop = ChargingFormat.profileTitleTop(g);
+        var sl = ChargingFormat.profileSlots(g, tTop);
+        var timersTop = sl.factsTop + 2 * sl.pitch + sl.timerGap;
+        return GeoTests._eq(logger, "title", tTop, 40)
+            && GeoTests._eq(logger, "nameTop", sl.nameTop, 70)
+            && GeoTests._eq(logger, "chipTop", sl.chipTop, 108)
+            && GeoTests._eq(logger, "factsTop", sl.factsTop, 136)
+            && GeoTests._eq(logger, "pitch", sl.pitch, 19)
+            && GeoTests._eq(logger, "timersTop", timersTop, 178)
+            && GeoTests._eq(logger, "lastTop", sl.lastTop, 216)
+            && GeoTests._eq(logger, "timer room", sl.timerRoom(timersTop), 3)
+            && GeoTests._eq(logger, "room under a third fact", sl.timerRoom(timersTop + sl.pitch), 2)
+            && GeoTests._eq(logger, "no room past the last line", sl.timerRoom(sl.lastTop + 1), 0)
+            && GeoTests._eq(logger, "stateTop", sl.stateTop, 104)
+            && GeoTests._eq(logger, "stateSubTop", sl.stateSubTop, 136)
+            && GeoTests._eq(logger, "errorTop", sl.errorTop, 112);
     }
 
 }

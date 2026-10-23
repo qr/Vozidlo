@@ -17,11 +17,23 @@ name: checks
 # times over, on a repository whose whole point is to welcome contributions.
 # A red X that no contributor can act on is worse than no check at all.
 #
-# So the maintainer runs `tools/ciq build --all` and `tools/ciq test` locally
-# before merging anything that touches app/, and CONTRIBUTING.md says so. What
-# runs here is everything that genuinely can: the mock server's own suite, the
-# repository consistency and privacy checks in tools/checks.py, and the UI
-# design checks in tools/ui/ (plain node, no SDK).
+# So the maintainer runs `tools/ciq verify` locally before merging anything
+# that touches app/, and CONTRIBUTING.md says so. It builds every product in
+# app/manifest.xml with warnings as errors, checks each build against that
+# watch's memory budget, and runs the unit tests in the simulator on one watch
+# per screen family and input profile (VERIFY_DEVICES in tools/ciq).
+#
+# What runs here is everything that genuinely can without the SDK: the mock
+# server's own suite, the repository checks in tools/checks.py, and the UI
+# design checks in tools/ui/ (plain node). With dozens of products, the risk CI can
+# still catch is drift: a watch added to the manifest but not to the README,
+# the store listing, the devices page or the jungle's map exclusion. The device
+# facts those checks need (screen, input, API counts, budgets) are committed in
+# tools/ui/devices/11-devdata.js, generated from the SDK's device files by
+# tools/ui/devices/devdata.py, so CI can hold everything to them without the
+# SDK. See docs/decisions.md, "Device facts are committed, so CI can check them
+# without the SDK." and "CI checks consistency; the app is built and tested
+# locally with tools/ciq verify."
 #
 # Cost: this repository is public, so standard GitHub-hosted runners are free
 # and unmetered. Nothing here needs a paid plan.
@@ -66,10 +78,23 @@ jobs:
         run: pip install pyyaml
 
       - name: Run the repository checks
-        # Internal links, YAML validity, the manifest and the device guide
-        # agreeing with each other, no unfilled placeholders, and a repository
-        # wide sweep for personal or vehicle data. Identical to what
-        # `python3 tools/checks.py` does locally.
+        # Identical to what `python3 tools/checks.py` does locally (and the
+        # first thing `tools/ciq verify` runs):
+        #   - internal documentation links and #anchors resolve; YAML parses
+        #   - the manifest's products agree with the guide's table, the README's
+        #     Supported watches table, the store listing's products marker, the
+        #     device facts in 11-devdata.js and the devices page columns
+        #   - every product meets the minimum (Connect IQ level, memory budgets,
+        #     Complications, PersistedContent, GlanceView, a known screen family)
+        #   - the map is left out in app/monkey.jungle exactly where MapView is
+        #     missing, and MapView code carries the (:map) annotation
+        #   - VERIFY_DEVICES in tools/ciq covers every family and input profile
+        #   - the manifest comment describes every product it ships
+        #   - decisions cited elsewhere exist in docs/decisions.md
+        #   - no stale claims that CI builds the app; shell scripts parse
+        #   - no unfilled placeholders, no personal or vehicle data, and the
+        #     Monkey C rules (no loadResource in onUpdate, no vertical slide in
+        #     menus, no orange, no request with a null body)
         run: python3 tools/checks.py
 
   ui:
@@ -83,8 +108,18 @@ jobs:
         # one without the other fails here. Node is preinstalled on the runner.
         run: bash tools/ui/build.sh --check
 
+      - name: Multi-device UI plan matches its sources
+        # docs/design/vozidlo-devices.html is built from tools/ui/devices/ plus the poc parts above.
+        run: bash tools/ui/build-devices.sh --check
+
       - name: Every new screen fits the round display
         # Text hidden by the curve or too close to it, overlaps, letters in a
         # digits-only font, text on grey, retired colours, monochrome pass.
         # See docs/design/style-guide.md, section 11.
         run: node tools/ui/fitcheck.mjs
+
+      - name: Every screen fits every watch
+        # The same checks on the devices page, for every product in the
+        # manifest: each screen outline (round or rectangle), the largest user
+        # font size on watches that have one, and the monochrome pass.
+        run: node tools/ui/fitcheck.mjs --devices

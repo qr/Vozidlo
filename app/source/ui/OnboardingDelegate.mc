@@ -55,11 +55,36 @@ class OnboardingDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
+    // A tap does what START does only where that is free: guidance opens
+    // the key page, the expiry notice continues home. On the check (with or
+    // without an error) and on a blocked key START retries, which spends
+    // quota, so a tap there is consumed and does nothing; consuming it also
+    // keeps it from arriving as onSelect() (A15). The state comes from the
+    // view this delegate was made for, as in onSelect().
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        var view = _view;
+        if (view instanceof OnboardingView) {
+            var onboarding = view as OnboardingView;
+            if (!onboarding.isValidating()) {
+                onboarding.openKeyPage();
+            }
+        } else if (view instanceof OnboardingExpiryNoticeView) {
+            HomeScreen.switchTo();
+        }
+        return true;
+    }
+
     // The two escape hatches every onboarding screen shares: US-007's
     // "Clear stored data" and US-003's link to go.skoda.eu/api-keys.
     function onMenu() as Boolean {
         OnboardingActionMenu.push();
         return true;
+    }
+
+    // Watches without MENU (profile C) open the same list from Garmin's
+    // action menu indicator; never called on the others.
+    function onActionMenu() as Boolean {
+        return onMenu();
     }
 
 }

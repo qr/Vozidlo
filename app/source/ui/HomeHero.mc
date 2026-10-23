@@ -10,20 +10,21 @@ import Toybox.Time;
 // the glance (US-034/041), so it appears instantly, cached data or none.
 //
 // Layout runs from the bottom of the title up (plan "Facts": only
-// Theme.heroBottom() px of the title are on screen at focus 0, the rest is
+// Geo.Display.heroBottom px of the title are on screen at focus 0, the rest is
 // cut at the top): status line just above the focused row, chips above it,
 // the SoC digits above those, in whichever number font still fits the chord
 // and stays clear of the ring.
 module HomeHero {
 
     // Air between the chips and the hero digits, and between the status line
-    // and the chips. The glyph boxes carry their own leading on top of this.
+    // and the chips, and between two chips. The glyph boxes carry their own
+    // leading on top of this. Px of the 260 face, scaled.
     const HERO_GAP = 4;
     const LINE_GAP = 2;
     const CHIP_GAP = 6;
-    // Digits whose top lands above this screen y would touch the ring at
-    // r 126 at any useful width (chord at y 12 is 84 px inside the ring).
-    const MIN_DIGIT_TOP = 12;
+    // Digits whose top lands above Geo.Display.minDigitTop (y 12 on the
+    // fēnix) would touch the ring at any useful width (chord at y 12 is
+    // 84 px inside the ring at r 126).
 
     // Everything the hero draws, gathered once per onShow / feedback change
     // so drawTitle() never reads Storage (onUpdate runs often).
@@ -113,11 +114,13 @@ module HomeHero {
     }
 
     // Title-area y positions, bottom up: [status top, chips top, hero
-    // baseline]. Without chips the hero sits straight on the status line.
-    function slots(bottom as Number, statusH as Number, chipH as Number, hasChips as Boolean) as [Number, Number, Number] {
+    // baseline], gaps scaled for display g. Without chips the hero sits
+    // straight on the status line.
+    function slots(g as Geo.Display, bottom as Number, statusH as Number, chipH as Number,
+                   hasChips as Boolean) as [Number, Number, Number] {
         var statusTop = bottom - statusH;
-        var chipsTop = hasChips ? statusTop - LINE_GAP - chipH : statusTop;
-        var baseline = chipsTop - HERO_GAP;
+        var chipsTop = hasChips ? statusTop - g.px(LINE_GAP) - chipH : statusTop;
+        var baseline = chipsTop - g.px(HERO_GAP);
         return [statusTop, chipsTop, baseline];
     }
 
@@ -185,11 +188,12 @@ module HomeHero {
     // Draws into the CustomMenu title dc. `off` maps title y to screen y at
     // focus 0, so every width is the chord where the line really appears.
     function draw(dc as Dc, data as Data) as Void {
+        var g = Geo.current();
         var h = dc.getHeight();
-        var off = Theme.heroBottom() - h;
-        var chipH = Chips.height();
-        var statusH = Graphics.getFontHeight(Graphics.FONT_XTINY);
-        var y = slots(h, statusH, chipH, data.chips.size() > 0);
+        var off = g.heroBottom - h;
+        var chipH = g.chipH;
+        var statusH = g.fonts.xtinyH;
+        var y = slots(g, h, statusH, chipH, data.chips.size() > 0);
 
         // Fitted to the ring margin first (the status line itself only keeps
         // the plain margin), leaving room for the "!" it adds to warnings.
@@ -207,8 +211,9 @@ module HomeHero {
                 widths.add(Chips.measure(dc, data.chips[i] as Chips.Chip));
             }
             var maxW = Ui.usable(y[1] + off, y[1] + off + chipH, Theme.RING_MARGIN);
-            var keep = chipsToKeep(widths, CHIP_GAP, maxW);
-            Chips.drawRow(dc, y[1], data.chips.slice(0, keep) as Array<Chips.Chip>, CHIP_GAP);
+            var gap = g.px(CHIP_GAP);
+            var keep = chipsToKeep(widths, gap, maxW);
+            Chips.drawRow(dc, y[1], data.chips.slice(0, keep) as Array<Chips.Chip>, gap);
         }
 
         _drawSoc(dc, data.soc, y[2], off);
@@ -223,7 +228,7 @@ module HomeHero {
         var unit = null;
         if (Ui.isNumberGlyphs(value)) {
             unit = "%";
-            var fit = new HeroFit(dc, baseline + off, dc.getTextWidthInPixels(unit, unitFont) + Ui.UNIT_GAP);
+            var fit = new HeroFit(dc, baseline + off, dc.getTextWidthInPixels(unit, unitFont) + Geo.current().px(Ui.UNIT_GAP));
             font = Ui.pickFont(value,
                 [Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD, Graphics.FONT_MEDIUM] as Array<Graphics.FontType>,
                 0, fit.method(:excess));
@@ -255,7 +260,7 @@ module HomeHero {
 
         function excess(s as String, font as Graphics.FontType) as Number {
             var top = digitTop(_baseline, Graphics.getFontAscent(font));
-            if (top < MIN_DIGIT_TOP) {
+            if (top < Geo.current().minDigitTop) {
                 return 9999;
             }
             var need = _dc.getTextWidthInPixels(s, font) + _unitW;

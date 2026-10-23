@@ -3,8 +3,9 @@ import Toybox.Math;
 import Toybox.System;
 import Toybox.Test;
 
-// Unit tests for source/model/Parking.mc and the Find my car layout in
-// source/ui/LocationView.mc (US-028..US-033): the pure
+// Unit tests for source/model/Parking.mc and the Find my car layout and
+// START rule in source/ui/LocationView.mc (US-028..US-033, M4, M7), the
+// layout checked on every screen via the GeoTests fixtures: the pure
 // geometry (LocationMath), the parkingPosition parser and its four edge
 // cases (ParkingPosition), and the small Storage-backed modules
 // (ParkingFeature, LastParked) that let this screen behave correctly across
@@ -163,8 +164,9 @@ module LocationTests {
     // at y 46/65 (fēnix 7 Pro xtiny, 19 px), and wider below the centre.
     (:test)
     function addressWidthsMatchThePoc(logger as Logger) as Boolean {
-        var top = FindCarLayout.addressWidths(46, 19);
-        var low = FindCarLayout.addressWidths(150, 19);
+        var g = GeoTests.fenix7pro();
+        var top = FindCarLayout.addressWidths(g, 46, 19);
+        var low = FindCarLayout.addressWidths(g, 150, 19);
         if (top[0] != 158 || top[1] != 186) {
             logger.error("expected [158, 186] at y 46, got [" + top[0] + ", " + top[1] + "]");
             return false;
@@ -174,6 +176,131 @@ module LocationTests {
             return false;
         }
         return true;
+    }
+
+    // M4: where START shows the menu glyph, the second address line (65 to
+    // 84 on a 260 face, level with the glyph at y 76) keeps 4 px clear of
+    // it; the first line is above the glyph and keeps its chord.
+    (:test)
+    function addressKeepsClearOfTheStartGlyph(logger as Logger) as Boolean {
+        var w = FindCarLayout.addressWidthsBesideGlyph(GeoTests.fr255(), 46, 19);
+        if (w[0] != 158 || w[1] != 168) {
+            logger.error("expected [158, 168] beside the START glyph, got [" + w[0] + ", " + w[1] + "]");
+            return false;
+        }
+        return true;
+    }
+
+    // The fēnix 7 Pro slots are today's numbers (PoC NF.parked / gps /
+    // moving): the screen must not move a pixel there.
+    (:test)
+    function findCarSlotsOnTheFenixAreToday(logger as Logger) as Boolean {
+        var g = GeoTests.fenix7pro();
+        var s = FindCarLayout.slots(g);
+        var got = [s.addressTop, s.distanceTop, s.ageTop, FindCarLayout.gpsTop(g, g.fonts.smallH),
+                   s.movingHeroTop, s.lastParkedTop, s.lastAddressTop, s.messageCentre, s.lastAgeTop,
+                   s.movingHeroSmallTop, s.gpsAgeTop] as Array<Number>;
+        var want = [46, 88, 172, 112, 90, 130, 150, 124, 196, 92, 172] as Array<Number>;
+        var names = ["address", "distance", "age", "gps", "moving hero", "last parked", "last address",
+                     "message centre", "last age", "moving hero small", "gps age"] as Array<String>;
+        var ok = true;
+        for (var i = 0; i < want.size(); i += 1) {
+            if (got[i] != want[i]) {
+                logger.error(names[i] + ": expected " + want[i] + ", got " + got[i]);
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    // On every supported screen the blocks stack top to bottom and the
+    // moving block's age stays above the status line (M14).
+    (:test)
+    function findCarSlotsStackOnEveryScreen(logger as Logger) as Boolean {
+        var displays = GeoTests.all();
+        var ok = true;
+        for (var i = 0; i < displays.size(); i += 1) {
+            var g = displays[i] as Geo.Display;
+            var s = FindCarLayout.slots(g);
+            var xt = g.fonts.xtinyH;
+            var what = "display " + i + " (" + g.w + "x" + g.h + ")";
+            if (!(s.addressTop + 2 * xt < s.distanceTop && s.distanceTop < s.ageTop && s.ageTop + xt <= g.h)) {
+                logger.error(what + ": parked stack " + s.addressTop + "/" + s.distanceTop + "/" + s.ageTop);
+                ok = false;
+            }
+            if (!(s.movingHeroTop < s.lastParkedTop && s.lastParkedTop + xt <= s.lastAddressTop
+                  && s.lastAddressTop + 2 * xt <= s.lastAgeTop && s.lastAgeTop + xt <= g.h - g.px(g.round ? 29 : 20))) {
+                logger.error(what + ": moving stack " + s.movingHeroTop + "/" + s.lastParkedTop + "/"
+                             + s.lastAddressTop + "/" + s.lastAgeTop);
+                ok = false;
+            }
+            if (s.gpsAgeTop < s.addressTop + 2 * xt + g.fonts.smallH) {
+                logger.error(what + ": gps age " + s.gpsAgeTop + " runs into the GPS line");
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    // Venu X1: the track is the display frame, so the chords follow the
+    // rounded rectangle; every block has room and none spans the frame.
+    (:test)
+    function findCarChordsOnTheRectangle(logger as Logger) as Boolean {
+        var g = GeoTests.venux1();
+        var s = FindCarLayout.slots(g);
+        var xt = g.fonts.xtinyH;
+        var tops = [s.addressTop, s.addressTop + xt, s.distanceTop, s.ageTop, s.lastAddressTop, s.messageCentre]
+            as Array<Number>;
+        var ok = true;
+        for (var i = 0; i < tops.size(); i += 1) {
+            var t = tops[i] as Number;
+            var w = FindCarLayout.chordWidth(g, t, t + xt);
+            if (w <= 0 || w >= g.w) {
+                logger.error("chord at y " + t + " is " + w + ", want 0 < w < " + g.w);
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    // M4 truth table: the map only when parked on a watch with MapView.
+    (:test)
+    function startOpensTheMapOnlyWhenParkedWithAMap(logger as Logger) as Boolean {
+        var parked = [true, true, false, false] as Array<Boolean>;
+        var map = [true, false, true, false] as Array<Boolean>;
+        var want = [:map, :list, :list, :list] as Array<Symbol>;
+        var ok = true;
+        for (var i = 0; i < want.size(); i += 1) {
+            var p = parked[i] as Boolean;
+            var m = map[i] as Boolean;
+            var got = FindCarLogic.startAction(p, m);
+            if (got != want[i]) {
+                logger.error("parked " + p + ", map " + m + ": expected " + (want[i] as Symbol).toString()
+                             + ", got " + got.toString());
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    // M7: the hints name no button (no MENU key on profile C).
+    (:test)
+    function findCarHintsNameNoButton(logger as Logger) as Boolean {
+        var hints = [FindCarLogic.REFRESH_HINT, FindCarLogic.RETRY_HINT] as Array<String>;
+        var ok = true;
+        for (var i = 0; i < hints.size(); i += 1) {
+            var h = hints[i] as String;
+            if (h.find("MENU") != null || h.find("START") != null || h.find("menu") == null) {
+                logger.error("hint \"" + h + "\" should point at the menu without a button name");
+                ok = false;
+            }
+        }
+        if (!FindCarLogic.REFRESH_HINT.equals("Refresh from the menu")
+            || !FindCarLogic.RETRY_HINT.equals("Try again from the menu")) {
+            logger.error("hint copy changed: " + FindCarLogic.REFRESH_HINT + " / " + FindCarLogic.RETRY_HINT);
+            ok = false;
+        }
+        return ok;
     }
 
     // US-029: "the arrow updates as I turn". Turning changes the device's

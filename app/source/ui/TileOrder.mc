@@ -37,10 +37,14 @@ module TileOrder {
     const _ORDER_STORAGE_KEY = "tileOrder";
     const _HIDDEN_STORAGE_KEY = "tileOrderHidden";
 
+    // Status first, then find my car, then the rest (the owner's decision of
+    // 2026-10-10): home opens on the row that only reads, so the hero is in
+    // view and a stray START opens a screen instead of sending a command.
+    // Only the default: an order the user saved is kept.
     function defaultOrder() as Array<Symbol> {
         return [
-            CATEGORY_CLIMATE, CATEGORY_CHARGING, CATEGORY_CHARGING_DETAIL,
-            CATEGORY_FIND_MY_CAR, CATEGORY_STATUS_DETAIL, CATEGORY_SETTINGS
+            CATEGORY_STATUS_DETAIL, CATEGORY_FIND_MY_CAR, CATEGORY_CLIMATE,
+            CATEGORY_CHARGING, CATEGORY_CHARGING_DETAIL, CATEGORY_SETTINGS
         ] as Array<Symbol>;
     }
 

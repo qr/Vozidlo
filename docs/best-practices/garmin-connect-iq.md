@@ -5,11 +5,16 @@ Every rule states what to do, why it matters, and where it comes from. Rules
 marked **[inferred]** are our reading of combined sources rather than something
 Garmin states in one place; rules marked **[unverified]** still need checking.
 
-Scope: a Monkey C **watch app** (`type="watch-app"`) for six devices in one
-device family (round-260x260): fēnix 7 Pro, fēnix 7, fēnix 7 Pro Solar, fēnix 8
-Solar 47mm, fēnix 9 Pro Solar 47mm and Forerunner 955: API level
-5.2, 260×260 round, 64-colour memory-in-pixel: making authenticated HTTPS calls
-to a third-party REST API through the paired phone. A watch face is out of scope.
+Scope: a Monkey C **watch app** (`type="watch-app"`) for the devices in
+`app/manifest.xml`, in eight device families: round 218, 240, 260 and 280
+memory-in-pixel (the fēnix 7, 7S, 7X and the Solar fēnix 8 and 9, Enduro 3,
+Forerunner 955, 255 and 255S), round 390, 416 and 454 AMOLED (Venu,
+vívoactive, the AMOLED fēnix 8 and 9, epix Pro, MARQ, Descent Mk3 and G2,
+D2 Mach 2, Forerunner 265, 965 and 970) and the 448×486 AMOLED rectangle of
+the Venu X1. Minimum API
+level 5.1; the devices run Connect IQ 5.1 to 6.0. The
+app makes authenticated HTTPS calls to a third-party REST API through the
+paired phone. A watch face is out of scope. The README has the full list.
 
 These rules are part of the process, not a reading list. A pull request that
 contradicts one of them should say so and why: several were learned the hard
@@ -19,8 +24,11 @@ way, and [decisions.md](../decisions.md) records which.
 
 ## 1. Memory and performance
 
-Our budgets on this device, taken from
-`~/.Garmin/ConnectIQ/Devices/fenix7pro/compiler.json` (identical for `fenix7`):
+Our budgets on the primary device, taken from
+`~/.Garmin/ConnectIQ/Devices/fenix7pro/compiler.json`. They are checked per
+device, because they are not the same everywhere: the Forerunner 255 has a
+524,288 B (512 KB) watch-app budget. `tools/ciq build --all` compares each
+build's size with its own device's budget.
 
 | App type | Limit |
 |---|---|
@@ -90,6 +98,13 @@ same Connect IQ version, builds clean at `-l 3 -w`, and has **no
 actually call: `grep -c Toybox_WatchUi_MapView` gives nine on a device that
 has it and zero on one that does not, and read the memory budgets out of its
 `compiler.json` rather than trusting the model name.
+
+A zero count means the dependent code must not reach that product: guard the
+call where a runtime check exists (`has`), or exclude the dependent class from
+that product's build. We do the latter for the map: the map classes carry a
+`(:map)` annotation and `monkey.jungle` sets `<id>.excludeAnnotations = map`
+for every product without `MapView`, so the Forerunner 255 now ships with the
+map left out rather than not at all.
 → [Glances](https://developer.garmin.com/connect-iq/core-topics/glances/),
 [Annotations](https://developer.garmin.com/connect-iq/monkey-c/annotations/)
 
@@ -118,7 +133,7 @@ first statement of every `initialize()`.
 `-l 1` gradual, `-l 2` informative, `-l 3` strict. Combine with `-w` or you will
 not see the warnings.
 
-> **Our rule:** build at `-l 3 -w`. We are a single-device project with fully
+> **Our rule:** build at `-l 3 -w`. We are a small project with fully
 > annotated source; there is no reason to accept ambiguity. **[inferred]**:
 > Garmin documents the levels but does not prescribe one.
 
@@ -191,7 +206,10 @@ continuous indicator, not several. Every web request in this app needs this.
 
 **Prefer `BehaviorDelegate` over `InputDelegate`.** It maps device input to
 portable behaviours (`onBack`, `onMenu`, `onSelect`, `onNextPage`,
-`onPreviousPage`) so the same code survives a change of target device.
+`onPreviousPage`, and `onActionMenu` on watches without a MENU button) so the
+same code survives a change of target device. On those watches a view shows
+Garmin's action menu indicator with `setActionMenuIndicator`, guarded by
+`has`, so the user can see a menu is there.
 → [Input handling](https://developer.garmin.com/connect-iq/core-topics/input-handling/)
 
 **Never remap the back behaviour.** It is one of the most common behaviours on
@@ -199,7 +217,9 @@ Garmin devices.
 → [Input handling](https://developer.garmin.com/connect-iq/core-topics/input-handling/)
 
 **Navigate vertically.** Up/down page loops map to both buttons and touch;
-left/right does not map well to physical buttons.
+left/right does not map well to physical buttons. The one exception is
+Garmin's own: on watches without a MENU button, a swipe left opens the action
+menu, and the app adds no horizontal navigation of its own.
 → [Designing workflows](https://developer.garmin.com/connect-iq/user-experience-guidelines/designing-workflows-and-interactions/)
 
 **Minimise on-device text entry.** Long strings belong in the phone's app

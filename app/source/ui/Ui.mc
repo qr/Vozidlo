@@ -14,7 +14,8 @@ module Ui {
     // render as boxes or nothing in those fonts (A8).
     const NUMBER_GLYPHS = " #%+-./0123456789:°";
 
-    // Space between a number and its unit; measured on the PoC hero.
+    // Space between a number and its unit; measured on the PoC hero, in px
+    // of the 260 face (scaled when drawn).
     const UNIT_GAP = 4;
 
     // ------------------------------------------------------------ pure
@@ -69,11 +70,29 @@ module Ui {
         return s.substring(0, n) as String;
     }
 
-    // Usable width for a glyph box from top to bottom on the 260 round face
+    // Usable width for a glyph box from top to bottom on this screen
     // (C8 step 2), with a wider margin on ring screens (Theme.RING_MARGIN).
+    // Margins are in px of the 260 face; Geo scales them and follows the
+    // outline (circle or rounded rectangle) and the indicator keep-out.
     function usable(top as Number, bottom as Number, margin as Number) as Number {
-        var u = TextBlock.lineWidth(130, 130, top, bottom) - 2 * (margin - TextBlock.MARGIN);
-        return u > 0 ? u : 0;
+        return Geo.current().usable(top, bottom, margin);
+    }
+
+    // usable() on any display, for layouts tested against the fixtures.
+    function usableIn(g as Geo.Display, top as Number, bottom as Number, margin as Number) as Number {
+        return g.usable(top, bottom, margin);
+    }
+
+    // SG §5: a title that does not fit at y moves down rather than
+    // shrinking, 2 px at a time and at most px(20); title() then cuts it
+    // with "…" if it still does not fit. textW is its FONT_TINY width.
+    function titleTop(g as Geo.Display, textW as Number, y as Number) as Number {
+        var t = y;
+        var limit = y + g.px(20);
+        while (t < limit && textW > g.usable(t, t + g.fonts.tinyH, Theme.MARGIN)) {
+            t += 2;
+        }
+        return t;
     }
 
     // Wrap to per-line chord widths but never past maxLines; the last line
@@ -143,15 +162,17 @@ module Ui {
     // ------------------------------------------------------------ drawing
 
     // Screen title: FONT_TINY in the accent, sentence case, fitted to the
-    // chord at its own y (B4, C2 "title tiny y 34"). Returns the bottom y so
-    // the caller can stack below it.
+    // chord (B4, C2 "title tiny y 34"). A long title moves down first
+    // (titleTop()). Returns the top y actually used, so the caller stacks
+    // below it from there.
     function title(dc as Dc, text as String, y as Number) as Number {
         var font = Graphics.FONT_TINY;
         var h = dc.getFontHeight(font);
-        var s = fit(text, usable(y, y + h, Theme.MARGIN), measurer(dc, font));
+        var top = titleTop(Geo.current(), dc.getTextWidthInPixels(text, font), y);
+        var s = fit(text, usable(top, top + h, Theme.MARGIN), measurer(dc, font));
         dc.setColor(Theme.c(Theme.ACCENT), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(dc.getWidth() / 2, y, font, s, Graphics.TEXT_JUSTIFY_CENTER);
-        return y + h;
+        dc.drawText(dc.getWidth() / 2, top, font, s, Graphics.TEXT_JUSTIFY_CENTER);
+        return top;
     }
 
     // Hero number with its unit: digits in the number font, unit in a text
@@ -168,7 +189,7 @@ module Ui {
         var u = unit;
         if (u != null) {
             wu = dc.getTextWidthInPixels(u, unitFont);
-            gap = wu > 0 ? UNIT_GAP : 0;
+            gap = wu > 0 ? Geo.current().px(UNIT_GAP) : 0;
         }
         var total = wv + gap + wu;
         var x0 = cx - total / 2;
@@ -183,12 +204,14 @@ module Ui {
     }
 
     // Hero word ("Locked", "Heating") in FONT_MEDIUM with an optional icon in
-    // front (B4: words in medium, never in a number font). Returns the width.
+    // front (B4: words in medium, never in a number font). Icon r 12 and an
+    // 8 px gap on the 260 face, scaled. Returns the width.
     function drawHeroWord(dc as Dc, cx as Number, y as Number, word as String, icon as Symbol?,
                           color as Number) as Number {
         var font = Graphics.FONT_MEDIUM;
-        var iconR = 12;
-        var iw = icon != null ? 2 * iconR + 8 : 0;
+        var g = Geo.current();
+        var iconR = g.px(12);
+        var iw = icon != null ? 2 * iconR + g.px(8) : 0;
         var w = dc.getTextWidthInPixels(word, font);
         var x0 = cx - (w + iw) / 2;
         var col = Theme.c(color);

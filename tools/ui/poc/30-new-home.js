@@ -4,10 +4,11 @@
   const NH = {};
 
   // ---------------------------------------------------------------- data
-  // Tile order (TileOrder): climate, charging, Charging detail, Find my car, Status, Settings.
-  NH.TILES = ["Start climate", "Stop climate", "Start charging", "Stop charging", "Charging", "Find my car", "Status", "Settings"];
+  // Default tile order since 1.3.0 (TileOrder.defaultOrder(); decisions.md "Home opens on its first row"):
+  // Status, Find my car, climate, charging, Charging detail, Settings. Home opens on row 0, Status.
+  NH.TILES = ["Status", "Find my car", "Start climate", "Stop climate", "Start charging", "Stop charging", "Charging", "Settings"];
   // First launch: operations unknown, so every action is offered (ventilation included).
-  NH.TILES_UNKNOWN = ["Start climate", "Stop climate", "Start ventilation", "Stop ventilation", "Start charging", "Stop charging", "Charging", "Find my car", "Status", "Settings"];
+  NH.TILES_UNKNOWN = ["Status", "Find my car", "Start climate", "Stop climate", "Start ventilation", "Stop ventilation", "Start charging", "Stop charging", "Charging", "Settings"];
   // Grid rule: up to 8 tiles (four full rows) are shown as is; above 8 the first 7 plus "More".
   NH.GRID_CAP = 8;
   NH.capGrid = tiles => tiles.length <= NH.GRID_CAP ? tiles.slice() : tiles.slice(0, NH.GRID_CAP - 1).concat(["More"]);
@@ -160,7 +161,7 @@
   const B = (draw, keys = KEYS_B) => ({ label: "b · hero list", draw, keys, decision: "D1", fitcheck: true });
   const ord = id => OLD_SCREENS[id] ? OLD_SCREENS[id].order : undefined;
   const REACH = [
-    "How Charging and Status are reached: (a) the Charging tile (row 3) and the Status tile (row 4); UP/DOWN move the focus, as verified on the watch.",
+    "How Charging and Status are reached: (a) the Status tile (row 1, focused when home opens) and the Charging tile (row 4); UP/DOWN move the focus, as verified on the watch.",
     "(b) Charging and Status are rows; the list wraps at both ends like Garmin's own menus (1.1.0 opened them past the ends, which read as a screen opening by itself). A tap on the hero opens Status."
   ];
   const lastIdx = NH.TILES.length - 1, lastScroll = NH.rowsOf(NH.TILES.length) - NH.VISIBLE_ROWS;
@@ -178,7 +179,8 @@
         "(a) Scroll arc on the right bezel replaces the carets.",
         "No text hint and no UP/DOWN glyphs; START hint arc only.",
         "(b) SoC ring, hero \"100%\", chips and the age in the title area, the focused row as accent pill, one row below (rows of 65 px; only the focused row and its neighbours are drawn, so three sit close together and the rest stays off screen)."],
-      notes: REACH.concat(["Mock: 8 tiles fill four rows, so no More. Rule chosen: up to 8 tiles shown as is, above 8 the first 7 plus More.",
+      notes: REACH.concat(["Default order since 1.3.0: Status, Find my car, then the commands; home opens on Status, so the hero is in view and a stray START opens a screen instead of sending a command.",
+        "Mock: 8 tiles fill four rows, so no More. Rule chosen: up to 8 tiles shown as is, above 8 the first 7 plus More.",
         { flag: "D1 open: (a) keeps the custom grid; (b) needs a CustomMenu with the hero as title area." }]) },
     { id: "home-scrolled", section: "home", order: ord("home-scrolled"), name: "Home, scrolled to Settings",
       neu: [A(dc => NH.grid(dc, { focus: lastIdx, scroll: lastScroll })), B(dc => NH.hero(dc, { focus: lastIdx }))],
@@ -190,9 +192,9 @@
       neu: [A(dc => NH.grid(dc, { tiles: unknownA, strip: NH.UNKNOWN_STRIP })),
             B(dc => NH.hero(dc, { rows: NH.TILES_UNKNOWN, strip: NH.UNKNOWN_STRIP }))],
       fixes: ["A6", "A8", "A14", "C1a", "C1b", "D1"],
-      changed: ["Unknown SoC and lock show \"—\" (no number-font letters).", "(a) 10 tiles: first 7 plus More; Charging is tile 7.",
+      changed: ["Unknown SoC and lock show \"—\" (no number-font letters).", "(a) 10 tiles: first 7 plus More; Charging is behind More.",
         "(b) No cap: all 10 rows, including ventilation.", "(b) Hero \"—\" in FONT_MEDIUM, lock chip \"—\", empty ring track."],
-      notes: REACH.concat([{ flag: "(a) Find my car, Status and Settings end up behind More on first launch." }]) },
+      notes: REACH.concat([{ flag: "(a) Stop charging, Charging and Settings end up behind More on first launch." }]) },
     { id: "home-sent", section: "home", order: ord("home-sent"), name: "Home, after a command",
       neu: [A(dc => NH.grid(dc, { msg: { text: "Sent", kind: "sent" } })), B(dc => NH.hero(dc, { msg: { text: "Sent", kind: "sent" } }))],
       fixes: ["A12", "A21", "B3"],
@@ -214,7 +216,7 @@
   CARDS.push(
     { id: "home-list-row3", section: "home", order: 150, name: "Home (b), focus on row 4",
       neu: [B(dc => NH.hero(dc, { focus: 3 }))], fixes: ["C1b", "D1"],
-      changed: ["Focus on \"Stop charging\": summary on top, two previous rows above, two next rows below."],
+      changed: ["Focus on \"Stop climate\": the hero has scrolled away; the previous and next rows above and below the pill."],
       notes: ["Row labels are fitted to the chord at their y with a 12 px ring margin.", REACH[1]] },
     { id: "home-stale", section: "home", order: 151, name: "Home, data 17 h old",
       neu: [A(dc => NH.grid(dc, { ageMin: 17 * 60 })), B(dc => NH.hero(dc, { ageMin: 17 * 60 }))], fixes: ["B1", "B3", "A17"],

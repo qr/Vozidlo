@@ -1,6 +1,5 @@
 import Toybox.Graphics;
 import Toybox.Lang;
-import Toybox.System;
 import Toybox.WatchUi;
 
 // "Night Panel" tokens (docs/design/ui-improvements.md B3). One accent, words
@@ -31,7 +30,11 @@ module Theme {
     const DESTRUCTIVE = 0xFF0000;
 
     // Default side margin inside the chord (TextBlock.MARGIN), and the wider
-    // one for screens with a ring at r 126 (C intro).
+    // one for screens with a ring at r 126 (C intro). Both are in px of the
+    // 260 face; Geo.Display.usable() scales them.
+    //
+    // Row height, hero bottom and the home title height moved to Geo
+    // (ui/Geometry.mc), which is app scope: they depend on the screen.
     const MARGIN = 8;
     const RING_MARGIN = 12;
 
@@ -42,13 +45,6 @@ module Theme {
     const SLIDE_STATUS = WatchUi.SLIDE_UP;
     const SLIDE_CHARGING = WatchUi.SLIDE_DOWN;
     const SLIDE_DIALOG = WatchUi.SLIDE_IMMEDIATE;
-
-    // Title area height for the home CustomMenu (the hero lives in the
-    // title). At focus 0 only heroBottom() px of the title are on screen
-    // (98 with rows of 65 on a 260 px display; see the header of
-    // ui/NightMenu.mc for what the spike could and could not check), so the
-    // title is exactly that tall and the hero lays out from its bottom up.
-    const HOME_TITLE_H = 98;
 
     var _mono as Boolean = false;
 
@@ -75,27 +71,6 @@ module Theme {
             return color;
         }
         return TEXT_1;
-    }
-
-    // Every list shows three rows: the focused one in the middle and one
-    // above and below. Rows sized from the font (53 to 55 px, 1.1.0) fitted
-    // five on a 260 px display, with the outer two in the round edge; rows of
-    // a third of the display (80 px, 1.1.1) kept three but spread them over
-    // the whole face. A quarter of the display (65 px) keeps the three close
-    // together; the rows two away from the focus would show in the edge at
-    // that pitch, so NightMenu leaves them blank (NightMenuLayout.isShown).
-    // System fonts scale on fēnix 8/9 (0.8 to 1.45), so the row never drops
-    // under FONT_MEDIUM plus 16 px for the focus pill.
-    function rowHeight() as Number {
-        var h = System.getDeviceSettings().screenHeight / 4;
-        var min = Graphics.getFontHeight(Graphics.FONT_MEDIUM) + 16;
-        return h > min ? h : min;
-    }
-
-    // Bottom edge of the home hero on screen: the focused row is centred, so
-    // the CustomMenu title ends half a row above the centre at focus 0.
-    function heroBottom() as Number {
-        return 130 - rowHeight() / 2;
     }
 
 }

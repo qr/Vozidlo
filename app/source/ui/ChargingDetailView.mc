@@ -50,8 +50,12 @@ class ChargingDetailView extends WatchUi.View {
     private var _statusMessage as String? = null;
     private var _statusKind as Symbol = :sent;
 
+    // Garmin's action menu indicator, on watches without MENU (profile C).
+    private var _indicator as Boolean = false;
+
     function initialize() {
         View.initialize();
+        _indicator = Input.enableIndicator(self);
     }
 
     // Public: called by the limit and mode menus once they have popped back
@@ -80,9 +84,11 @@ class ChargingDetailView extends WatchUi.View {
     // Status for US-013), refined by a live fetch once the user asks for one
     // via the action list (see refresh() below): never re-loaded on every
     // re-entry, so a live refresh already in _fullyChargedAtEpoch/etc. is
-    // never clobbered by Cache's narrower shape. Theme per onShow (A21).
+    // never clobbered by Cache's narrower shape. Theme per onShow (A21),
+    // and the indicator keep-out, which NightMenu clears on its way in.
     function onShow() as Void {
         Theme.refresh();
+        Geo.setKeepOut(_indicator);
         if (!_hasSection) {
             _loadFromCache();
         }
@@ -279,66 +285,77 @@ class ChargingDetailView extends WatchUi.View {
 
     // -------------------------------------------------------- rendering
 
-    // PoC NC.detail: ring with the limit tick, title y 34, hero numMed y 58,
-    // state chip y 134, up to two xtiny rows from y 160, age y 202.
+    // PoC NC.detail, laid out by ChargingFormat.slots() (spec DS.charging):
+    // ring with the limit tick, title, hero in the watch's hero font, state
+    // chip, up to two xtiny rows and the age line. On the fēnix 7 Pro that
+    // is title y 34, hero 58, chip 134, rows from 160, age 202.
     function onUpdate(dc as Dc) as Void {
+        var g = Geo.current();
         dc.setColor(Theme.TEXT_1, Theme.BG);
         dc.clear();
-        var cx = dc.getWidth() / 2;
 
         var soc = ChargingFormat.toNumber(_socPercent);
         var target = _targetSocPercent;
         Bezel.ring(dc, soc != null ? soc / 100.0 : 0,
             _isActive() ? Theme.ACCENT : Theme.TEXT_1,
             (_hasSection && target != null) ? target / 100.0 : null);
-        Ui.title(dc, "Charging", 34);
+        var tTop = Ui.title(dc, "Charging", g.titleTop);
         // START opens the action list; a glyph, not a text hint (B4), and no
         // hint arc because it would sit on the ring.
-        Bezel.glyph(dc, Bezel.BTN_START, :menu, Theme.TEXT_1, null);
+        Bezel.glyphAt(dc, :start, :menu, Theme.TEXT_1, null);
 
         if (!_hasSection) {
-            _drawNoData(dc, cx);
+            _drawNoData(dc, ChargingFormat.slots(g, tTop, 0));
             return;
         }
 
-        Ui.drawValueWithUnit(dc, cx, 58, soc != null ? soc.toString() + "%" : Labels.DASH, null,
-            Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_MEDIUM, Theme.TEXT_1);
+        // The watch's hero font (M1); the milder one if "100%" outgrows the
+        // outline (a large user font).
+        var text = soc != null ? soc.toString() + "%" : Labels.DASH;
+        var heroTop = ChargingFormat.heroTop(g, tTop);
+        var font = g.heroFont;
+        if (dc.getTextWidthInPixels(text, font) > Ui.usable(heroTop, heroTop + dc.getFontHeight(font), Theme.RING_MARGIN)) {
+            font = Graphics.FONT_NUMBER_MILD;
+        }
+        var sl = ChargingFormat.slots(g, tTop, dc.getFontHeight(font));
+        Ui.drawValueWithUnit(dc, g.cx, sl.heroTop, text, null, font, g.unitFont, Theme.TEXT_1);
 
         var chip = _stateChip();
         if (chip != null) {
-            Chips.draw(dc, cx, 134, chip);
+            Chips.draw(dc, g.cx, sl.chipTop, chip);
         }
 
         var rows = ChargingFormat.detailRows(_powerKw, _chargeType, _fullyChargedAtEpoch,
-            _remainingMinutes, _rangeMeters, ChargingFormat.MAX_DETAIL_ROWS);
-        var rowsBottom = ChargingFormat.drawLines(dc, 160, ChargingFormat.ROW_PITCH, rows, Theme.TEXT_1);
+            _remainingMinutes, _rangeMeters, sl.maxRows);
+        var rowsBottom = ChargingFormat.drawLines(dc, sl.rowsTop, sl.pitch, rows, Theme.TEXT_1);
 
         // A transient line (offline, refreshing, an error, command feedback)
-        // takes a free row slot so the age stays visible; with both rows in
+        // takes a free row slot so the age stays visible; with every row in
         // use it replaces the age until the next refresh.
         var kind = _transientKind();
-        if (kind != null && rows.size() < ChargingFormat.MAX_DETAIL_ROWS) {
+        if (kind != null && rows.size() < sl.maxRows) {
             Ui.drawStatusLine(dc, rowsBottom, _transientText(), kind);
-            _drawAge(dc, 202);
+            _drawAge(dc, sl.ageTop);
         } else if (kind != null) {
-            Ui.drawStatusLine(dc, 202, _transientText(), kind);
+            Ui.drawStatusLine(dc, sl.ageTop, _transientText(), kind);
         } else {
-            _drawAge(dc, 202);
+            _drawAge(dc, sl.ageTop);
         }
     }
 
     // PoC NS.page nodata: "No data yet", then a hint where the age goes.
-    function _drawNoData(dc as Dc, cx as Number) as Void {
+    function _drawNoData(dc as Dc, sl as ChargingFormat.Slots) as Void {
+        var g = Geo.current();
         var font = Graphics.FONT_SMALL;
-        var y = 98;
+        var y = sl.noDataTop;
         var s = Ui.fit("No data yet", Ui.usable(y, y + dc.getFontHeight(font), Theme.RING_MARGIN), Ui.measurer(dc, font));
         dc.setColor(Theme.c(Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, y, font, s, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(g.cx, y, font, s, Graphics.TEXT_JUSTIFY_CENTER);
         var kind = _transientKind();
         if (kind != null) {
-            Ui.drawStatusLine(dc, 136, _transientText(), kind);
+            Ui.drawStatusLine(dc, sl.noDataSubTop, _transientText(), kind);
         } else {
-            Ui.drawStatusLine(dc, 136, "Refresh from the menu", :age);
+            Ui.drawStatusLine(dc, sl.noDataSubTop, "Refresh from the menu", :age);
         }
     }
 
@@ -454,9 +471,10 @@ class ChargingDetailView extends WatchUi.View {
 
 }
 
-// BehaviorDelegate, never InputDelegate; back untouched. START and MENU both
-// open the action list (B6): there is one list of things to do here, and
-// MENU is a long-press UP on these watches, which few people find.
+// BehaviorDelegate, never InputDelegate; back untouched. START, MENU and the
+// action menu all open the action list (B6): there is one list of things to
+// do here, and MENU is a long press (UP, or BACK on the Venu 3 / 3S) that
+// few people find, or no key at all on profile C watches.
 class ChargingDetailDelegate extends WatchUi.BehaviorDelegate {
 
     private var _view as WeakReference;
@@ -471,6 +489,12 @@ class ChargingDetailDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onMenu() as Boolean {
+        return _openMenu();
+    }
+
+    // Swipe left or the indicator on watches without MENU (API 5.1.1, only
+    // called on the watches that have it).
+    function onActionMenu() as Boolean {
         return _openMenu();
     }
 

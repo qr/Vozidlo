@@ -256,7 +256,7 @@ class CommandRunner {
     }
 
     // US-058: the status line persists, the native toast does not; both
-    // fire. Guarded with `has`: minApiLevel 5.2.0 predates showToast on some
+    // fire. Guarded with `has`: minApiLevel 5.1.0 predates showToast on some
     // firmware, so it stays a bonus (docs/best-practices "Probe optional
     // API surface with has").
     function _toast(message as String) as Void {

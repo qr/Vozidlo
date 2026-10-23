@@ -2,7 +2,7 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 
 // US-061: the on-device screen for reordering and hiding the home rows,
-// reached from the home's Settings row (SettingsScreen.openTileOrder()).
+// reached from Settings on home (SettingsScreen.open(), then Tile order).
 // A NightMenu (PoC NSet.order): each row shows its category with an icon and
 // the current value as sub-label ("Position 2" or "Hidden"); selecting it
 // opens a second menu for the change, the pattern docs/best-practices

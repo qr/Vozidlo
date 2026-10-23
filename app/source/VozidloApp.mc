@@ -87,13 +87,12 @@ class VozidloApp extends Application.AppBase {
         return HomeScreen.view();
     }
 
-    // US-018: the only on-device settings screen this app has, see
-    // ui/TargetTemperatureSettingsView.mc. A watch app may offer one
+    // US-018: the only on-device settings screen this app has, the target
+    // temperature list in ui/TemperatureMenu.mc. A watch app may offer one
     // (docs/best-practices); watch faces and data fields may not.
     (:typecheck(disableGlanceCheck))
     function getSettingsView() as [Views] or [Views, InputDelegates] or Null {
-        var view = new TargetTemperatureSettingsView();
-        return [ view, new TargetTemperatureSettingsDelegate(view) ];
+        return TemperatureMenu.settingsView();
     }
 
     // Task 10 (US-034/US-035): the glance carousel entry point. VozidloGlanceView
@@ -101,8 +100,8 @@ class VozidloApp extends Application.AppBase {
     // (see ui/GlanceView.mc's own header for the full argument and how it
     // was verified). Selecting the glance in the carousel falls through to
     // the SAME getInitialView() above, which already lands on home with
-    // the primary action focused (US-037): nothing extra to wire here, only
-    // not to break it.
+    // its first row focused: nothing extra to wire here, only not to break
+    // it.
     (:glance)
     function getGlanceView() as [GlanceView] or [GlanceView, GlanceViewDelegate] or Null {
         return [ new VozidloGlanceView() ];

@@ -16,6 +16,10 @@ import Toybox.WatchUi;
 // WatchUi.MapMarker for both the car and (when known) the user, and the
 // same "back steps BROWSE -> PREVIEW -> pop" delegate shape as
 // MapSampleMapDelegate, see MapPreviewDelegate below.
+//
+// (:map): compiled only for watches with MapView (app/monkey.jungle leaves
+// it out on the others, where START opens the Find my car list, M4).
+(:map)
 class MapPreviewView extends WatchUi.MapView {
 
     // A fixed box around the CAR's own location, not a bounding box of both
@@ -79,6 +83,10 @@ class MapPreviewView extends WatchUi.MapView {
 
         // After Garmin's sequence on purpose: a plain field, not map state.
         _car = carLocation;
+
+        // Also after it: the action menu indicator (no MENU key, M5) in
+        // PREVIEW; the delegate hides it while the user pans in BROWSE.
+        Input.enableIndicator(self);
     }
 
     function carLocation() as Position.Location {
@@ -127,6 +135,7 @@ class MapPreviewView extends WatchUi.MapView {
 // is the exact pattern Garmin's own MapSample ships for a MapView
 // (MapSampleMapDelegate.onBack()), not an invention of ours, and it is
 // literally what US-031's acceptance criteria ask for.
+(:map)
 class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
 
     // Weak, see docs/best-practices, "Break reference cycles with weak()".
@@ -144,6 +153,7 @@ class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
         }
         if (view.getMapMode() == WatchUi.MAP_MODE_BROWSE) {
             view.setMapMode(WatchUi.MAP_MODE_PREVIEW);
+            Input.setIndicator(view, true);
         } else {
             view.release();
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
@@ -158,17 +168,24 @@ class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
         var view = _resolve();
         if (view != null) {
             view.setMapMode(WatchUi.MAP_MODE_BROWSE);
+            // Panning owns the whole screen: no indicator over the map.
+            Input.setIndicator(view, false);
         }
         return true;
     }
 
     // B6/research 2026-10-07: the map had no MENU handler, so navigating
     // meant backing out to Find my car first. Same confirmation and
-    // CarNavigation path as there (NavigateConfirm).
+    // CarNavigation path as there (NavigateConfirm). Its one item is
+    // Navigate, so there is no menu where the watch cannot save a waypoint
+    // (M13).
     function onMenu() as Boolean {
         var view = _resolve();
         if (view == null) {
             return false;
+        }
+        if (!CarNavigation.isAvailable()) {
+            return true;
         }
         var car = view.carLocation().toDegrees();
         var menu = new NightMenu("Map", 0, null);
@@ -176,6 +193,11 @@ class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
         view.holdForChild();
         WatchUi.pushView(menu, new MapMenuDelegate(car[0], car[1]), Theme.SLIDE_IN);
         return true;
+    }
+
+    // Watches without MENU (M5): the indicator or a swipe left.
+    function onActionMenu() as Boolean {
+        return onMenu();
     }
 
     private function _resolve() as MapPreviewView? {
@@ -189,6 +211,7 @@ class MapPreviewDelegate extends WatchUi.BehaviorDelegate {
 
 // MENU on the map (PoC NF.MAP_MENU): one item. Pops first, so the
 // confirmation lands on the map and "No" returns to it (A14).
+(:map)
 class MapMenuDelegate extends NightMenuDelegate {
 
     private var _latitude as Double;

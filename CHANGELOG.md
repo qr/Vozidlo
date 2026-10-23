@@ -3,7 +3,118 @@
 Notable changes, newest first. Versions match what is published to the Connect
 IQ Store.
 
-## 1.2.0: unreleased
+## 1.3.0: 2026-10-23
+
+### Added
+
+- **Vozidlo runs on 43 watches instead of six.** New are the Forerunner
+  255S and 255S Music (218 round), the fēnix 7S and 7S Pro (240 round), the
+  fēnix 7X, 7X Pro, 7X Pro Solar Edition (no Wi-Fi), 8 Solar 51mm and 9 Pro
+  Solar 51mm and the Enduro 3 (280 round), the Forerunner 255 and 255 Music,
+  and on AMOLED the Venu 3S, vívoactive 5 and 6, Venu 4 41mm, epix Pro
+  (Gen 2) 42mm, MARQ (Gen 2), Descent Mk3 43mm and Descent G2 (390 round),
+  the epix Pro (Gen 2) 47mm, fēnix 8 43mm and Forerunner 265 (416 round),
+  the Venu 3, Venu 4 45mm, fēnix 8 and 8 Pro (AMOLED), fēnix 9 and 9 Pro
+  47mm (AMOLED), epix Pro (Gen 2) 51mm, Forerunner 965 and 970, D2 Mach 2
+  and Mach 2 Pro and Descent Mk3i 51mm (454 round) and the Venu X1 (448×486
+  rectangle). Only the fēnix 7 Pro has been worn; the others are
+  built and unit-tested with `tools/ciq verify` and checked on the devices
+  design page.
+
+- **Connect IQ 5.1 is enough.** The minimum is 5.1 instead of 5.2, for the
+  Descent Mk3 and Mk3i; the app uses nothing newer without checking for it.
+
+- **The map is optional.** It is on the fēnix watches, the Forerunner 955
+  and the Venu X1. Elsewhere the app is built without it, Find my car shows
+  the address, distance and bearing, and START opens the Find my car list
+  with Navigate and Refresh. Navigate is hidden where the watch has no
+  waypoint support, which the app checks at runtime; on the Venu 3 and 3S
+  that is not yet verified.
+
+- **The app follows each watch's buttons.** Five-button watches work as
+  before, with touch where the watch has it; the Forerunner 255 has no
+  touchscreen. On the Venu 3 and 3S, MENU is holding BACK. The vívoactive
+  6, Venu 4 and Venu X1 have no MENU button: the app's menus open with a
+  swipe left, shown by Garmin's action menu indicator.
+
+### Changed
+
+- **Home opens on Status.** The default order is Status, Find my car, then
+  the commands and the rest, and home opens on its first row so the state of
+  charge and chips are in view. The most-used command is the first climate
+  row, two rows down. An order you saved yourself is kept.
+
+- **The target temperature is a list.** It offers 16 to 30 °C, like the
+  charge limit, instead of a value you step up and down.
+
+- **Empty screens no longer name a button.** They say "Refresh from the
+  menu" or "Try again from the menu", which reads the same on every watch.
+
+- **START on Find my car opens the list where there is no map.** On a
+  watch with the map it still opens the map.
+
+- **The app icon is drawn at each watch's launcher size.**
+
+- **Layouts are computed from the screen.** Sizes and positions follow each
+  watch's resolution and fonts. The fēnix 7 Pro is pixel-identical to
+  1.2.0; the fēnix 7, 8 and 9 and the Forerunner 955 follow their own
+  fonts, which fixes the age overlapping the status text there.
+
+### Fixed
+
+- **One "rate limit exceeded" stopped the app for good.** After that error
+  the app never asked the car again until you cleared all stored data. It
+  now waits an hour, the length of the quota window, shows when it may ask
+  again, and then carries on. A watch stuck this way on 1.2.0 can ask again
+  as soon as 1.3.0 is installed.
+
+- **"Clear stored data" left the car's position behind.** It now also
+  removes the last parked position, the saved location for Navigate, the
+  tile order and the parking flag, as the privacy policy says, and it is in
+  Settings, not only in the menu during setup. After clearing, the app
+  closes; the next start opens setup.
+
+- **A tap could spend a request from the hourly quota.** A tap on Charging
+  profiles after a failed fetch, and on the onboarding retry or blocked
+  screens, sent a request. Taps there are now consumed.
+
+- **Refresh and Navigate on Find my car were only behind MENU.** Where
+  there is no map, START now opens the Find my car list with both; on
+  watches without a MENU button the list also opens with a swipe left.
+
+### Project
+
+- **`tools/ciq verify` is the check before every pull request.** It runs
+  `tools/checks.py`, the design page checks, `build --all` with warnings
+  fatal and each build's size against that watch's memory budget, and the
+  unit tests on one watch per screen family and input profile.
+
+- **Warnings fail the build.**
+
+- **CI checks that the product lists agree.** The manifest, the README, the
+  store listing and the committed device facts in
+  `tools/ui/devices/11-devdata.js` must name the same watches. CI cannot
+  build the app, because the device files need a Garmin login.
+
+- **The lists of watches are generated.** `tools/devicelists.py` writes the
+  README and guide tables, the store listing's requirements, the manifest
+  comment and the jungle's per-watch lines from the manifest and the device
+  facts, and the devices page builds its columns from them, so adding a
+  watch is a manifest line and two generator runs.
+
+- **A build larger than its watch's memory budget fails**, and so does
+  `tools/ciq verify`.
+
+- **`tools/ciq run` loads the watch it built.** With `CIQ_DEVICE` set it
+  used to load the fēnix 7 Pro's build.
+
+- **How to release** is written down in `docs/releasing.md`.
+
+- **A devices design page**, `docs/design/vozidlo-devices.html`, shows every
+  screen on every supported watch, fit-checked by
+  `node tools/ui/fitcheck.mjs --devices`.
+
+## 1.2.0: 2026-10-08
 
 ### Added
 

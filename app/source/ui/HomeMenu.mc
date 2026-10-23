@@ -29,8 +29,9 @@ class HomeMenu extends NightMenu {
 
     function initialize() {
         var built = HomeRows.build();
-        // US-037: the primary action has the focus at launch.
-        NightMenu.initialize("", built[1], Theme.HOME_TITLE_H);
+        // Home opens on its first row (Status by default), so the hero is in
+        // view at launch (decisions.md "Home opens on its first row.").
+        NightMenu.initialize("", built[1], Geo.current().heroBottom);
         _signature = ControlTiles.signature(built[0]);
         _addRows(built[0]);
         _hero = HomeHero.fromCache(null, :sent);
@@ -118,7 +119,10 @@ class HomeMenu extends NightMenu {
 // what home shows (US-061 "never less").
 module HomeRows {
 
-    // [rows, index of the primary action] (US-037).
+    // [rows, index of the row to focus]. The focus is the first row: the
+    // hero is only drawn while row 0 has it, and with the default order the
+    // first row is Status. The primary action still comes first within the
+    // climate group (US-037), one or two rows down.
     function build() as [Array<ControlTiles.TileDescriptor>, Number] {
         var settings = getApp().getSettings();
         var operations = Cache.operations() as Array<String>?;
@@ -136,8 +140,7 @@ module HomeRows {
         if (rows.size() == 0) {
             rows.add(new ControlTiles.TileDescriptor(ControlTiles.OPEN_TILE_ORDER, "Settings", :gear));
         }
-        var primary = ControlTiles.primaryAction(ControlTiles.visibleCandidates(operations, settings.hasSpin), preferred);
-        return [rows, ControlTiles.indexOf(rows, primary)];
+        return [rows, 0];
     }
 
     function supported() as Array<Symbol> {
@@ -176,7 +179,7 @@ class HomeDelegate extends NightMenuDelegate {
         } else if (id == ControlTiles.FIND_MY_CAR) {
             FindMyCarScreen.open();
         } else if (id == ControlTiles.OPEN_TILE_ORDER) {
-            SettingsScreen.openTileOrder();
+            SettingsScreen.open();
         } else if (id instanceof Symbol) {
             var home = _resolve();
             if (home != null) {

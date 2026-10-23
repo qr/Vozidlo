@@ -89,17 +89,25 @@ module HomeHeroTests {
     }
 
     // fēnix 7 Pro: title 104, xtiny 19, chips 21. Status line sits on the
-    // bottom, the chips above, the digits' baseline above those.
+    // bottom, the chips above, the digits' baseline above those. The gaps
+    // scale with the screen (Venu 3S: 3 and 6).
     (:test)
     function slotsStackFromTheBottom(logger as Logger) as Boolean {
-        var y = HomeHero.slots(104, 19, 21, true);
+        var g = GeoTests.fenix7pro();
+        var y = HomeHero.slots(g, 104, 19, 21, true);
         if (y[0] != 85 || y[1] != 62 || y[2] != 58) {
             logger.error("unexpected slots " + y[0].toString() + "/" + y[1].toString() + "/" + y[2].toString());
             return false;
         }
-        var noChips = HomeHero.slots(104, 19, 21, false);
+        var noChips = HomeHero.slots(g, 104, 19, 21, false);
         if (noChips[1] != noChips[0] || noChips[2] != 81) {
             logger.error("without chips the hero must sit on the status line");
+            return false;
+        }
+        var v = GeoTests.venu3s();
+        var big = HomeHero.slots(v, v.heroBottom, v.fonts.xtinyH, v.chipH, true);
+        if (big[0] != 147 - v.fonts.xtinyH || big[1] != big[0] - 3 - v.chipH || big[2] != big[1] - 6) {
+            logger.error("unexpected Venu 3S slots " + big[0].toString() + "/" + big[1].toString() + "/" + big[2].toString());
             return false;
         }
         return true;

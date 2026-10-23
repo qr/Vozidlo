@@ -215,4 +215,48 @@ module GlanceTests {
         return true;
     }
 
+    // GlanceLayout.rows(): [row 1 top, row 2 top, bar top, bar height] in
+    // the glance area's own px. Font heights and areas are the device files'
+    // (tools/ui/devices/11-devdata.js), so these run on any test device.
+    function rowsAre(logger as Logger, label as String, got as Array<Number>,
+                     want as Array<Number>) as Boolean {
+        for (var i = 0; i < want.size(); i += 1) {
+            if (got[i] != want[i]) {
+                logger.error(label + ": expected " + want.toString() + ", got " + got.toString());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // fēnix 7 Pro, s = 1, 171 x 63 area, FONT_XTINY 19, FONT_TINY 29: the
+    // layout the glance has always had, pixel for pixel.
+    (:test)
+    function fenix7ProRowsAreUnchanged(logger as Logger) as Boolean {
+        return rowsAre(logger, "fenix7pro", GlanceLayout.rows(63, 1.0, 19, 29, false), [2, 22, 55, 4]);
+    }
+
+    // fēnix 8 (81 high, FONT_XTINY 21) and FR955 (93 high): row 2 still
+    // follows the larger name font and the bar stays 8 px off the bottom.
+    (:test)
+    function fenix8AndFr955RowsAreUnchanged(logger as Logger) as Boolean {
+        return rowsAre(logger, "fenix8solar47mm", GlanceLayout.rows(81, 1.0, 21, 29, false), [2, 24, 73, 4])
+            && rowsAre(logger, "fr955", GlanceLayout.rows(93, 1.0, 21, 29, false), [2, 24, 85, 4]);
+    }
+
+    // Venu 3S, s = 1.5, 260 x 141 area, FONT_XTINY 32, FONT_TINY 40: the
+    // 88 px block of rows (bar 6, gap 9) centres, the bar follows row 2.
+    (:test)
+    function venu3sRowsCentreInTheTallArea(logger as Logger) as Boolean {
+        return rowsAre(logger, "venu3s", GlanceLayout.rows(141, 1.5, 32, 40, true), [27, 60, 109, 6]);
+    }
+
+    // Centring never pushes row 1 above px(2) or the bar below h - px(8);
+    // at the fēnix 7 Pro's 63 px both rules land on today's layout.
+    (:test)
+    function centredRowsStayInsideTheArea(logger as Logger) as Boolean {
+        return rowsAre(logger, "centred, fenix7pro area", GlanceLayout.rows(63, 1.0, 19, 29, true), [2, 22, 55, 4])
+            && rowsAre(logger, "centred, too short", GlanceLayout.rows(40, 1.0, 19, 29, true), [2, 22, 32, 4]);
+    }
+
 }

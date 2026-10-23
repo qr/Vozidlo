@@ -115,18 +115,21 @@ module StatusPagesTests {
             && _expect(logger, "ac lines", _joined(ac.lines), "Windscreen heat off");
     }
 
-    // A7 and US-008: no data asks for START; a missing value is a dash with
-    // no unit; the lock hero turns amber when insecure.
+    // A7, M7 and US-008: no data points to the menu, not to a button; a
+    // missing value is a dash with no unit; the lock hero turns amber when
+    // insecure.
     (:test)
     function emptyAndMissingValues(logger as Logger) as Boolean {
         var empty = StatusPages.build("odometer", _section(VehicleState.KIND_UNKNOWN, {}));
+        var away = StatusPages.build("fuelStatus", _section(VehicleState.KIND_UNAVAILABLE, {}));
         var odo = StatusPages.build("odometer", _section(VehicleState.KIND_PRESENT, {}));
         var lock = StatusPages.build("status", _section(VehicleState.KIND_PRESENT, { "doorsLocked" => "TRUNK_OPENED" }));
         if (empty.kind != :empty || odo.unit != null || lock.color != Theme.WARNING) {
             logger.error("wrong kind, unit or lock colour");
             return false;
         }
-        return _expect(logger, "empty", empty.main + "/" + (empty.sub as String), "No data yet/START to refresh")
+        return _expect(logger, "empty", empty.main + "/" + (empty.sub as String), "No data yet/Refresh from the menu")
+            && _expect(logger, "unavailable", away.main + "/" + (away.sub as String), "Unavailable/Try again from the menu")
             && _expect(logger, "odometer", odo.main, Labels.DASH)
             && _expect(logger, "lock", lock.main, "Trunk open");
     }

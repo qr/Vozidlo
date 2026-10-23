@@ -7,14 +7,26 @@
 // a grey fill, retired colours, and a monochrome pass that may only use black and white.
 // The OLD (1.0) screens are not checked: they are the record of what was wrong.
 //
+// --devices runs the multi-device plan (docs/design/vozidlo-devices.html, tools/ui/devices/) the same way:
+// every product in DEV_DATA, drawn with its column's rules and its own fonts, every screen it has (DEV_SCREENS
+// with avail(P)), against its own outline (circle r 130 logical, or the X1's rounded rectangle), with EDGE in
+// logical px; variants: font scale 1, 1.4 on watches without MENU (user font size), and a monochrome pass.
+// Not checked there: the glance (drawn at device px in the glance list, not on the screen outline) and the
+// map preview (Garmin's MapView).
+//
 // Usage: node tools/ui/fitcheck.mjs [card-id-prefix | sim]     exit code 1 when anything fails
+//        node tools/ui/fitcheck.mjs --devices [product-id]
 import fs from "node:fs";
 import vm from "node:vm";
 import path from "node:path";
 
-const dir = path.join(path.dirname(new URL(import.meta.url).pathname), "poc");
-const parts = ["10-core.js", "20-old.js", "30-new-home.js", "31-new-status.js", "32-new-other.js", "40-sim.js"];
-const filter = process.argv[2] || "";
+const here = path.dirname(new URL(import.meta.url).pathname);
+const dir = path.join(here, "poc");
+const DEVICES = process.argv[2] === "--devices";
+const parts = DEVICES ? ["10-core.js", "30-new-home.js", "31-new-status.js", "32-new-other.js"]
+  : ["10-core.js", "20-old.js", "30-new-home.js", "31-new-status.js", "32-new-other.js", "40-sim.js"];
+const devParts = ["11-devdata.js", "10-profiles.js", "20-render.js", "30-native.js", "40-screens.js", "45-input.js"];
+const filter = (DEVICES ? process.argv[3] : process.argv[2]) || "";
 
 let styleLog = [];
 const ctx = new Proxy({}, {
@@ -35,8 +47,11 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-const code = parts.map(p => fs.readFileSync(path.join(dir, p), "utf8")).join("\n") +
-  "\n;globalThis.__api = { Dc, CARDS, SIM_VIEWS, OLD_SCREENS, FM, PX, BANNED, T, TB, Ui, calibrate };";
+const code = DEVICES
+  ? parts.map(p => fs.readFileSync(path.join(dir, p), "utf8")).concat(devParts.map(p => fs.readFileSync(path.join(here, "devices", p), "utf8"))).join("\n") +
+    "\n;globalThis.__api = { Dc, FM, PX, BANNED, T, TB, Ui, calibrate, DEV, DEV_DATA, DevRender, DEV_SCREENS };"
+  : parts.map(p => fs.readFileSync(path.join(dir, p), "utf8")).join("\n") +
+    "\n;globalThis.__api = { Dc, CARDS, SIM_VIEWS, OLD_SCREENS, FM, PX, BANNED, T, TB, Ui, calibrate };";
 vm.runInContext(code, sandbox, { filename: "poc.js" });
 const A = sandbox.__api;
 A.calibrate();
@@ -47,10 +62,11 @@ const RULE = A.T.RULE.toUpperCase(), GREENS = ["#00FF00", "#00AA00"];
 const fails = [];
 function halfChord(dy) { return dy >= 130 ? 0 : Math.sqrt(130 * 130 - dy * dy); }
 
-function check(label, draw, mono) {
+// halfChordOf: half width of the outline at distance dy from the centre (130, 130); makeDc: the Dc to draw on.
+function check(label, draw, mono, halfChordOf = halfChord, makeDc = () => new A.Dc(ctx, 260, 260)) {
   const events = []; styleLog = [];
   A.Dc.onDraw = e => events.push(e);
-  const dc = new A.Dc(ctx, 260, 260); dc.mono = mono;
+  const dc = makeDc(); dc.mono = mono;
   try { draw(dc); } catch (e) { fails.push([label, "throws", String(e && e.message || e)]); A.Dc.onDraw = null; return; }
   A.Dc.onDraw = null;
   events.forEach((e, i) => e.i = i);
@@ -76,7 +92,7 @@ function check(label, draw, mono) {
     }
     const bandTop = e.top + e.asc * 0.25, bandBot = e.top + e.asc;
     if (e.clip && (bandBot <= e.clip.y || bandTop >= e.clip.y + e.clip.h)) continue;    // clipped away on purpose
-    const hc = halfChord(Math.max(Math.abs(bandTop - 130), Math.abs(bandBot - 130)));
+    const hc = halfChordOf(Math.max(Math.abs(bandTop - 130), Math.abs(bandBot - 130)));
     const hidden = Math.max(0, (130 - hc) - e.left) + Math.max(0, e.right - (130 + hc));
     const margin = Math.min(e.left - (130 - hc), (130 + hc) - e.right);
     if (hidden > 1) fails.push([label, "off-circle", `"${e.text}" ${e.font} y${Math.round(e.top)} w${Math.round(e.right - e.left)} hidden ${Math.round(hidden)}px`]);
@@ -99,6 +115,8 @@ function check(label, draw, mono) {
 }
 
 let count = 0;
+if (DEVICES) checkDevices();
+else {
 for (const card of A.CARDS) {
   if (filter && !card.id.startsWith(filter)) continue;
   (card.neu || []).forEach((v, i) => {
@@ -117,6 +135,36 @@ for (const [name, view] of Object.entries(A.SIM_VIEWS)) {
     try { st = view.init(Object.assign({}, o)); for (const k of sq) { const r = view.key(k, st); if (r && typeof r === "object" && (r.push || r.pop || r.replace)) { ok = false; break; } } } catch (e) { fails.push([lab, "throws", String(e.message || e)]); continue; }
     if (!ok) continue;
     check(lab, dc => view.draw(dc, st), false); count++;
+  }
+}
+}
+
+// Every product with its column's rules and its own fonts; outline per shape.
+function checkDevices() {
+  const { DEV, DEV_DATA, DevRender, DEV_SCREENS } = A;
+  DevRender.captureOriginals();
+  const bad = DEV.validate().concat(DevRender.fontsMatchPoc() ? ["fenix7pro fonts differ from the poc's FM table"] : []);
+  for (const b of bad) fails.push(["columns", "data", b]);
+  for (const pid of Object.keys(DEV_DATA)) {
+    if (filter && pid !== filter) continue;
+    const col = DEV.columnOf(pid); if (!col) continue;
+    for (const k of col.input === "C" ? [1, 1.4] : [1]) {
+      const P = DEV.derive(col.id, { product: pid, fontScale: k });
+      const outline = P.shape === "round" ? halfChord : dy => {
+        const half = P.H / 2; if (dy >= half) return 0;
+        const d = half - dy, rc = P.corner;
+        return 130 - (d < rc ? rc - Math.sqrt(rc * rc - (rc - d) * (rc - d)) : 0);
+      };
+      for (const scr of DEV_SCREENS.list) {
+        if (!scr.avail(P) || scr.raw || scr.bg) continue;
+        const ind = !!scr.indicator && P.input === "C";
+        const draw = dc => DevRender.withProfile(P, G => { scr.prop(dc, G, P); if (ind) G.indicator(dc); }, { indicator: ind, glyphMap: scr.glyphMap });
+        const label = `${pid}${k !== 1 ? " ×" + k : ""} ${scr.id}`;
+        check(label, draw, false, outline, () => new DevRender.DevDc(ctx, 260, 260));
+        check(label + " mono", draw, true, outline, () => new DevRender.DevDc(ctx, 260, 260));
+        count++;
+      }
+    }
   }
 }
 const byKind = {};

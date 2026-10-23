@@ -24,6 +24,30 @@ module TextBlockTests {
         return (new FixedWidthFont()).method(:width);
     }
 
+    // The Venu X1's rounded rectangle: full width between the corners, the
+    // corner circle's chord inside them (r 58: 10 px from the edge the
+    // circle is 32.6 px in from its centre), 0 outside.
+    (:test)
+    function roundedRectHalfChordFollowsTheCorners(logger as Logger) as Boolean {
+        if (TextBlock.roundedRectHalfChord(224, 243, 58, 0) != 224 || TextBlock.roundedRectHalfChord(224, 243, 58, 185) != 224) {
+            logger.error("between the corners the half chord is the half width");
+            return false;
+        }
+        if (TextBlock.roundedRectHalfChord(224, 243, 58, 233) != 198) {
+            logger.error("10 px from the edge expected 198, got " + TextBlock.roundedRectHalfChord(224, 243, 58, 233));
+            return false;
+        }
+        if (TextBlock.roundedRectHalfChord(224, 243, 58, 243) != 0 || TextBlock.roundedRectHalfChord(224, 243, 58, 400) != 0) {
+            logger.error("at and past the edge there is no room");
+            return false;
+        }
+        if (TextBlock.roundedRectHalfChord(224, 243, 0, 242) != 224) {
+            logger.error("square corners give the full width up to the edge");
+            return false;
+        }
+        return true;
+    }
+
     // The chord of a circle, which is what decides how much room a line of
     // text has on a round face. Values checked against Pythagoras: at the
     // centre the half-chord is the radius; at 3-4-5 proportions it is exact.

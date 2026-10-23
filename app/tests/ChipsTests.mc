@@ -59,11 +59,18 @@ module ChipsTests {
         return _is(logger, Chips.forClimate("HEATING"), "Heating", :outline);
     }
 
-    // B4: 8 px padding each side, 14 for an icon; a row adds its gaps.
+    // B4: 8 px padding each side, 14 for an icon, scaled with the screen;
+    // a row adds its gaps.
     (:test)
     function widthMaths(logger as Logger) as Boolean {
-        if (Chips.width(50, false) != 66 || Chips.width(50, true) != 80) {
+        var g = GeoTests.fenix7pro();
+        if (Chips.widthIn(g, 50, false) != 66 || Chips.widthIn(g, 50, true) != 80) {
             logger.error("expected 66 without and 80 with an icon for 50 px of text");
+            return false;
+        }
+        var v = GeoTests.venu3s();
+        if (Chips.widthIn(v, 50, false) != 74 || Chips.widthIn(v, 50, true) != 95) {
+            logger.error("on the Venu 3S expected 74 and 95 (padding 12, icon 21)");
             return false;
         }
         if (Chips.rowWidth([80, 66] as Array<Number>, 6) != 152) {

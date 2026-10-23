@@ -1,8 +1,25 @@
 # Vozidlo UI improvements (fēnix 7 Pro)
 
+> **Partly superseded for the other watches (1.3.0).** This proposal was made
+> for the 260 px fēnix 7 Pro, and it stays the record of that. For the 21
+> watches supported since 1.3.0, the devices design page,
+> `docs/design/vozidlo-devices.html` (decisions M1 to M13), and
+> [decisions.md, Devices](../decisions.md#devices) take precedence; the
+> current rules are in the [style guide](style-guide.md). Superseded here:
+> the wording of B1.1 ("the widest chord, y ≈ 95 to 165" now reads "the
+> middle band, about 0.37h to 0.63h"); B1.3 (the menu route, and the left
+> swipe on watches without MENU); B1.4 (Garmin's action menu indicator stays
+> native too); B1.6 ("the outline is the grid", positions stacked from
+> measured fonts); the B3 rationale (the palette also serves the AMOLED
+> watches); B4's bezel zone r ≥ 122 (r ≥ 108, scaled as R − 22·s); C2's
+> white current page dot (it is the accent); C4's stepper (the charge limit
+> and the target temperature are lists); and step 4 of C8 (corners are
+> checked against the outline at R − 22·s, not r 122). The decisions D1 to D7
+> below are this document's own and are not the devices page's M1 to M13.
+
 Status: implemented in 1.1.0. All seven decisions are settled (section 6): D1, D2, D4 and D7 decided as hero list, separate charging screen, action list and own page dots; D3 decided as Škoda Electric Green; D5 implemented as solid icons; D6 implemented as one tap runs a row (`CustomMenu`). Two checks on the watch are still open: what the number font draws for missing glyphs, and whether a single tap runs a row. The rest of this document is kept as the record of the proposal.
 
-Proposal of 2026-10-07. Basis: code at `3c4d005`, the screen board `docs/design/vozidlo-screens.html`, fēnix 7 Pro device files from SDK 9.2.0, and desk research on MyŠkoda, Škoda corporate design and Garmin UX guidelines (sources at the end).
+Proposal of 2026-10-07. Basis: code at `3c4d005`, the screen board `docs/design/vozidlo-screens.html` (removed on 2026-10-23; it is in the git history), fēnix 7 Pro device files from SDK 9.2.0, and desk research on MyŠkoda, Škoda corporate design and Garmin UX guidelines (sources at the end).
 
 ## 1. Summary
 

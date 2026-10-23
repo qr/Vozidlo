@@ -122,8 +122,8 @@ class StatusModel {
         var errorBody = (data instanceof Dictionary) ? (data as Dictionary) : null;
         if (responseCode == 429) {
             var problemType = (errorBody != null) ? (errorBody.get("type") as String?) : null;
-            // Retry-After is likewise unreadable on this platform, so this
-            // can only record "blocked", never "blocked until X" (Quota.mc).
+            // Retry-After is likewise unreadable on this platform, so a
+            // rate-limit-exceeded blocks for an hour from now (Quota.mc).
             Quota.recordRateLimited(problemType, null);
         }
         // Full text: the page fits it to the circle by pixels (A5), which

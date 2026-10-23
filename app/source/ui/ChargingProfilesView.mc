@@ -47,11 +47,6 @@ class ChargingProfileEntry {
 // VehicleState.KIND_UNSUPPORTED).
 class ChargingProfilesView extends WatchUi.View {
 
-    // xtiny pitch on the profile card (PoC NC.profile) and the lowest line
-    // start that still leaves a usable chord.
-    const LINE_PITCH = 19;
-    const LAST_LINE_Y = 216;
-
     private var _hasFetched as Boolean = false;
     private var _fetching as Boolean = false;
     private var _supported as Boolean = false;
@@ -67,8 +62,11 @@ class ChargingProfilesView extends WatchUi.View {
     function onLayout(dc as Dc) as Void {
     }
 
+    // No action menu here, so no indicator: clear the keep-out the
+    // charging screen underneath may have left on.
     function onShow() as Void {
         Theme.refresh();
+        Geo.setKeepOut(false);
         if (!_hasFetched) {
             _fetch();
         }
@@ -209,7 +207,8 @@ class ChargingProfilesView extends WatchUi.View {
         WatchUi.requestUpdate();
     }
 
-    // A19: SELECT retries after a failed or blocked fetch. A loaded list is
+    // A19: START retries after a failed or blocked fetch (a tap does not:
+    // a retry spends quota). A loaded list is
     // not re-fetched: profiles are fetched once per visit (class comment).
     function retry() as Void {
         if (_fetching || (_hasFetched && _lastError == null)) {
@@ -220,28 +219,30 @@ class ChargingProfilesView extends WatchUi.View {
 
     // -------------------------------------------------------- rendering
 
-    // PoC NC.profile / NC.profilesUnsupported: title y 40, then either a
+    // PoC NC.profile / NC.profilesUnsupported, laid out by
+    // ChargingFormat.profileSlots() (spec DS.profile): title, then either a
     // state (loading, error, unsupported, none) or one profile card.
     function onUpdate(dc as Dc) as Void {
+        var g = Geo.current();
         dc.setColor(Theme.TEXT_1, Theme.BG);
         dc.clear();
-        Ui.title(dc, "Charging profiles", 40);
+        var sl = ChargingFormat.profileSlots(g, Ui.title(dc, "Charging profiles", ChargingFormat.profileTitleTop(g)));
 
         if (_fetching) {
-            _drawState(dc, "Loading" + Labels.ELLIPSIS, null);
+            _drawState(dc, sl, "Loading" + Labels.ELLIPSIS, null);
             return;
         }
 
         var error = _lastError;
         if (error != null) {
-            Ui.drawStatusLine(dc, 112, error, :error);
+            Ui.drawStatusLine(dc, sl.errorTop, error, :error);
             _drawRetryGlyph(dc);
             return;
         }
 
         if (!_hasFetched) {
             // Only when the config gate blocked the fetch; START tries again.
-            _drawState(dc, "Not loaded", null);
+            _drawState(dc, sl, "Not loaded", null);
             _drawRetryGlyph(dc);
             return;
         }
@@ -250,52 +251,57 @@ class ChargingProfilesView extends WatchUi.View {
             // US-026: "the section is absent". This vehicle simply does
             // not have any (the mock's default scenario, and every real
             // vehicle measured so far, see mock/README.md).
-            _drawState(dc, "Not supported", "by this car");
+            _drawState(dc, sl, "Not supported", "by this car");
             return;
         }
 
         if (_profiles.size() == 0) {
-            _drawState(dc, "No profiles saved", null);
+            _drawState(dc, sl, "No profiles saved", null);
             return;
         }
 
-        _drawProfile(dc, _profiles[_pageIndex] as ChargingProfileEntry);
+        _drawProfile(dc, g, sl, _profiles[_pageIndex] as ChargingProfileEntry);
         if (_profiles.size() > 1) {
             Bezel.pageDots(dc, _pageIndex, _profiles.size());
         }
     }
 
-    // FONT_SMALL at y 104, an optional grey second line at y 136.
-    function _drawState(dc as Dc, line1 as String, line2 as String?) as Void {
+    // FONT_SMALL, an optional grey second line (y 104 / 136 on the fēnix 7
+    // Pro).
+    function _drawState(dc as Dc, sl as ChargingFormat.ProfileSlots, line1 as String, line2 as String?) as Void {
         var font = Graphics.FONT_SMALL;
         var cx = dc.getWidth() / 2;
         var h = dc.getFontHeight(font);
         var measure = Ui.measurer(dc, font);
+        var y = sl.stateTop;
         dc.setColor(Theme.c(Theme.TEXT_1), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 104, font, Ui.fit(line1, Ui.usable(104, 104 + h, Theme.MARGIN), measure), Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, y, font, Ui.fit(line1, Ui.usable(y, y + h, Theme.MARGIN), measure), Graphics.TEXT_JUSTIFY_CENTER);
         if (line2 != null) {
+            var y2 = sl.stateSubTop;
             dc.setColor(Theme.c(Theme.TEXT_2), Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, 136, font, Ui.fit(line2, Ui.usable(136, 136 + h, Theme.MARGIN), measure), Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(cx, y2, font, Ui.fit(line2, Ui.usable(y2, y2 + h, Theme.MARGIN), measure), Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
 
     // Replaces the old "SELECT to load" text: a glyph at START (B4).
     function _drawRetryGlyph(dc as Dc) as Void {
-        Bezel.glyph(dc, Bezel.BTN_START, :refresh, Theme.TEXT_1, :accent);
+        Bezel.glyphAt(dc, :start, :refresh, Theme.TEXT_1, :accent);
     }
 
-    // Name as the hero word y 70, a white "Here" chip y 108 for the profile
-    // where the car is parked (A-resolutions: white, not green), facts from
-    // y 136, timers in grey below them, each line fitted to its chord.
-    function _drawProfile(dc as Dc, profile as ChargingProfileEntry) as Void {
-        var cx = dc.getWidth() / 2;
+    // Name as the hero word, a white "Here" chip for the profile where the
+    // car is parked (A-resolutions: white, not green), facts under it,
+    // timers in grey below them, each line fitted to its chord. Timers
+    // start 4 px under the facts (y 178 on the fēnix 7 Pro, lower under a
+    // third fact) and the last one must start by ProfileSlots.lastTop
+    // (y 216), where the chord is still about half the width.
+    function _drawProfile(dc as Dc, g as Geo.Display, sl as ChargingFormat.ProfileSlots, profile as ChargingProfileEntry) as Void {
         var font = Graphics.FONT_MEDIUM;
-        var nameY = 70;
+        var nameY = sl.nameTop;
         var name = Ui.fit(profile.name, Ui.usable(nameY, nameY + dc.getFontHeight(font), Theme.MARGIN), Ui.measurer(dc, font));
-        Ui.drawHeroWord(dc, cx, nameY, name, null, Theme.TEXT_1);
+        Ui.drawHeroWord(dc, g.cx, nameY, name, null, Theme.TEXT_1);
 
         if (profile.isCurrent) {
-            Chips.draw(dc, cx, 108, new Chips.Chip("Here", :pin, :white));
+            Chips.draw(dc, g.cx, sl.chipTop, new Chips.Chip("Here", :pin, :white));
         }
 
         var facts = [
@@ -306,21 +312,20 @@ class ChargingProfilesView extends WatchUi.View {
         if (nextTime != null) {
             facts.add("Next " + nextTime);
         }
-        var y = ChargingFormat.drawLines(dc, 136, LINE_PITCH, facts, Theme.TEXT_1);
-
-        // Timers start at y 178 (PoC) or right under a third fact line; the
-        // last one must start by y 216, where the chord is still ~130 px.
-        var timerY = y + 4 > 178 ? y + 4 : 178;
-        if (profile.timerLines.size() == 0) {
-            ChargingFormat.drawLines(dc, timerY, LINE_PITCH, ["No enabled timers"] as Array<String>, Theme.TEXT_2);
+        var timerY = ChargingFormat.drawLines(dc, sl.factsTop, sl.pitch, facts, Theme.TEXT_1) + sl.timerGap;
+        var room = sl.timerRoom(timerY);
+        if (room <= 0) {
             return;
         }
-        var room = (LAST_LINE_Y - timerY) / LINE_PITCH + 1;
+        if (profile.timerLines.size() == 0) {
+            ChargingFormat.drawLines(dc, timerY, sl.pitch, ["No enabled timers"] as Array<String>, Theme.TEXT_2);
+            return;
+        }
         var timers = profile.timerLines;
         if (timers.size() > room) {
             timers = timers.slice(0, room) as Array<String>;
         }
-        ChargingFormat.drawLines(dc, timerY, LINE_PITCH, timers, Theme.TEXT_2);
+        ChargingFormat.drawLines(dc, timerY, sl.pitch, timers, Theme.TEXT_2);
     }
 
     function _percentText(value as Number?) as String {
@@ -333,8 +338,9 @@ class ChargingProfilesView extends WatchUi.View {
 }
 
 // BehaviorDelegate, back untouched: leaving this screen needs nothing
-// beyond the default pop. UP/DOWN page through the profiles; SELECT retries
-// a failed fetch (A19), which the old delegate could not do at all.
+// beyond the default pop. UP/DOWN and swipes page through the profiles;
+// START retries a failed fetch (A19). A tap does nothing: a retry spends
+// quota, and a tap is easy to make by accident (A15).
 class ChargingProfilesDelegate extends WatchUi.BehaviorDelegate {
 
     private var _view as WeakReference;
@@ -365,6 +371,11 @@ class ChargingProfilesDelegate extends WatchUi.BehaviorDelegate {
         if (view != null) {
             view.retry();
         }
+        return true;
+    }
+
+    // Consumed so it never arrives as onSelect (a retry).
+    function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
         return true;
     }
 

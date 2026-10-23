@@ -1,0 +1,248 @@
+<title>Vozidlo on every watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Roboto:wght@400;700;900&family=Roboto+Condensed:wght@600;700&family=Yantramanav:wght@400&display=swap">
+<style>
+/* Layout: the poc's review board, widened. Header, sticky toolbar, device facts, input profiles,
+   principles and decisions, then one card per screen with a watch per column: today, then the proposal per watch. */
+:root {
+  --bg: #eceae6; --surface: #f7f6f3; --ink: #1d1f22; --ink-2: #565a60; --rule: #d3d0ca;
+  --accent: #0077b6; --accent-bg: #e0eef6; --flag: #b45309; --flag-bg: #fbecd9; --chip: #e2dfd9;
+  --ok: #2f7d32; --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tb-h: 64px; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+    --accent: #3db8ff; --accent-bg: #13283a; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; --ok: #7bc47f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141517; --surface: #1c1e21; --ink: #e9e7e3; --ink-2: #a3a39f; --rule: #2e3135;
+  --accent: #3db8ff; --accent-bg: #13283a; --flag: #f5a524; --flag-bg: #2e2412; --chip: #26292d; --ok: #7bc47f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); overflow-x: hidden; }
+.wrap { max-width: 1960px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code { font: .85em var(--font-mono); background: var(--chip); padding: .05em .3em; border-radius: 3px; overflow-wrap: anywhere; }
+header h1 { font: 700 2.4rem/1.05 var(--font-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+header .meta { font: 500 .8rem/1.5 var(--font-mono); color: var(--ink-2); margin-top: .5rem; }
+header p { max-width: 80ch; margin: .9rem 0 0; color: var(--ink-2); }
+
+.toolbar { position: sticky; top: 0; z-index: 5; margin-top: 1.25rem; padding: .6rem 0; background: var(--bg); border-bottom: 1px solid var(--rule);
+  display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; }
+.toolbar .grp { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
+.toolbar .lbl { font: 600 .72rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin-right: .25rem; }
+.toolbar button, .toolbar label { font: 500 .85rem/1 var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 6px; padding: .45rem .65rem; cursor: pointer; display: inline-flex; gap: .4rem; align-items: center; }
+.toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.toolbar label:has(input:checked) { border-color: var(--accent); }
+.toolbar label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toolbar input { accent-color: var(--accent); margin: 0; }
+.toolbar input:focus-visible { outline: none; }
+.toolbar nav { display: flex; gap: .25rem .9rem; flex-wrap: wrap; margin-left: auto; }
+.toolbar nav a { color: var(--ink-2); text-decoration: none; font: 600 .8rem/1.6 var(--font-display); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.toolbar nav a:hover { color: var(--accent); }
+
+.box { margin-top: 1.75rem; border: 1px solid var(--rule); border-left: 4px solid var(--accent); background: var(--surface); border-radius: 4px; padding: 1rem 1.25rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+.box.flagged { border-left-color: var(--flag); }
+.box h2 { font: 700 1.25rem/1.2 var(--font-display); margin: 0 0 .6rem; letter-spacing: .02em; }
+.box h3 { font: 700 .95rem/1.2 var(--font-display); margin: 1rem 0 .4rem; letter-spacing: .02em; }
+.box ul { margin: 0; padding-left: 1.2rem; display: grid; gap: .35rem; }
+.box li::marker { color: var(--accent); }
+.box p { margin: .3rem 0 0; max-width: 95ch; }
+.fine { color: var(--ink-2); font-size: .85rem; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: .88rem; }
+th, td { text-align: left; vertical-align: top; padding: .35rem .6rem; border-bottom: 1px solid var(--rule); }
+thead th { font: 700 .78rem/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
+tbody th { font-weight: 600; white-space: nowrap; }
+table.facts td { white-space: nowrap; }
+.st { font: 600 .66rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .25rem .4rem; border-radius: 3px; white-space: nowrap; }
+.st.holds { background: var(--chip); color: var(--ok); }
+.st.scaled { background: var(--accent-bg); color: var(--accent); }
+.st.amended { background: var(--flag-bg); color: var(--flag); }
+.dec { font: 600 .7rem/1 var(--font-mono); color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: .15rem .3rem; margin-right: .35rem; white-space: nowrap; vertical-align: .1em; }
+.dec.done { color: var(--ok); border-color: var(--ok); }
+.profiles { display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; margin-top: .8rem; }
+.profiles figure { margin: 0; display: grid; gap: .5rem; align-content: start; max-width: 300px; }
+.profiles figcaption { font-size: .9rem; }
+.touchoff { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-12deg); background: var(--flag); color: #fff;
+  font: 700 .8rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .35rem .6rem; border-radius: 3px; }
+
+section.area { margin-top: 2.75rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+section.area > h2 { font: 700 1.6rem/1.1 var(--font-display); margin: 0; display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
+section.area > h2 small { font: 500 .78rem/1 var(--font-mono); color: var(--ink-2); }
+section.area > p { color: var(--ink-2); margin: .4rem 0 0; max-width: 95ch; }
+.cards { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
+.card { min-width: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1rem 1.1rem 1.1rem; scroll-margin-top: calc(var(--tb-h) + 12px); }
+.card:target { border-color: var(--accent); }
+.card > h3 { font: 700 1.15rem/1.2 var(--font-display); margin: 0; letter-spacing: .01em; display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: baseline; }
+.card > h3 a { color: inherit; text-decoration: none; }
+.card > h3 a:hover { color: var(--accent); }
+.card > h3 .id, .card > h3 .src { font: 500 .72rem/1 var(--font-mono); color: var(--ink-2); }
+.card > h3 .src { margin-left: auto; }
+.tag { font: 600 .66rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .28rem .45rem; border-radius: 3px; background: var(--chip); color: var(--ink-2); white-space: nowrap; }
+.tag.sys { font-style: italic; }
+.tag.ex { color: var(--flag); }
+.row { display: flex; flex-wrap: wrap; gap: 1.25rem 1.1rem; margin-top: .9rem; align-items: flex-start; }
+figure.col { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: .45rem; width: min(100%, 236px); }
+figure.col.old { padding-right: 1.2rem; border-right: 1px solid var(--rule); width: min(100%, 256px); }
+figure.col figcaption { display: flex; flex-wrap: wrap; gap: .2rem .4rem; align-items: center; }
+figure.col .who { font: 700 .8rem/1.1 var(--font-display); text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+figure.col.old .who { color: var(--ink-2); }
+figure.col .sub { font: .72rem/1.3 var(--font-mono); color: var(--ink-2); width: 100%; }
+.badge { font: 600 .62rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: .22rem .4rem; border-radius: 3px; background: var(--chip); color: var(--ink-2); }
+.badge.adapted { background: var(--flag-bg); color: var(--flag); }
+.badge.scaled { background: var(--accent-bg); color: var(--accent); }
+.badge.same { color: var(--ok); }
+.slot { display: flex; align-items: flex-start; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: .1rem .6rem; font-size: .82rem; margin: 0; }
+.keys dt { font: 600 .68rem/1.75 var(--font-mono); color: var(--ink-2); }
+.keys dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.keys .touch { opacity: .62; }
+.keys .vh { grid-column: 1 / -1; font: .74rem/1.35 var(--font-body); color: var(--ink-2); margin-top: .15rem; }
+.shared { margin-top: .9rem; padding-top: .7rem; border-top: 1px solid var(--rule); }
+.shared h4 { font: 700 .74rem/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); margin: 0 0 .35rem; }
+.shared ul.notes { font-size: .86rem; max-width: 110ch; }
+ul.notes { margin: 0; padding-left: 1rem; font-size: .82rem; display: grid; gap: .2rem; }
+.notes li.flag { color: var(--flag); }
+.notes li.flag::marker { content: "▲ "; font-size: .7em; }
+
+.watch { position: relative; flex: none; aspect-ratio: 1; max-width: 100%; }
+.watch svg.bezel { position: absolute; inset: 0; width: 100%; height: 100%; }
+.watch canvas { position: absolute; border-radius: 50%; background: #000; }
+.watch.flat canvas { position: static; display: block; width: 100%; height: 100%; }
+.watch svg.overlay { position: absolute; pointer-events: none; }
+.watch.none { border: 1.5px dashed var(--rule); border-radius: 50%; display: grid; place-items: center; text-align: center; color: var(--ink-2);
+  font: 600 .95rem/1.3 var(--font-display); letter-spacing: .02em; padding: 18%; }
+.watch.none small { display: block; font: 400 .8rem/1.35 var(--font-body); margin-top: .3rem; }
+
+footer { margin-top: 3rem; color: var(--ink-2); font-size: .88rem; border-top: 1px solid var(--rule); padding-top: 1rem; max-width: 100ch; display: grid; gap: .6rem; }
+footer p { margin: 0; }
+.bootfail { margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--flag); background: var(--flag-bg); color: var(--ink); border-radius: 4px; }
+@media (max-width: 640px) {
+  .wrap { padding-inline: 16px; padding-block: 20px 48px; }
+  header h1 { font-size: 1.9rem; }
+  .toolbar nav { margin-left: 0; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+  figure.col, figure.col.old { width: 100%; padding-right: 0; border-right: 0; }
+  .card > h3 .src { margin-left: 0; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<script>
+window.__jsErrors = 0;
+window.addEventListener("error", function () { window.__jsErrors++; if (document.body) document.body.dataset.jsErrors = window.__jsErrors; });
+window.addEventListener("unhandledrejection", function () { window.__jsErrors++; if (document.body) document.body.dataset.jsErrors = window.__jsErrors; });
+</script>
+
+<div class="wrap">
+<header>
+  <h1>Vozidlo on every watch</h1>
+  <div class="meta">UI plan · fēnix 7 Pro today → <span data-fill="count"></span> watches in <span data-fill="columns"></span> columns, on screens of <span data-fill="screens"></span> px · Night Panel 1.1.x · 2026-10-23</div>
+  <p>Each card is one screen. The first watch is the app today on the fēnix 7 Pro, drawn with the design reference's own code (<code>vozidlo-poc.html</code>). The others are the proposal on each supported watch (one column per group of products that share a screen; the table below lists which), drawn at that watch's real pixel size with its own fonts and laid out from the Dc: positions stack from measured font heights, widths follow the screen outline, bezel parts sit at R − k·s with s = width / 260. Under each watch: what every button and gesture does there. Values come from the mock car unless a card says Example.</p>
+</header>
+
+<div class="toolbar" role="toolbar" aria-label="View options" id="toolbar">
+  <div class="grp"><span class="lbl">Size</span>
+    <button type="button" data-size="mm" title="Same physical size on screen: compare how big things really are">True size</button>
+    <button type="button" data-size="px" title="Device pixels: compare layouts">Pixels</button>
+    <button type="button" data-scale="0.75">0.75×</button><button type="button" data-scale="1">1×</button><button type="button" data-scale="1.5">1.5×</button>
+  </div>
+  <div class="grp"><span class="lbl">Show</span>
+    <label><input type="checkbox" data-opt="overlay"> Touch overlay</label>
+    <label><input type="checkbox" data-opt="mono"> Monochrome</label>
+    <label title="The watches without a MENU key let the user scale fonts up to 1.4×"><input type="checkbox" data-opt="fontScale"> Font size 1.4× (no-MENU watches)</label>
+  </div>
+  <div class="grp" id="cols"><span class="lbl">Watches</span></div>
+  <nav aria-label="Sections">
+    <a href="#devices">Watches</a><a href="#input">Input</a><a href="#principles">Principles</a><a href="#decisions">Decisions</a><a href="#entry">Entry</a><a href="#home">Home</a><a href="#status">Status</a><a href="#charging">Charging</a><a href="#findcar">Find my car</a><a href="#settings">Settings</a><a href="#onboarding">Onboarding</a>
+  </nav>
+</div>
+
+<section class="box" id="devices" aria-labelledby="devices-h">
+  <h2 id="devices-h">The watches</h2>
+  <div class="scroll" id="facts"></div>
+</section>
+
+<section class="box" id="input" aria-labelledby="input-h">
+  <h2 id="input-h">Three input profiles, one rule</h2>
+  <p><strong>Every action is reachable in every profile.</strong> Touch is an extra on top of the buttons, never the only route: a five-button watch must work with touch switched off. The app only uses Garmin's behaviours (select, back, next/previous page, menu), so the same code serves all of them. Where MENU does not exist, Garmin's action menu indicator (<code>setActionMenuIndicator</code> + <code>onActionMenu</code>) takes its place.</p>
+  <div class="profiles" id="profiles-grid"></div>
+</section>
+
+<section class="box" id="principles" aria-labelledby="principles-h">
+  <h2 id="principles-h">Design principles on the other watches</h2>
+  <p>The principles from <code>docs/design/style-guide.md</code> and <code>ui-improvements.md</code> B1, checked against the new watches. Most hold as written or only need their numbers scaled; where one cannot hold, the smallest reasonable change is given.</p>
+  <div class="scroll"><table class="principles">
+    <thead><tr><th>Principle</th><th>On the new watches</th><th>Wording / rule from now on</th></tr></thead>
+    <tbody>
+      <tr><th>B1.1 One hero per screen</th><td><span class="st holds">holds</span></td><td>Unchanged. "The widest chord (y ≈ 95 to 165)" reads "the middle band, about 0.37h to 0.63h".</td></tr>
+      <tr><th>B1.2 Every value shows its age</th><td><span class="st holds">holds</span></td><td>Unchanged.</td></tr>
+      <tr><th>B1.3 A gesture means the same on buttons and touch</th><td><span class="st amended">amended</span></td><td>Add: <em>the menu route opens the screen's action list: hold UP (five buttons), hold BACK (profile B), or a left swipe / the indicator (watches without MENU). It is the same list START opens, unless START has a primary action of its own (map, retry, continue).</em> A left swipe means nothing else anywhere.</td></tr>
+      <tr><th>B1.4 Garmin components first</th><td><span class="st amended">amended</span></td><td>Add the action menu indicator to the native parts: "Confirmations, toasts and the action menu indicator stay native."</td></tr>
+      <tr><th>B1.5 One accent, words before colour</th><td><span class="st holds">holds</span></td><td>Unchanged.</td></tr>
+      <tr><th>B1.6 The chord is the grid</th><td><span class="st amended">amended</span></td><td><em>The outline is the grid.</em> No text or box is placed by a constant: y positions stack from measured font heights and s = w / 260, and every width is checked against the outline at its y: the chord on a round screen, the corner-inset width on the X1.</td></tr>
+      <tr><th>B1.7 Škoda-like in calm, not in identity</th><td><span class="st holds">holds</span></td><td>Unchanged.</td></tr>
+      <tr><th>Palette (SG §3)</th><td><span class="st scaled">rationale</span></td><td>The nine tokens stay exactly as they are; they sit on the 64-colour MIP grid and AMOLED shows them unchanged, so one token is one colour on every watch. "No text on grey" and the monochrome test stay for consistency (on AMOLED grey does not dither). Open: use the true Electric Green #78FAAE on AMOLED?</td></tr>
+      <tr><th>Type roles (SG §4)</th><td><span class="st scaled">scaled</span></td><td>Roles unchanged; heights are measured per watch. Hero numbers: one font per watch, the larger of NUMBER_MEDIUM and NUMBER_MILD that fits the Charging worst case; never NUMBER_HOT (M1). Digits-only rule stays.</td></tr>
+      <tr><th>One shared 260 face, titles at y 34, the y-position table (SG §5)</th><td><span class="st amended">replaced</span></td><td>Tokens from the Dc: title top 34·s (rectangle: 20·s from the edge), status line ends 29·s above the bottom, everything between stacks with measured heights. The 260 px numbers stay as the reference result, not as inputs.</td></tr>
+      <tr><th>Bezel zone (SG §5)</th><td><span class="st scaled">scaled</span></td><td>Ring R − 4·s, glyphs R − 22·s, page dots R − 12·s, hint arcs ±10°. The SG's r ≥ 108 wins over B4's r ≥ 122. On the X1: the ring becomes a frame along the display edge, hint arcs become short bars next to the keys, the dots keep their formula (a near-vertical column).</td></tr>
+      <tr><th>Buttons and glyphs (SG §6)</th><td><span class="st amended">amended</span></td><td>START sits at −30° (h/4 on the X1) and BACK at +30° (3h/4) on every watch. UP and DOWN glyphs only where those buttons exist. The menu glyph follows the menu route: UP on five-button watches, BACK on profile B, Garmin's indicator elsewhere.</td></tr>
+      <tr><th>Three-row lists (SG §6)</th><td><span class="st scaled">scaled</span></td><td>Row = max(h/4, FONT_MEDIUM + 16); pill = FONT_MEDIUM + 14, at most row − 6; pill width 212·s (M2); neighbours 193·s.</td></tr>
+      <tr><th>App icon "40 by 40 on every watch"</th><td><span class="st amended">amended</span></td><td>One SVG at each watch's launcher size: <span data-fill="icons"></span> px (per column in the watch table).</td></tr>
+      <tr><th>A tap never spends quota (SG §7)</th><td><span class="st holds">holds</span></td><td>Unchanged, and now enforced where it was broken: Charging profiles retry and Onboarding retry/blocked consume the tap.</td></tr>
+      <tr><th>Empty states name the button (SG §8)</th><td><span class="st amended">amended</span></td><td>Copy names the action, not the button: "Refresh from the menu", "Try again from the menu" (M7). Capitals stay reserved for button names, which on-screen copy no longer uses.</td></tr>
+      <tr><th>Navigate vertically (best practices)</th><td><span class="st amended">amended</span></td><td>Add: except Garmin's own left swipe for the action menu on watches without MENU.</td></tr>
+      <tr><th>Interaction table (SG §7) and checklist (SG §10)</th><td><span class="st amended">amended</span></td><td>The table becomes the per-screen maps on this page. Checklist adds: checked at <span data-fill="screens"></span> px, on a watch without touch (<span data-fill="profile:A0"></span>) and on a five-button watch with touch off.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="box flagged" id="decisions" aria-labelledby="decisions-h">
+  <h2 id="decisions-h">Decisions</h2>
+  <h3>Taken</h3>
+  <ul>
+    <li><span class="dec done">scope</span><span data-fill="count"></span> products: every product in <code>app/manifest.xml</code>, listed per column in the watch table. Connect IQ 5.1 and up since 2026-10-23: the Descent Mk3 and Mk3i run 5.1 and the app uses nothing newer (it builds clean against their API lists).</li>
+    <li><span class="dec done">layout</span>Computed from the Dc, not constants per family.</li>
+    <li><span class="dec done">confirm</span>Native <code>WatchUi.Confirmation</code> stays; on touch that is one tap on Yes, as on the touch fēnix today.</li>
+    <li><span class="dec done">M1</span>One hero number font per watch: NUMBER_MEDIUM where the Charging worst case fits (<span data-fill="hero:numMed"></span>); NUMBER_MILD where MEDIUM overflows that stack (<span data-fill="hero:numMild"></span>). Never NUMBER_HOT.</li>
+    <li><span class="dec done">M2</span>Focus pill width 212·s (0.815 of the width) plus the outline check.</li>
+    <li><span class="dec done">M3</span>Venu X1 uses the full rectangle: same vertical stack, rectangle widths, bezel parts follow the edge.</li>
+    <li><span class="dec done">M4</span>Find my car START: the map when parked and the watch has MapView; otherwise the Find my car list (<span data-fill="map:no"></span>). <a href="#fc-parked">Find my car</a></li>
+    <li><span class="dec done">M5</span>On watches without MENU, turn the indicator on in every view that has an action list (Status, Charging, Find my car, Map preview, all Onboarding states): onActionMenu only fires with it on.</li>
+    <li><span class="dec done">M6</span>Target temperature becomes a list on every watch, like the charge limit. <a href="#set-temp">Target temperature</a></li>
+    <li><span class="dec done">M7</span>Button-neutral empty-state copy on every watch: "Refresh from the menu", "Try again from the menu".</li>
+    <li><span class="dec done">M8</span>No left swipe for the menu on profile B (<span data-fill="profile:B"></span>): hold BACK is that platform's route.</li>
+    <li><span class="dec done">M9</span>Menu glyph at BACK on profile B, only where MENU is the only route (Onboarding).</li>
+    <li><span class="dec done">M10</span>No glyph drawn on the map (Garmin's view).</li>
+    <li><span class="dec done">M11</span>Page dots on the X1 keep the arc formula: a near-vertical column at the left edge, like Garmin's own indicator there.</li>
+    <li><span class="dec done">M12</span>Lock grid: chip width fits the longest label, capped by the width of the paired rows. Where three rows do not fit above the age, the spacing squeezes in order: word to grid 9 → 4, row gap 2 → 1, age clearance 3 → 1; only if that is not enough, two rows and "+N" (per column: "Lock grid" in the watch table). The indicator's keep-out limits only the right edge, so the grid may shift left and "Windows" fits next to it. Open items sort first, so an open door or trunk is never behind "+N".</li>
+    <li><span class="dec done">M13</span>Navigate is hidden where <code>saveWaypoint</code> is unavailable, checked at run time (the Venu 3S lists it only partly in its api.debug.xml). Still to try on a real Venu 3S.</li>
+  </ul>
+  <h3>Open, with the proposal shown on this page</h3>
+  <ul>
+    <li><span class="dec">M14</span>Large user font sizes (up to 1.4× on <span data-fill="profile:C"></span>) and long copy: content keeps its order and gives way instead of overlapping. Onboarding text that runs past the outline in FONT_XTINY splits into parts with page dots, instead of the "…" the app cuts it with today (at the default size too where "Onboarding text cut" in the watch table says so); detail lines that would reach the age drop, last first; the lock grid goes to one row with "+N" and a small hero word; message screens wrap; home drops its chips, then the number (the ring shows the SoC); list rows grow to FONT_SMALL + FONT_XTINY + 8.</li>
+    <li><span class="dec">AMOLED</span>Keep 0x55FFAA as the accent, or use the brand's #78FAAE where the panel can show it.</li>
+  </ul>
+  <p class="fine">M numbers are this page's; D1 to D7 in ui-improvements.md are the Night Panel's.</p>
+  <h3>Bugs this pass fixes on every watch</h3>
+  <ul>
+    <li>A tap on Charging profiles retries and spends quota (no <code>onTap</code>); same for Onboarding retry and Blocked. <a href="#ch-profile-ex">Profiles</a></li>
+    <li>Find my car: Refresh and Navigate only behind MENU, and the copy names MENU. <a href="#fc-nodata">No data</a></li>
+  </ul>
+</section>
+
+<main id="board" aria-label="Screens per watch"></main>
+
+<footer>
+  <p><strong>How it is drawn.</strong> Today's column runs the Night Panel code of <code>tools/ui/poc/</code> unchanged (with the few as-built corrections each card names). The other columns use the same drawing calls in logical units (a frame 260 wide scaled by s), with each watch's fonts from its SDK device files (<code>tools/ui/devices/11-devdata.js</code>): heights and every character's advance, so wrapping and fitting match the watch. Text is drawn with Google's Roboto and Yantramanav, the fonts those watches use. Garmin's own parts (confirmation, toast, action menu indicator) are stand-ins on the AMOLED watches.</p>
+  <p><strong>Built by</strong> <code>tools/ui/build-devices.sh</code>; CI checks the page matches its sources. Adding a watch in general: <code>docs/adding-a-watch.md</code>.</p>
+</footer>
+</div>
+<script>

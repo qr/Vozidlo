@@ -20,15 +20,24 @@ module Chips {
         }
     }
 
+    // Padding, icon column and icon radius in px of the 260 face; scaled
+    // by Geo when used.
     const PAD = 8;
     const ICON_W = 14;
+    const ICON_R = 6;
 
     // ------------------------------------------------------------ pure
 
-    // Chip width for a measured text width: 8 px padding both sides, 14 for
-    // the icon (r 6 plus a gap). Pure so layouts can be checked in tests.
+    // Chip width for a measured text width on display g: 8 px padding both
+    // sides, 14 for the icon (r 6 plus a gap), scaled. Pure so layouts can
+    // be checked in tests.
+    function widthIn(g as Geo.Display, textW as Number, hasIcon as Boolean) as Number {
+        return 2 * g.px(PAD) + (hasIcon ? g.px(ICON_W) : 0) + textW;
+    }
+
+    // widthIn() on this screen.
     function width(textW as Number, hasIcon as Boolean) as Number {
-        return 2 * PAD + (hasIcon ? ICON_W : 0) + textW;
+        return widthIn(Geo.current(), textW, hasIcon);
     }
 
     // Width of a centred row, for the "usable >= row" check (C8 step 3).
@@ -95,10 +104,10 @@ module Chips {
 
     // ------------------------------------------------------------ drawing
 
-    // At least 20 px (B4), more when fēnix 8/9 scale FONT_XTINY up.
+    // At least 20 px (B4, scaled), more when FONT_XTINY is taller
+    // (Geo.Display.chipH).
     function height() as Number {
-        var h = Graphics.getFontHeight(Graphics.FONT_XTINY) + 2;
-        return h < 20 ? 20 : h;
+        return Geo.current().chipH;
     }
 
     // Measured width of one chip on this Dc.
@@ -132,11 +141,13 @@ module Chips {
             dc.setPenWidth(1);
             dc.drawRoundedRectangle(x, y, w, h, h / 2);
         }
-        var tx = x + PAD;
+        var g = Geo.current();
+        var tx = x + g.px(PAD);
         var icon = iconFor(chip);
         if (icon != null) {
-            NightIcons.draw(dc, icon, tx + 6, y + h / 2, 6, fg);
-            tx += ICON_W;
+            var r = g.px(ICON_R);
+            NightIcons.draw(dc, icon, tx + r, y + h / 2, r, fg);
+            tx += g.px(ICON_W);
         }
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawText(tx, y + h / 2, Graphics.FONT_XTINY, chip.text,
