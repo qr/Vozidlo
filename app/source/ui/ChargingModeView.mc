@@ -39,7 +39,6 @@ module ChargingModeMenu {
 class ChargingModeMenuDelegate extends NightMenuDelegate {
 
     private var _detail as WeakReference;
-    private var _sending as Boolean = false;
     private var _pendingMode as String? = null;
 
     function initialize(detail as ChargingDetailView) {
@@ -48,9 +47,6 @@ class ChargingModeMenuDelegate extends NightMenuDelegate {
     }
 
     function onPick(id as Object?) as Void {
-        if (_sending) {
-            return;
-        }
         if (!(id instanceof String)) {
             return;
         }
@@ -60,12 +56,9 @@ class ChargingModeMenuDelegate extends NightMenuDelegate {
         }
 
         _pendingMode = mode;
-        _sending = true;
-        // US-025 carries no "always confirm" entry in ConfirmationPolicy's
-        // table (same reasoning as the charge limit, see
-        // ChargingLimitMenuDelegate.send()): ConfirmationPolicy.run() still
-        // owns whether a dialog appears at all (only when the quota is nearly
-        // spent). Never a second, hand-rolled confirmation here.
+        // ConfirmationPolicy.run() owns whether a confirmation appears
+        // (US-062: for every command, unless the user switched it off). Never
+        // a second, hand-rolled confirmation here.
         ConfirmationPolicy.run(ConfirmationPolicy.SET_CHARGE_MODE, "Set mode to " + Labels.mode(mode) + "?",
             method(:_send), method(:_announceSent));
     }
@@ -75,6 +68,7 @@ class ChargingModeMenuDelegate extends NightMenuDelegate {
         if (mode == null) {
             return;
         }
+        CommandFlight.start();
         var settings = getApp().getSettings();
         var body = { "chargeMode" => mode } as Dictionary<Object, Object>;
         ApiClient.setChargeMode(settings.vin, body, settings.apiKey, method(:_onCommandResponse));
@@ -89,9 +83,10 @@ class ChargingModeMenuDelegate extends NightMenuDelegate {
     // The menu has already closed (A14), so a refused pick says why in a
     // toast instead of doing nothing visible (Refusal, the same checks as
     // Refresh). The detail screen no longer has a top bar showing quota
-    // state, so a spent quota also stays on its status line.
+    // state, so a spent quota also stays on its status line. A pick while
+    // any command is on its way (CommandFlight) stays silent, as on home.
     function _refused() as Boolean {
-        var verdict = Refusal.current(false);
+        var verdict = Refusal.current(CommandFlight.busy());
         if (verdict == :ok) {
             return false;
         }
@@ -107,10 +102,12 @@ class ChargingModeMenuDelegate extends NightMenuDelegate {
     // error comes back as a negative transport code with the problem+json
     // body unreadable (see ApiClient.mc): that still means the car refused
     // this mode, so it is worded as a refusal, never a generic failure, and
-    // never claims to know the specific reason.
+    // never claims to know the specific reason. The one exception is a -400
+    // on iOS, which is how Garmin Connect there reports Škoda's 202: sent,
+    // see Commands.isSent().
     function _onCommandResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null) as Void {
-        _sending = false;
-        if (responseCode >= 200 && responseCode < 300) {
+        CommandFlight.done();
+        if (Commands.isSent(responseCode, Commands.phoneIsIos())) {
             Quota.recordHeaders(null, null, null);
             // One read 15 s later says whether the car took it (CommandCheck).
             var detail = _detail.get() as ChargingDetailView?;

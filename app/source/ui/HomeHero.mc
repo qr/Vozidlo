@@ -35,6 +35,11 @@ module HomeHero {
         public var chips as Array<Chips.Chip>;
         public var status as String;
         public var statusKind as Symbol;
+        // The hero as fitted to the title dc, filled by the first draw(). Any
+        // change builds a new Data, so it never goes stale. The hero is drawn
+        // on every frame of a scroll (the mask, not the focus, hides it), and
+        // fitting measures every chip and up to three fonts.
+        public var fitted as Fitted? = null;
 
         function initialize(socText as String, frac as Float, isCharging as Boolean,
                             chipList as Array<Chips.Chip>, statusText as String, kind as Symbol) {
@@ -44,6 +49,23 @@ module HomeHero {
             chips = chipList;
             status = statusText;
             statusKind = kind;
+        }
+    }
+
+    // What draw() measured once for a title dc h px high: the status line
+    // fitted to its chord, the chips that fit and the SoC font.
+    class Fitted {
+        public var h as Number;
+        public var status as String;
+        public var chips as Array<Chips.Chip>;
+        public var socFont as Graphics.FontType;
+
+        function initialize(height as Number, statusText as String, kept as Array<Chips.Chip>,
+                            font as Graphics.FontType) {
+            h = height;
+            status = statusText;
+            chips = kept;
+            socFont = font;
         }
     }
 
@@ -185,15 +207,31 @@ module HomeHero {
 
     // ------------------------------------------------------------ drawing
 
-    // Draws into the CustomMenu title dc. `off` maps title y to screen y at
-    // focus 0, so every width is the chord where the line really appears.
+    // Draws into the CustomMenu title dc, fitted once per Data (Fitted).
     function draw(dc as Dc, data as Data) as Void {
         var g = Geo.current();
         var h = dc.getHeight();
-        var off = g.heroBottom - h;
+        var y = slots(g, h, g.fonts.xtinyH, g.chipH, data.chips.size() > 0);
+        var fitted = data.fitted;
+        if (fitted == null || fitted.h != h) {
+            fitted = _fit(dc, data, y, g.heroBottom - h);
+            data.fitted = fitted;
+        }
+        Ui.drawStatusLine(dc, y[0], fitted.status, data.statusKind);
+        if (fitted.chips.size() > 0) {
+            Chips.drawRow(dc, y[1], fitted.chips, g.px(CHIP_GAP));
+        }
+        var value = data.soc;
+        Ui.drawValueWithUnit(dc, dc.getWidth() / 2, y[2] - Graphics.getFontAscent(fitted.socFont), value,
+            Ui.isNumberGlyphs(value) ? "%" : null, fitted.socFont, Graphics.FONT_SMALL, Theme.TEXT_1);
+    }
+
+    // `off` maps title y to screen y at focus 0, so every width is the
+    // chord where the line really appears.
+    function _fit(dc as Dc, data as Data, y as [Number, Number, Number], off as Number) as Fitted {
+        var g = Geo.current();
         var chipH = g.chipH;
         var statusH = g.fonts.xtinyH;
-        var y = slots(g, h, statusH, chipH, data.chips.size() > 0);
 
         // Fitted to the ring margin first (the status line itself only keeps
         // the plain margin), leaving room for the "!" it adds to warnings.
@@ -203,38 +241,33 @@ module HomeHero {
         if ((kind == :warn || kind == :error) && data.status.find("!") != 0) {
             lineW -= dc.getTextWidthInPixels("! ", font);
         }
-        Ui.drawStatusLine(dc, y[0], Ui.fit(data.status, lineW, Ui.measurer(dc, font)), kind);
+        var status = Ui.fit(data.status, lineW, Ui.measurer(dc, font));
 
+        var chips = [] as Array<Chips.Chip>;
         if (data.chips.size() > 0) {
             var widths = [] as Array<Number>;
             for (var i = 0; i < data.chips.size(); i += 1) {
                 widths.add(Chips.measure(dc, data.chips[i] as Chips.Chip));
             }
             var maxW = Ui.usable(y[1] + off, y[1] + off + chipH, Theme.RING_MARGIN);
-            var gap = g.px(CHIP_GAP);
-            var keep = chipsToKeep(widths, gap, maxW);
-            Chips.drawRow(dc, y[1], data.chips.slice(0, keep) as Array<Chips.Chip>, gap);
+            var keep = chipsToKeep(widths, g.px(CHIP_GAP), maxW);
+            chips = data.chips.slice(0, keep) as Array<Chips.Chip>;
         }
 
-        _drawSoc(dc, data.soc, y[2], off);
+        return new Fitted(dc.getHeight(), status, chips, _socFont(dc, data.soc, y[2], off));
     }
 
     // "100" in the largest number font that clears the ring, "%" in a text
     // font on the same baseline (C1b, A8). A dash takes FONT_MEDIUM, as
     // Ui.drawValueWithUnit would pick for it anyway.
-    function _drawSoc(dc as Dc, value as String, baseline as Number, off as Number) as Void {
-        var unitFont = Graphics.FONT_SMALL;
-        var font = Graphics.FONT_MEDIUM;
-        var unit = null;
-        if (Ui.isNumberGlyphs(value)) {
-            unit = "%";
-            var fit = new HeroFit(dc, baseline + off, dc.getTextWidthInPixels(unit, unitFont) + Geo.current().px(Ui.UNIT_GAP));
-            font = Ui.pickFont(value,
-                [Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD, Graphics.FONT_MEDIUM] as Array<Graphics.FontType>,
-                0, fit.method(:excess));
+    function _socFont(dc as Dc, value as String, baseline as Number, off as Number) as Graphics.FontType {
+        if (!Ui.isNumberGlyphs(value)) {
+            return Graphics.FONT_MEDIUM;
         }
-        Ui.drawValueWithUnit(dc, dc.getWidth() / 2, baseline - Graphics.getFontAscent(font), value, unit,
-            font, unitFont, Theme.TEXT_1);
+        var fit = new HeroFit(dc, baseline + off, dc.getTextWidthInPixels("%", Graphics.FONT_SMALL) + Geo.current().px(Ui.UNIT_GAP));
+        return Ui.pickFont(value,
+            [Graphics.FONT_NUMBER_MEDIUM, Graphics.FONT_NUMBER_MILD, Graphics.FONT_MEDIUM] as Array<Graphics.FontType>,
+            0, fit.method(:excess));
     }
 
     // SoC ring over the whole menu (C1b "all states"): white fill, the

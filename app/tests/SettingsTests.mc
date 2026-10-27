@@ -56,4 +56,19 @@ module SettingsTests {
         return true;
     }
 
+    // US-062: the confirmation before a command is on unless switched off;
+    // a watch that has not synced the property yet (null) asks too.
+    (:test)
+    function confirmCommandsDefaultsToOn(logger as Logger) as Boolean {
+        if (!Settings.resolveConfirmCommands(null) || !Settings.resolveConfirmCommands(true)) {
+            logger.error("null and true must mean on");
+            return false;
+        }
+        if (Settings.resolveConfirmCommands(false)) {
+            logger.error("false must stay off");
+            return false;
+        }
+        return true;
+    }
+
 }

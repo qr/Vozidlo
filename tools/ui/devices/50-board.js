@@ -11,11 +11,11 @@ const DevBoard = (function () {
   const ONLY = (location.search.match(/[?&]only=([a-z]+)/) || [])[1];   // ?only=status: one section, for review
   const SECTIONS = {
     entry: ["Entry", "ui/GlanceView.mc", "The glance in the watch's glance list. Drawn at device pixels: the content area comes from each device file."],
-    home: ["Home", "ui/HomeMenu.mc · ui/HomeHero.mc", "A CustomMenu with the hero in its title area. Rows, pill and hero are laid out from the Dc and the device fonts."],
+    home: ["Home", "ui/HomeMenu.mc · ui/HomeHero.mc", "A CustomMenu with the hero in its title area. Rows, pill and hero are laid out from the Dc and the device fonts. Every command asks first, on a NightMenu confirmation (US-062)."],
     status: ["Status", "ui/StatusPages.mc · ui/StatusPager.mc", "The status loop. Positions stack from measured font heights instead of the 260 px constants."],
     charging: ["Charging", "ui/ChargingDetailView.mc · ui/ChargingLimitMenu.mc · ui/ChargingProfilesView.mc", "Charging detail with its list, the charge limit and mode lists, and the profiles."],
     findcar: ["Find my car", "ui/LocationView.mc · ui/MapPreviewView.mc", "START opens the map where the watch has MapView and the car is parked; otherwise the Find my car list (M4)."],
-    settings: ["Settings", "ui/screens/SettingsScreen.mc · ui/TemperatureMenu.mc · ui/TileOrderView.mc", "Home's Settings row opens a list with the tile order and Clear stored data. The target temperature becomes a list on every watch (M6); tile order is already a list."],
+    settings: ["Settings", "ui/screens/SettingsScreen.mc · ui/TemperatureMenu.mc · ui/TileOrderView.mc", "Home's Settings row opens a list with the tile order, Confirmation (asking before commands) and Clear stored data. The target temperature becomes a list on every watch (M6); tile order is already a list."],
     onboarding: ["Onboarding", "ui/OnboardingView.mc · ui/OnboardingDelegate.mc", "Text screens before a key is set up. The MENU route moves with the watch: hold UP, hold BACK, or the action menu indicator."],
     garmin: ["Garmin UI", "native", "Garmin draws these itself. On the AMOLED watches they are stand-ins, from the areas the device files give."]
   };

@@ -10,8 +10,9 @@ import Toybox.PersistedContent;
 // them all.
 //
 // Left alone on purpose: preferences that say nothing about the user or
-// the car (TemperatureUnit, TargetTemperature, CheckAfterCommand), the
-// developer's MockBaseUrl, and the monochrome test switch.
+// the car (TemperatureUnit, TargetTemperature, CheckAfterCommand,
+// ConfirmCommands), the developer's MockBaseUrl, and the monochrome test
+// switch.
 module StoredData {
 
     function clearAll() as Void {

@@ -104,17 +104,18 @@
 
   // ---------------------------------------------------------------- (b) hero + action list, C1b
   // o: {rows, focus, strip, msg, ageMin}. Ring margin 12 for every line.
-  // Mirrors app/source/ui/HomeMenu.mc + HomeHero.mc: a CustomMenu with rows of ROW_H, of which only
-  // the focused row and its two neighbours are drawn, the hero in the 98 px title area above row 0
-  // (drawn at focus 0 only, so it slides in coming back to row 0 and is blank once row 1 has the focus), laid out bottom-up: status line, chips, then the SoC in the largest
+  // Mirrors app/source/ui/HomeMenu.mc + HomeHero.mc: a CustomMenu with rows of ROW_H under the list
+  // mask (Ui.menuMask), so the focused row and its two neighbours are in view, the hero in the 98 px
+  // title area above row 0 (it slides out under the mask going to row 1 and back in coming back to
+  // row 0), laid out bottom-up: status line, chips, then the SoC in the largest
   // font whose digits clear y 12 and fit the chord (HomeHero.HeroFit). o.shift: see Ui.menu.
   NH.ROW_H = Ui.ROW_H;
   NH.HERO_BOTTOM = 130 - Math.floor(NH.ROW_H / 2);
   NH.hero = function (dc, o = {}) {
     dc.setColor(T.TEXT_1, T.BG); dc.clear();
     const rows = o.rows || NH.TILES, f = Math.max(0, Math.min(rows.length - 1, o.focus || 0)), s = o.strip || NH.mockStrip();
-    const H = NH.ROW_H, shift = o.shift || 0, heroDy = Math.round(-f * H + shift);
-    if (f === 0) {
+    const H = NH.ROW_H, shift = o.shift || 0, heroDy = Math.round(-f * H + shift), mask = Ui.menuMask(f);
+    if (NH.HERO_BOTTOM + heroDy > mask[0] + 1) {
       dc.translate(0, heroDy);
       const statusTop = NH.HERO_BOTTOM - FM.xtiny.h;
       const chips = [lockChip(s.lock), chargeChip(s.charging)].filter(Boolean);
@@ -141,16 +142,18 @@
       }
       dc.translate(0, -heroDy);
     }
-    // Rows: centre y = 130 + (i - f) * H; only the focused row and its neighbours are drawn. While
-    // o.shift is set they slide into place; the hero and the row leaving are blank (see Ui.menu).
-    for (let i = Math.max(0, f - 1); i <= Math.min(rows.length - 1, f + 1); i++) {
+    // Rows: centre y = 130 + (i - f) * H, under the mask. While o.shift is set they slide into place,
+    // and the hero and the row leaving slide out under the mask (see Ui.menu).
+    for (let i = Math.max(0, f - 2); i <= Math.min(rows.length - 1, f + 2); i++) {
       const cy = Math.round(130 + (i - f) * H + shift);
+      if (cy + H / 2 <= mask[0] + 1 || cy - H / 2 >= mask[1] - 1) continue;
       if (i === f) Ui.focusPill(dc, 24, cy - 25, 212, 51, rows[i], "medium");
       else {
         const at = 130 + (i - f) * H, w = Ui.usable(at - 14, at + 15, 8);   // fitted where it settles, as in the app
         dc.setColor(T.TEXT_2); dc.drawText(130, cy, "tiny", Ui.fit(dc, rows[i], "tiny", Math.min(193, w)), J.CENTER | J.VCENTER);
       }
     }
+    Ui.drawMenuMask(dc, mask);
     Ui.drawRing(dc, s.soc == null ? 0 : s.soc / 100, { fill: s.charging === "CHARGING" ? T.ACCENT : T.TEXT_1 });
   };
 
@@ -178,7 +181,7 @@
         "(a) Outline tiles, focused tile accent with black label (A21).",
         "(a) Scroll arc on the right bezel replaces the carets.",
         "No text hint and no UP/DOWN glyphs; START hint arc only.",
-        "(b) SoC ring, hero \"100%\", chips and the age in the title area, the focused row as accent pill, one row below (rows of 65 px; only the focused row and its neighbours are drawn, so three sit close together and the rest stays off screen)."],
+        "(b) SoC ring, hero \"100%\", chips and the age in the title area, the focused row as accent pill, one row below (rows of 65 px; every row is drawn and a mask covers all but the focused row and its neighbours, so three sit close together and the rest slides in and out under the mask)."],
       notes: REACH.concat(["Default order since 1.3.0: Status, Find my car, then the commands; home opens on Status, so the hero is in view and a stray START opens a screen instead of sending a command.",
         "Mock: 8 tiles fill four rows, so no More. Rule chosen: up to 8 tiles shown as is, above 8 the first 7 plus More.",
         { flag: "D1 open: (a) keeps the custom grid; (b) needs a CustomMenu with the hero as title area." }]) },
@@ -233,9 +236,40 @@
       notes: ["Unlocked and open use the same amber chip; Locked stays a plain padlock."] }
   );
 
-  // Sample card (lead): the confirmation is Garmin's own; the NEW text keeps it a yes/no question.
+  // ---------------------------------------------------------------- command confirmation (US-062)
+  // Mirrors app/source/ui/CommandConfirm.mc: a NightMenu whose title area runs down to row 0, as home's
+  // hero does, holding the question in accent tiny: one line where it fits, else two, else two in xtiny (the
+  // second cut with "…" only then), 12 px from the outline, the last line NH.CONFIRM_GAP above the rule. Rows: the action, focused on open, then "Cancel".
+  // o: {question, action, stop, focus, shift}; stop: the action pill in DESTRUCTIVE (CommandConfirm.isStop).
+  NH.CONFIRM_GAP = 6;
+  NH.confirm = function (dc, o = {}) {
+    const q = o.question || "Stop charging?", focus = o.focus || 0;
+    const action = o.action || "Stop charging", stop = o.stop != null ? o.stop : /^Stop /.test(action);
+    Ui.menu(dc, { items: [{ label: action, pill: stop ? T.DESTRUCTIVE : null }, { label: "Cancel" }], focus, shift: o.shift });
+    if (focus !== 0) return;
+    const hb = 130 - Math.floor(Ui.ROW_H / 2), bottom = hb - NH.CONFIRM_GAP;
+    const widths = f => { const h = FM[f].h; return [Ui.usable(bottom - 2 * h, bottom - h, 12), Ui.usable(bottom - h, bottom, 12)]; };
+    let font = "tiny", lines = dc.getTextWidthInPixels(q, "tiny") <= widths("tiny")[1] ? [q] : TB.wrap(q, widths("tiny"), s => dc.getTextWidthInPixels(s, "tiny"));
+    if (lines.length > 2) { font = "xtiny"; lines = Ui.wrap(dc, q, "xtiny", widths("xtiny"), 2); }
+    dc.setColor(T.ACCENT); lines.forEach((l, i) => dc.drawText(130, bottom - (lines.length - i) * FM[font].h, font, l, J.CENTER));
+    dc.setColor(T.RULE); dc.fillRectangle(60, hb - 2, 140, 1);
+  };
+  const CONFIRM_KEYS = { START: "Picks the focused row: the action on open (not in its first 0.5 s)", "UP/DOWN": "Move between the action and Cancel", Tap: "Picks the row tapped", BACK: "Cancel, nothing sent" };
   CARDS.push({ id: "home-confirm", section: "home", name: "Confirmation",
-    neu: [{ label: "", draw: dc => Native.confirmation(dc, "Stop charging?"), keys: { START: "Yes, send", DOWN: "No" } }],
-    fixes: ["B6"], changed: ["Drawn from the device files: green check at START, red cross at DOWN (personality.mss)."], notes: [] });
+    neu: [{ label: "Opens on the action", draw: dc => NH.confirm(dc, {}), keys: CONFIRM_KEYS, fitcheck: true },
+      { label: "After DOWN", draw: dc => NH.confirm(dc, { focus: 1 }), keys: { START: "Cancel, nothing sent", UP: "Back to the action", BACK: "Cancel, nothing sent" }, fitcheck: true },
+      { label: "Two lines", draw: dc => NH.confirm(dc, { question: "Start the auxiliary heater?", action: "Start aux heat" }), keys: CONFIRM_KEYS, fitcheck: true },
+      { label: "With a value", draw: dc => NH.confirm(dc, { question: "Set mode to Immediate discharging?", action: "Set mode" }), keys: CONFIRM_KEYS, fitcheck: true },
+      { label: "A start", draw: dc => NH.confirm(dc, { question: "Start climate?", action: "Start climate" }), keys: CONFIRM_KEYS, fitcheck: true }],
+    fixes: ["B6"],
+    changed: ["Every command asks first (US-062), on a NightMenu instead of Garmin's Confirmation: the question in the title area, the action focused, \"Cancel\" below it.",
+      "With \"Confirm commands\" off (Garmin Connect, or Settings on the watch) nothing asks: no exception for stop charging, the auxiliary heater or a low quota.",
+      "The question wraps to two lines where one does not fit; the action row uses the home row's words, and the charge limit and mode keep their value in the question."],
+    notes: ["The action is row 0 so the question stays in view: from row 1 on the mask covers the title on the button watches. Confirming is one more press of the same button.",
+      "A second START, or a second tap where home's focused row was, lands on the action, so it ignores a pick in the first 0.5 s after the screen opens: a double tap or double press sends nothing. Someone who keeps pressing confirms with the first press after that. Not measured on a watch.",
+      "A tap where home's row above the focus was lands on the question and does nothing; where the row below was, on Cancel.",
+      "BACK always cancels. Pushed and popped with SLIDE_IMMEDIATE (Theme.SLIDE_DIALOG).",
+      "Stop commands (climate, ventilation, aux heat, charging) get a red action pill, without the \"!\" red carries elsewhere: \"!\" means a failure or warning, and the word Stop says it. Starts, the charge limit and the charge mode keep the accent. Monochrome: white, as every pill.",
+      "Clear stored data and Navigate keep Garmin's confirmation (they are not commands)."] });
   window.NH = NH;
 })();

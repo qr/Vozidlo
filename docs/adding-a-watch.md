@@ -139,7 +139,8 @@ import json,os
 s=json.load(open(os.path.expanduser(f'~/.Garmin/ConnectIQ/Devices/$ID/simulator.json')))
 print('touch :', bool(s['display'].get('isTouch')))
 print('keys  :', [k['id'] + ('/hold' if k.get('isHold') else '') + ' ' + k['behavior'] for k in s['keys']])
-print('hint  :', 'actionMenuHint' in json.dumps(s['layouts']))"
+print('hint  :', 'actionMenuHint' in json.dumps(s['layouts']))
+print('menu  :', s['layouts'][0]['menu2']['mode'])"
 ```
 
 Then read the rules top to bottom; the first that matches is the profile:
@@ -155,6 +156,13 @@ The order matters. A five-button watch also has a `menu/hold onMenu` key
 (holding UP is MENU there), which is why UP and DOWN are checked first. This is
 exactly what `devdata.py` does (`profile()`), and the result lands as `profile`
 in `tools/ui/devices/11-devdata.js`.
+
+Then check `menu`: on every supported watch it is `touchButton` for profiles A
+and A0 and `scroll` for B and C. The app relies on that pairing: on a
+`touchButton` watch Garmin centres the focused row and the lists cover the edge
+beyond the three middle rows, on a `scroll` watch they cover nothing
+(`NightMenuLayout.masks()`). A watch that breaks the pairing needs that
+function changed for it.
 
 A watch that fits none of these, for example one with fewer than five buttons
 and no touch, or touch without a START button, needs a new profile. That is a

@@ -56,6 +56,10 @@ The API is fire-and-forget: a command is only confirmed by reading the car
 afterwards. The app does that once, about 15 seconds later ("Climate on"), for
 one extra request. You can switch it off in the settings.
 
+Every command asks first, so it no longer goes out on a single tap, and a
+quick double tap sends nothing. If you would rather send on one tap, switch "Confirm commands" off in the settings in
+Garmin Connect, or "Confirmation" in Settings on the watch.
+
 ### You need your own API key
 
 Škoda's API is free and open to anyone, but each user creates their own key. In

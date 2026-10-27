@@ -12,6 +12,9 @@ module Chips {
         var text as String;
         var icon as Symbol?;
         var kind as Symbol;
+        // Width from the first measure(), -1 before: home draws its chips
+        // on every frame of a list scroll.
+        var measured as Number = -1;
 
         function initialize(text as String, icon as Symbol?, kind as Symbol) {
             self.text = text;
@@ -110,9 +113,12 @@ module Chips {
         return Geo.current().chipH;
     }
 
-    // Measured width of one chip on this Dc.
+    // Measured width of one chip on this Dc, measured once per chip.
     function measure(dc as Dc, chip as Chip) as Number {
-        return width(dc.getTextWidthInPixels(chip.text, Graphics.FONT_XTINY), iconFor(chip) != null);
+        if (chip.measured < 0) {
+            chip.measured = width(dc.getTextWidthInPixels(chip.text, Graphics.FONT_XTINY), iconFor(chip) != null);
+        }
+        return chip.measured;
     }
 
     // Draws one chip centred on cx with its top at y; returns its width.

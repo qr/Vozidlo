@@ -26,6 +26,7 @@ module Settings {
         var spin = Properties.getValue("Spin") as String?;
         var targetTemperature = Properties.getValue("TargetTemperature") as Number?;
         var checkAfterCommand = Properties.getValue("CheckAfterCommand") as Boolean?;
+        var confirmCommands = Properties.getValue("ConfirmCommands") as Boolean?;
 
         return new Config(
             apiKey != null ? apiKey : "",
@@ -33,13 +34,20 @@ module Settings {
             resolveTemperatureUnit(unit),
             spin != null ? spin : "",
             targetTemperature,
-            resolveCheckAfterCommand(checkAfterCommand)
+            resolveCheckAfterCommand(checkAfterCommand),
+            resolveConfirmCommands(confirmCommands)
         );
     }
 
     // On unless the user switched it off: a watch that has not synced the
     // new property yet (null) checks, as the default in properties.xml does.
     function resolveCheckAfterCommand(value as Boolean?) as Boolean {
+        return value != false;
+    }
+
+    // The same for the confirmation before a command (US-062): a watch that
+    // has not synced the property yet asks, as the default does.
+    function resolveConfirmCommands(value as Boolean?) as Boolean {
         return value != false;
     }
 
@@ -90,9 +98,12 @@ module Settings {
         public var targetTemperature as Number?;
         // Read the car once, 15 s after a command (CommandCheck).
         public var checkAfterCommand as Boolean;
+        // Ask before every command (ConfirmationPolicy).
+        public var confirmCommands as Boolean;
 
         function initialize(key as String, vinValue as String, unit as String, spinValue as String,
-                            targetTemperatureValue as Number?, checkAfterCommandValue as Boolean) {
+                            targetTemperatureValue as Number?, checkAfterCommandValue as Boolean,
+                            confirmCommandsValue as Boolean) {
             apiKey = key;
             vin = vinValue;
             vinValid = Settings.isVinValid(vinValue);
@@ -103,6 +114,7 @@ module Settings {
             hasSpin = spinValue.length() > 0;
             targetTemperature = Settings.isTargetTemperatureSet(targetTemperatureValue) ? targetTemperatureValue : null;
             checkAfterCommand = checkAfterCommandValue;
+            confirmCommands = confirmCommandsValue;
         }
 
     }

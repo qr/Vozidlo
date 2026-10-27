@@ -1,3 +1,4 @@
+import Toybox.Communications;
 import Toybox.Lang;
 import Toybox.PersistedContent;
 import Toybox.System;
@@ -135,14 +136,32 @@ module Commands {
         return NOT_SENT_PREFIX + status.toString() + "): " + reason;
     }
 
+    // Whether a command's answer means "sent". Škoda answers every command
+    // with 202, an empty body and no Content-Type. Garmin Connect on iOS
+    // turns that into -400 although the car does get the command (measured
+    // 2026-10-26 on an iPad, Garmin's CIQQA-4818); Android and the simulator
+    // return the 202 itself. So on iOS a -400 counts as sent, and the check
+    // after a command (CommandCheck.mc) says whether the car acted. Every
+    // other code, and -400 everywhere else, stays a failure.
+    function isSent(responseCode as Number, onIos as Boolean) as Boolean {
+        if (responseCode >= 200 && responseCode < 300) {
+            return true;
+        }
+        return onIos && responseCode == Communications.INVALID_HTTP_BODY_IN_NETWORK_RESPONSE;
+    }
+
+    function phoneIsIos() as Boolean {
+        return System.getDeviceSettings().phoneOperatingSystem == System.PHONE_OS_IOS;
+    }
+
 }
 
-// Sends one command at a time for the home list. `_sending` lives here, not
-// in the menu, so a double press is ignored however the menu was rebuilt.
+// Sends the home list's commands. Whether one is on its way is
+// CommandFlight's, shared with the charging menus, so a second command of
+// any kind waits for the first answer, however the menus were rebuilt.
 class CommandRunner {
 
     private var _home as WeakReference;
-    private var _sending as Boolean = false;
     private var _action as Symbol = ConfirmationPolicy.START_CLIMATE;
 
     function initialize(home as HomeMenu) {
@@ -157,7 +176,7 @@ class CommandRunner {
             return;
         }
         var settings = getApp().getSettings();
-        var verdict = Commands.guard(_sending, System.getDeviceSettings().phoneConnected, Quota.canSpend(),
+        var verdict = Commands.guard(CommandFlight.busy(), System.getDeviceSettings().phoneConnected, Quota.canSpend(),
             settings.vinValid, settings.apiKey.length() > 0);
         if (verdict == :quota) {
             _feedback(Commands.QUOTA_SPENT, :error);
@@ -176,7 +195,7 @@ class CommandRunner {
     // omit it for every command (see ApiClient.mc).
 
     function _send() as Void {
-        _sending = true;
+        CommandFlight.start();
         var settings = getApp().getSettings();
         var vin = settings.vin;
         var key = settings.apiKey;
@@ -206,7 +225,7 @@ class CommandRunner {
         } else if (action == ConfirmationPolicy.STOP_CHARGING) {
             ApiClient.stopCharging(vin, key, done);
         } else {
-            _sending = false;
+            CommandFlight.done();
         }
     }
 
@@ -217,11 +236,12 @@ class CommandRunner {
     // already said so. "Climate on" is only ever said from the car's own
     // report, read once 15 s later when the user's setting allows
     // (CommandCheck.mc). A failure overwrites "sent" with "Not sent", see
-    // ProblemDetail's own note on why the reason comes from the status.
+    // ProblemDetail's own note on why the reason comes from the status. On
+    // iOS a -400 is a sent command too (Commands.isSent()).
     function _onCommandResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null) as Void {
-        _sending = false;
+        CommandFlight.done();
 
-        if (responseCode >= 200 && responseCode < 300) {
+        if (Commands.isSent(responseCode, Commands.phoneIsIos())) {
             Quota.recordHeaders(null, null, null);
             if (_home.stillAlive()) {
                 var home = _home.get() as HomeMenu?;

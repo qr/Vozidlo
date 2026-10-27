@@ -67,23 +67,26 @@ class HomeMenu extends NightMenu {
         VehicleComplications.publish();
     }
 
+    // Drawn at every focus, so the hero scrolls out with the list instead
+    // of vanishing at the first step. From focus 1 on only the bottom 33 px
+    // would show, cut by the edge, so the mask covers it on the button
+    // watches (NightMenu.drawForeground). Feedback counts as seen only while
+    // row 0 has the focus.
     function drawTitle(dc as Dc) as Void {
         dc.setColor(Theme.TEXT_1, Theme.BG);
         dc.clear();
-        // From focus 1 on only the bottom 33 px of the hero would show, cut
-        // by the edge: the hero belongs to the top of the list.
-        if (!titleShown()) {
-            return;
-        }
+        MenuTrace.title(dc.getWidth(), dc.getHeight());
         HomeHero.draw(dc, _hero);
-        if (_feedback != null) {
+        if (_feedback != null && titleShown()) {
             _feedbackDrawn = true;
         }
     }
 
-    // Called after the rows and title, over the whole screen: the SoC ring
-    // stays put while the list scrolls under it.
+    // Called after the rows and title, over the whole screen: the mask
+    // first, then the SoC ring, which stays put while the list scrolls
+    // under it.
     function drawForeground(dc as Dc) as Void {
+        NightMenu.drawForeground(dc);
         HomeHero.drawRing(dc, _hero);
     }
 
@@ -110,6 +113,19 @@ class HomeMenu extends NightMenu {
             var row = rows[i] as ControlTiles.TileDescriptor;
             addItem(new NightMenuItem(row.actionId, row.label, null, row.icon, null));
         }
+        _addTraceRow();
+    }
+
+    // The debug build ends home with the menu trace (MenuTrace.mc), one UP
+    // from the first row; it is not a tile, so the tile order never sees it.
+    (:debug)
+    function _addTraceRow() as Void {
+        addItem(new NightMenuItem(MenuTrace.ROW, "Menu trace", null, :list, null));
+    }
+
+    // A release build has no trace row.
+    (:release)
+    function _addTraceRow() as Void {
     }
 
 }
@@ -120,7 +136,7 @@ class HomeMenu extends NightMenu {
 module HomeRows {
 
     // [rows, index of the row to focus]. The focus is the first row: the
-    // hero is only drawn while row 0 has it, and with the default order the
+    // hero is only in view while row 0 has it, and with the default order the
     // first row is Status. The primary action still comes first within the
     // climate group (US-037), one or two rows down.
     function build() as [Array<ControlTiles.TileDescriptor>, Number] {
@@ -172,6 +188,9 @@ class HomeDelegate extends NightMenuDelegate {
     }
 
     function onPick(id as Object?) as Void {
+        if (_pickTrace(id)) {
+            return;
+        }
         if (id == ControlTiles.OPEN_CHARGING) {
             ChargingScreen.open();
         } else if (id == ControlTiles.OPEN_STATUS) {
@@ -194,6 +213,21 @@ class HomeDelegate extends NightMenuDelegate {
     // two presses or after twenty depending on where the focus started.
     function onWrap(key as WatchUi.Key) as Boolean {
         return true;
+    }
+
+    // The debug build's trace row (HomeMenu._addTraceRow).
+    (:debug)
+    function _pickTrace(id as Object?) as Boolean {
+        if (id == MenuTrace.ROW) {
+            MenuTrace.open();
+            return true;
+        }
+        return false;
+    }
+
+    (:release)
+    function _pickTrace(id as Object?) as Boolean {
+        return false;
     }
 
     // A tap on the hero: the touch route to Status.

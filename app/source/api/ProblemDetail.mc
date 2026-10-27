@@ -105,7 +105,8 @@ module ProblemDetail {
             // real 202 or a problem+json body (see ApiClient.mc): if it
             // still occurs with the split respected, the response body
             // itself was unreadable for some other reason, so there is
-            // nothing more specific to say.
+            // nothing more specific to say. A command's -400 on iOS never
+            // gets here: it is Škoda's 202 (Commands.isSent()).
             return new Message("The car's answer could not be read. Try again.", null, false);
         }
         if (status == Communications.SECURE_CONNECTION_REQUIRED) {

@@ -10,8 +10,9 @@ import Toybox.WatchUi;
 //   fr955            FONT_MEDIUM 39, SMALL 32, TINY 29, XTINY 21
 // Rows were FONT_MEDIUM + 16 then (53 / 55 px), which fitted five on screen
 // and ran the outer two into the round edge. Geo.Display.rowH is now a
-// quarter of the display (65) and only the focused row and its two
-// neighbours are drawn (NightMenuLayout.isShown), so every list shows three.
+// quarter of the display (65). Every row is drawn, and on the button
+// watches drawForeground() masks what lies more than a row and a half from
+// the centre (NightMenuLayout.maskBands), so a list shows three there.
 //   So Chips.height() is 21 on fenix7pro and 23 on the other two.
 // Read from the device files (simulator.json layouts.menu2), the platform's
 // own Menu2 geometry: title 78 / 88 / 92 px high, focused item 87 / 83 / 76
@@ -28,8 +29,9 @@ import Toybox.WatchUi;
 // at focus 0 the visible title is cy - rowH / 2 = Geo heroBottom px (98
 // with rows of 65), and the home title is exactly that tall; at focus 1
 // the title bottom is at heroBottom - rowH = 33, so from focus 1 on
-// the title is drawn blank, like a row two away from the focus. Check on the
-// watch; onShow() below refreshes the theme either way.
+// the title lies under the mask, like a row two away from the focus. Check on
+// the watch; onShow() below refreshes the theme either way. The debug build
+// shows the title and row dc sizes on the watch (MenuTrace).
 //
 // Menus in Škoda green (B6 "Menus"): Menu2 cannot be recoloured on these
 // watches (themes unsupported), so every list is a CustomMenu drawn here. A
@@ -39,8 +41,8 @@ import Toybox.WatchUi;
 class NightMenu extends WatchUi.CustomMenu {
 
     private var _title as String;
-    // Which row has the focus, for leaving the far rows blank. Kept here
-    // rather than asked of the rows: see NightMenuFocus.
+    // Which row has the focus, for the mask's top band. Kept here rather
+    // than asked of the rows: see NightMenuFocus.
     private var _focus as NightMenuFocus;
     private var _count as Number = 0;
 
@@ -73,21 +75,28 @@ class NightMenu extends WatchUi.CustomMenu {
     function onShow() as Void {
         Theme.refresh();
         Geo.setKeepOut(false);
+        MenuTrace.shown(_count);
         CustomMenu.onShow();
+    }
+
+    // The debug build keeps its menu trace across runs (MenuTrace.save).
+    function onHide() as Void {
+        MenuTrace.save();
+        CustomMenu.onHide();
     }
 
     // Accent FONT_TINY title with a 1 px rule under it (PoC Ui.menu). The
     // title area ends just above the focused row at focus 0, so the text is
-    // fitted to the chord at that height, not to the dc width.
+    // fitted to the chord at that height, not to the dc width. Drawn at
+    // every focus, so it scrolls out with the list: from focus 1 on the
+    // mask covers it on the button watches (drawForeground).
     function drawTitle(dc as Dc) as Void {
         dc.setColor(Theme.TEXT_1, Theme.BG);
         dc.clear();
-        if (!titleShown()) {
-            return;
-        }
         var g = Geo.current();
         var h = dc.getHeight();
         var w = dc.getWidth();
+        MenuTrace.title(w, h);
         var font = Graphics.FONT_TINY;
         var fh = dc.getFontHeight(font);
         var cy = h / 2;
@@ -105,12 +114,39 @@ class NightMenu extends WatchUi.CustomMenu {
         dc.fillRectangle(w / 2 - g.px(70), h - 2, g.px(140), 1);
     }
 
+    // Called after the title and the rows, over the whole screen. On the
+    // button watches a black band covers everything more than a row and a
+    // half from the centre, so rows slide into and out of the edge by where
+    // they are. Up to 1.3.0 a row was left blank by its index instead
+    // (within one of the focus or not), and Garmin's scroll animation moves
+    // rows while the focus is still the old one or already the new one, so
+    // rows on screen went blank mid-scroll. The focus read here is this
+    // frame's: every row has reported its own by now. Subclasses that draw
+    // over the menu (the home ring) call this first.
+    function drawForeground(dc as Dc) as Void {
+        _focus.endFrame();
+        MenuTrace.frame(_focus.focus());
+        if (!NightMenuLayout.masks(Geo.current().input)) {
+            return;
+        }
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var bands = NightMenuLayout.maskBands(h, Geo.current().rowH, _focus.focus());
+        dc.setColor(Theme.BG, Graphics.COLOR_TRANSPARENT);
+        if (bands[0] > 0) {
+            dc.fillRectangle(0, 0, w, bands[0]);
+        }
+        if (bands[1] < h) {
+            dc.fillRectangle(0, bands[1], w, h - bands[1]);
+        }
+    }
+
     // The focus as this menu last saw it (NightMenuFocus).
     function focusState() as NightMenuFocus {
         return _focus;
     }
 
-    // Whether the title is on screen: it sits where row -1 would.
+    // Whether the title is in view: it sits above row 0.
     function titleShown() as Boolean {
         return _focus.titleShown();
     }
@@ -167,7 +203,7 @@ class NightMenu extends WatchUi.CustomMenu {
 }
 
 // One row: focused = accent pill with black text (white pill under
-// monochrome), otherwise grey FONT_TINY with an accent icon, a grey FONT_XTINY
+// monochrome; setPill() can give another fill), otherwise grey FONT_TINY with an accent icon, a grey FONT_XTINY
 // sub-label and an accent check when set (B6, PoC Ui.menu).
 class NightMenuItem extends WatchUi.CustomMenuItem {
 
@@ -192,6 +228,15 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
     // row (charge mode, tile order).
     private var _menu as WeakReference? = null;
     private var _index as Number = -1;
+    // The fitted text of both states, kept between frames: draw() runs on
+    // every frame of a scroll, and fitting measures (Ui.pickFont, Ui.fit).
+    private var _layout as NightMenuRowCache = new NightMenuRowCache();
+    // Fill of the focus pill; null is the accent. The confirmation before a
+    // stop command sets Theme.DESTRUCTIVE (CommandConfirm). Not part of the
+    // row cache, since the fill changes no text; the monochrome test still
+    // draws the pill white. Text on it stays black, so only fills that carry
+    // black text (style guide "Never put text on a grey fill").
+    private var _pill as Number? = null;
 
     function initialize(id as Object, label as String, sub as String?, icon as Symbol?, checked as Boolean?) {
         CustomMenuItem.initialize(id, {});
@@ -209,14 +254,32 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
     // Lets a screen update a row in place so focus survives (WP1 rebuild rule).
     function setText(label as String) as Void {
         _label = label;
+        _layout.clear();
     }
 
     function setSub(sub as String?) as Void {
         _sub = sub;
+        _layout.clear();
     }
 
+    // The check column changes the room for the text, so this clears the
+    // layout as well.
     function setChecked(checked as Boolean?) as Void {
         _checked = checked;
+        _layout.clear();
+    }
+
+    function setPill(color as Number?) as Void {
+        _pill = color;
+    }
+
+    function pill() as Number? {
+        return _pill;
+    }
+
+    // The row's laid-out text (NightMenuRowCache), for the tests.
+    function layout() as NightMenuRowCache {
+        return _layout;
     }
 
     // The menu this row is in, as a WeakReference (the menu holds its rows),
@@ -226,21 +289,16 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
         _index = index;
     }
 
+    // Every row is drawn, whatever the focus; the menu's mask decides what
+    // shows (NightMenu.drawForeground).
     function draw(dc as Dc) as Void {
         var focused = isFocused();
+        MenuTrace.row(_index, focused, dc.getHeight());
         var ref = _menu;
         if (ref != null && _index >= 0) {
             var menu = ref.get() as NightMenu?;
-            if (menu != null) {
-                var state = menu.focusState();
-                // Rows drawn earlier in this frame went by the old focus:
-                // one more frame puts every row right.
-                if (state.drawn(_index, focused)) {
-                    WatchUi.requestUpdate();
-                }
-                if (!state.shows(_index, focused)) {
-                    return;
-                }
+            if (menu != null && menu.focusState().drawn(_index, focused)) {
+                WatchUi.requestUpdate();
             }
         }
         if (focused) {
@@ -265,7 +323,8 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
         var px = (w - pw) / 2;
         var py = (h - ph) / 2;
         var mid = py + ph / 2;
-        dc.setColor(Theme.isMono() ? Theme.TEXT_1 : Theme.ACCENT, Graphics.COLOR_TRANSPARENT);
+        var pill = _pill;
+        dc.setColor(Theme.isMono() ? Theme.TEXT_1 : (pill != null ? pill : Theme.ACCENT), Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);
 
         var right = _checked != null ? g.px(34) : 0;
@@ -275,21 +334,27 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
             NightIcons.draw(dc, icon, x + g.px(8), mid, g.px(9), Theme.BG);
             x += g.px(26);
         }
-        var maxW = px + pw - g.px(20) - right - x;
-        var fonts = sub != null
-            ? [Graphics.FONT_SMALL, Graphics.FONT_TINY] as Array<Graphics.FontType>
-            : [Graphics.FONT_MEDIUM, Graphics.FONT_SMALL, Graphics.FONT_TINY] as Array<Graphics.FontType>;
-        var font = Ui.pickFont(_label, fonts, maxW, Ui.fontMeasurer(dc));
-        var label = Ui.fit(_label, maxW, Ui.measurer(dc, font));
+        var laid = _layout.at(w, h).focused();
+        if (laid == null) {
+            var maxW = px + pw - g.px(20) - right - x;
+            var fonts = sub != null
+                ? [Graphics.FONT_SMALL, Graphics.FONT_TINY] as Array<Graphics.FontType>
+                : [Graphics.FONT_MEDIUM, Graphics.FONT_SMALL, Graphics.FONT_TINY] as Array<Graphics.FontType>;
+            var font = Ui.pickFont(_label, fonts, maxW, Ui.fontMeasurer(dc));
+            laid = [Ui.fit(_label, maxW, Ui.measurer(dc, font)),
+                sub != null ? Ui.fit(sub, maxW, Ui.measurer(dc, Graphics.FONT_XTINY)) : null,
+                font] as [String, String?, Graphics.FontType];
+            _layout.setFocused(laid);
+        }
         dc.setColor(Theme.BG, Graphics.COLOR_TRANSPARENT);
         var vjust = Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER;
-        if (sub != null) {
-            dc.drawText(x, mid - ph / 5, font, label, vjust);
-            var subText = Ui.fit(sub, maxW, Ui.measurer(dc, Graphics.FONT_XTINY));
+        var subText = laid[1];
+        if (subText != null) {
+            dc.drawText(x, mid - ph / 5, laid[2], laid[0], vjust);
             dc.setColor(Theme.isMono() ? Theme.BG : Theme.EMERALD, Graphics.COLOR_TRANSPARENT);
             dc.drawText(x, mid + ph / 4, Graphics.FONT_XTINY, subText, vjust);
         } else {
-            dc.drawText(x, mid, font, label, vjust);
+            dc.drawText(x, mid, laid[2], laid[0], vjust);
         }
 
         var checked = _checked;
@@ -311,33 +376,45 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
     function _drawPlain(dc as Dc) as Void {
         var g = Geo.current();
         var w = dc.getWidth();
-        var mid = dc.getHeight() / 2;
+        var h = dc.getHeight();
+        var mid = h / 2;
         var font = Graphics.FONT_TINY;
         var iconW = _icon != null ? g.px(26) : 0;
         var checked = _checked;
         var checkW = checked != null ? g.px(CHECK_W) : 0;
-        // An unfocused row that is on screen sits one row above or below the
-        // centre (three rows per screen), so its text is fitted to the chord
-        // there, and never wider than the PoC's widest unfocused row.
-        var blockH = dc.getFontHeight(font) + (_sub != null ? dc.getFontHeight(Graphics.FONT_XTINY) : 0);
-        var maxW = NightMenuLayout.neighbourWidth(g, dc.getHeight(), blockH) - iconW - checkW;
-        var cap = g.px(NEIGHBOUR_MAX_W) - iconW - checkW;
-        if (maxW > cap) {
-            maxW = cap;
+        var laid = _layout.at(w, h).plain();
+        if (laid == null) {
+            // An unfocused row in view on the button watches sits one row
+            // above or below the centre (the mask hides the rest), so its text
+            // is fitted to the chord there, and never wider than the PoC's
+            // widest unfocused row.
+            var blockH = dc.getFontHeight(font) + (_sub != null ? dc.getFontHeight(Graphics.FONT_XTINY) : 0);
+            var maxW = NightMenuLayout.neighbourWidth(g, h, blockH) - iconW - checkW;
+            var cap = g.px(NEIGHBOUR_MAX_W) - iconW - checkW;
+            if (maxW > cap) {
+                maxW = cap;
+            }
+            var fitted = Ui.fit(_label, maxW, Ui.measurer(dc, font));
+            var fittedW = dc.getTextWidthInPixels(fitted, font);
+            var sub = _sub;
+            var fittedSub = null as String?;
+            if (sub != null) {
+                fittedSub = Ui.fit(sub, maxW, Ui.measurer(dc, Graphics.FONT_XTINY));
+                var subW = dc.getTextWidthInPixels(fittedSub, Graphics.FONT_XTINY);
+                if (subW > fittedW) {
+                    fittedW = subW;
+                }
+            }
+            laid = [fitted, fittedSub, fittedW] as [String, String?, Number];
+            _layout.setPlain(laid);
         }
-        var label = Ui.fit(_label, maxW, Ui.measurer(dc, font));
-        var textW = dc.getTextWidthInPixels(label, font);
-        var sub = _sub;
-        var subText = null as String?;
+        var label = laid[0];
+        var subText = laid[1];
+        var textW = laid[2];
         var labelY = mid;
         var subY = mid;
-        if (sub != null) {
-            subText = Ui.fit(sub, maxW, Ui.measurer(dc, Graphics.FONT_XTINY));
-            var subW = dc.getTextWidthInPixels(subText, Graphics.FONT_XTINY);
-            if (subW > textW) {
-                textW = subW;
-            }
-            var ys = NightMenuLayout.plainLines(dc.getHeight(), dc.getFontHeight(font), dc.getFontHeight(Graphics.FONT_XTINY));
+        if (subText != null) {
+            var ys = NightMenuLayout.plainLines(h, dc.getFontHeight(font), dc.getFontHeight(Graphics.FONT_XTINY));
             labelY = ys[0];
             subY = ys[1];
         }
@@ -371,15 +448,46 @@ class NightMenuItem extends WatchUi.CustomMenuItem {
 // Pure row geometry, outside the item class so tests need no CustomMenuItem.
 module NightMenuLayout {
 
-    // Rows (and the title, at index -1) more than one row from the focus are
-    // left blank: at a 65 px pitch they would sit in the round edge, cut off.
-    // An unknown focus (-1) shows everything.
-    function isShown(index as Number, focus as Number) as Boolean {
-        if (focus < 0) {
-            return true;
-        }
-        var d = index - focus;
-        return d >= -1 && d <= 1;
+    // Whether lists are masked on a watch of this input profile. In the
+    // device files (simulator.json layouts menu2.mode, SDK 9.2.0) the menus
+    // of every five-button watch are "touchButton", with the focused row
+    // centred, and those of the seven profile B and C watches (Venu 3 and
+    // 3S, vívoactive 5 and 6, Venu 4 41 and 45 mm, Venu X1) are "scroll":
+    // the list is dragged and rests anywhere, 4 to 5 rows in view, so there
+    // is no row two from a centred focus to hide, and nothing is masked
+    // there. docs/adding-a-watch.md section 2 checks the pairing for a new
+    // watch.
+    function masks(input as Number) as Boolean {
+        return input == Geo.INPUT_A;
+    }
+
+    // The mask over a list on a screen h px high with rows rowH apart, as
+    // [bottom of the top band, top of the bottom band]: black above and
+    // below a row and a half from the centre, rounded outwards, so a
+    // centred focus and both its neighbours keep every pixel and the rows
+    // two away are covered (at 65 px rows on a 260 face: 0 to 32 and 228
+    // to 260, where only the round edge would show of them). The top band
+    // is off (0) while row 0 has the focus: the title sits above it (on
+    // home, the hero), and there is no row above to hide.
+    //
+    // Built to fail open. It assumes the focused row is centred. The device
+    // files point that way for touchButton menus (the selection theme area
+    // of the fēnix 8 47 mm, Forerunner 265 and 965 sits on the screen
+    // centre, and there and on the Forerunner 955 Menu2's title height puts
+    // its first row in the middle), but nothing states it for a CustomMenu,
+    // and on the fēnix 7 Menu2's first row (78 + 87 / 2) sits 8 px above
+    // the centre. Off by d px, the band takes d px from one neighbour's
+    // outer edge, which is empty row up to (rowH - text) / 2 (8 px with a
+    // sub-label on the fēnix 7 Pro), then cuts its text with a straight
+    // edge: visible, never a whole row, and the row two away shows a sliver
+    // on the other side. The default title height (menu2.title.height) does
+    // not enter: at focus 0 the top band is off, and from focus 1 on the
+    // title lies wholly above row 0, inside the band, however tall it is.
+    function maskBands(h as Number, rowH as Number, focus as Number) as [Number, Number] {
+        var half = (3 * rowH + 1) / 2;
+        var top = focus == 0 ? 0 : h / 2 - half;
+        var bottom = h / 2 + half;
+        return [top > 0 ? top : 0, bottom < h ? bottom : h];
     }
 
     // Vertical centres [label, sub] of an unfocused row with a sub-label:
@@ -409,22 +517,29 @@ module NightMenuLayout {
 
 }
 
-// Which rows of a NightMenu are drawn, kept apart from WatchUi so the unit
-// tests can drive it frame by frame (NightMenuFocusTests).
+// Which row of a NightMenu has the focus, for the mask's top band, kept
+// apart from WatchUi so the unit tests can drive it frame by frame
+// (NightMenuFocusTests).
 //
 // There is no Menu2.getFocus(), and CustomMenuItem.isFocused() is only known
 // to be right for the row being drawn: 1.1.1 drew its focus pill from it and
 // that was right on the watch. 1.1.2 at first asked every row for
 // isFocused() while drawing one, and on the watch the first frames of a
 // menu then hid the rows that were on screen until a later redraw. So the
-// focus here starts at the focus the menu was opened with, follows only the
-// row being drawn reporting its own focus, and the caller asks for one more
-// frame when it moved.
+// focus here starts at the focus the menu was opened with and follows only
+// the row being drawn reporting its own focus. A frame ends in
+// NightMenu.drawForeground (endFrame).
 class NightMenuFocus {
 
     private var _focus as Number;
     // Number of rows, once known; -1 until the first row is added.
     private var _count as Number = -1;
+    // The first row to report focus in this frame, -1 while none has. Two
+    // rows reporting focus at once is known from the forum (the Venu 3, and
+    // the old and new row after setFocus); the first one in a frame decides,
+    // the row already focused included, and the second is ignored, so the
+    // focus cannot swing between the two from frame to frame.
+    private var _mover as Number = -1;
 
     function initialize(focus as Number) {
         _focus = focus < 0 ? 0 : focus;
@@ -448,25 +563,83 @@ class NightMenuFocus {
     }
 
     // Every row reports here as it draws, with its own focus state. Returns
-    // true when that moved the focus: rows drawn before it in the same frame
-    // went by the old one, so the caller asks for another frame.
+    // true when the caller should ask for one more frame: only when the
+    // move shows or hides the title, the one thing the focus still decides,
+    // and at most once per frame. drawForeground reads the focus after the
+    // rows, so on a watch that draws as documented this frame is spare; it
+    // is a safety net, where up to 1.3.0 every move asked for one (and two
+    // rows reporting focus could ask forever).
     function drawn(index as Number, focused as Boolean) as Boolean {
-        if (!focused || index == focus()) {
+        if (index == _mover) {
+            // The row that decided the focus draws again: a new frame, even
+            // if drawForeground did not end the last one.
+            _mover = -1;
+        }
+        if (!focused || _mover >= 0) {
             return false;
         }
+        if (index == focus()) {
+            _mover = index;
+            return false;
+        }
+        var titleWas = titleShown();
         _focus = index;
-        return true;
+        _mover = index;
+        return titleShown() != titleWas;
     }
 
-    // A row is drawn when it is the focus or next to it; the focused row
-    // always, whatever was tracked before.
-    function shows(index as Number, focused as Boolean) as Boolean {
-        return focused || NightMenuLayout.isShown(index, focus());
+    // NightMenu.drawForeground, after every row of the frame.
+    function endFrame() as Void {
+        _mover = -1;
     }
 
-    // The title sits where row -1 would.
+    // The title sits above row 0.
     function titleShown() as Boolean {
-        return NightMenuLayout.isShown(-1, focus());
+        return focus() == 0;
+    }
+
+}
+
+// The fitted text of one NightMenuItem, per state, laid out on its first
+// draw and kept until the row changes (setText, setSub, setChecked) or is
+// drawn into a dc of another size. Focused: [label, sub-label or null,
+// label font]. Plain: [label, sub-label or null, width of the wider].
+class NightMenuRowCache {
+
+    private var _w as Number = -1;
+    private var _h as Number = -1;
+    private var _focused as [String, String?, Graphics.FontType]? = null;
+    private var _plain as [String, String?, Number]? = null;
+
+    // The cache for a row dc of w by h; a different size drops both states.
+    function at(w as Number, h as Number) as NightMenuRowCache {
+        if (w != _w || h != _h) {
+            clear();
+            _w = w;
+            _h = h;
+        }
+        return self;
+    }
+
+    function focused() as [String, String?, Graphics.FontType]? {
+        return _focused;
+    }
+
+    function setFocused(laid as [String, String?, Graphics.FontType]) as Void {
+        _focused = laid;
+    }
+
+    function plain() as [String, String?, Number]? {
+        return _plain;
+    }
+
+    function setPlain(laid as [String, String?, Number]) as Void {
+        _plain = laid;
+    }
+
+    function clear() as Void {
+        _focused = null;
+        _plain = null;
     }
 
 }

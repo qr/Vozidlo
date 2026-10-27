@@ -138,6 +138,9 @@
     { label: "Find my car", sub: "Position 3", icon: "pin" }, { label: "Status", sub: "Position 4", icon: "list" }];
   NSet.order = (dc, focus = 0) => nmenu(dc, { title: "Tile order", items: NSet.ORDER, focus });
   NSet.orderMoved = dc => nmenu(dc, { title: "Tile order", items: NSet.ORDER_MOVED, focus: 1 });
+  // ui/screens/SettingsScreen.mc: "Confirmation" with On or Off as its sub-label, switched in place on START or a tap.
+  // ("Confirm commands", the Garmin Connect title, is cut with "…" in the focused pill on every watch.)
+  NSet.menu = (dc, focus = 1, on = true) => nmenu(dc, { title: "Settings", items: [{ label: "Tile order" }, { label: "Confirmation", sub: on ? "On" : "Off" }, { label: "Clear stored data" }], focus });
   NSet.item = (dc, focus = 1) => nmenu(dc, { title: "Climate", items: [{ label: "Move up" }, { label: "Move down" }, { label: "Hide" }], focus });
   NSet.temp = function (dc, v = NMOCK.targetTemp) {
     blank(dc);
@@ -238,6 +241,12 @@
       fixes: ["B6"], changed: ["New: hold UP on the map opens a one-item Menu2 \"Navigate to car\"; OLD had no MENU handler."],
       notes: ["Same confirmation as from the Find my car screen."] },
 
+    { id: "set-menu", section: "settings", order: 499, name: "Settings",
+      neu: [{ label: "Confirmation on", draw: dc => NSet.menu(dc, 1, true), keys: { START: "Switch it off (saved at once)", "UP/DOWN": "Move focus", BACK: "Home" }, fitcheck: true },
+        { label: "Switched off", draw: dc => NSet.menu(dc, 1, false), keys: { START: "Switch it on" }, fitcheck: true }],
+      fixes: [], changed: ["New row \"Confirmation\" (US-062) with On or Off under it: the same property as \"Confirm commands\" in Garmin Connect, so both show the same value.",
+        "Named \"Confirmation\" because \"Confirm commands\" does not fit the focused pill on any watch."],
+      notes: ["On by default; a watch that has not synced the property yet asks too.", "Takes effect with the next command, no restart (VozidloApp.onSettingsChanged)."] },
     { id: "set-order", section: "settings", name: "Tile order",
       neu: [{ label: "", draw: dc => NSet.order(dc), keys: { START: "Edit item", "UP/DOWN": "Move focus" }, fitcheck: true }],
       fixes: ["B6"], changed: ["IconMenuItem with the category icons.", "\"Status detail\" becomes \"Status\"."], notes: ["Hidden categories show \"Hidden\" as sub-label."] },

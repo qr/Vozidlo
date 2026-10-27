@@ -12,7 +12,9 @@ import Toybox.PersistedContent;
 //   - Škoda answers a command with 202, an empty body and NO Content-Type
 //     header. With :responseType set, Connect IQ cannot match that against
 //     "application/json" and reports -400: every successful command would
-//     look like a failure.
+//     look like a failure. Garmin Connect on iOS reports -400 for that 202
+//     even without :responseType (no client-side fix, Garmin's CIQQA-4818),
+//     so the command screens read a -400 on iOS as sent (Commands.isSent()).
 //   - An error body comes back as application/problem+json. Without
 //     :responseType, Connect IQ's automatic content-type detection only
 //     recognises an exact "application/json" match, so a problem+json body

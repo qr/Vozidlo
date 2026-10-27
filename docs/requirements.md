@@ -84,7 +84,7 @@ what ships: say so in an issue and it will get fixed in one place or the other.
 - **US-044**: Read errors in plain language
 - **US-045**: Know when my phone is the problem
 - **US-046**: Never poll (the one check after a command is caused by the user's command and can be switched off)
-- **US-062**: Confirm only what deserves confirming
+- **US-062**: Confirm every command before it is sent, unless switched off (since 2026-10-27, see decisions.md "Every command is confirmed, unless the user switches it off."; up to 1.3 only what deserved confirming)
 
 ## Developer experience
 

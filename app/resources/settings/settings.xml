@@ -49,4 +49,10 @@
         <settingConfig type="boolean" />
     </setting>
 
+    <!-- US-062: a confirmation before every command. On by default; the
+         watch's own Settings list switches the same property. -->
+    <setting propertyKey="@Properties.ConfirmCommands" title="@Strings.SettingConfirmCommandsTitle" prompt="@Strings.SettingConfirmCommandsHelp">
+        <settingConfig type="boolean" />
+    </setting>
+
 </settings>

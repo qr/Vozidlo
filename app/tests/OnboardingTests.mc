@@ -177,19 +177,19 @@ module OnboardingTests {
 
     (:test)
     function unconfiguredSettingsAreNeverConfigured(logger as Logger) as Boolean {
-        var noKey = new Settings.Config("", "TMBJJ7NS4H0123456", "C", "", null, true);
+        var noKey = new Settings.Config("", "TMBJJ7NS4H0123456", "C", "", null, true, true);
         if (Onboarding.isConfigured(noKey)) {
             logger.error("an empty API key must never read as configured");
             return false;
         }
 
-        var badVin = new Settings.Config("some-key", "TOO-SHORT", "C", "", null, true);
+        var badVin = new Settings.Config("some-key", "TOO-SHORT", "C", "", null, true, true);
         if (Onboarding.isConfigured(badVin)) {
             logger.error("a VIN that fails Settings.isVinValid() must never read as configured");
             return false;
         }
 
-        var ok = new Settings.Config("some-key", "TMBJJ7NS4H0123456", "C", "", null, true);
+        var ok = new Settings.Config("some-key", "TMBJJ7NS4H0123456", "C", "", null, true, true);
         if (!Onboarding.isConfigured(ok)) {
             logger.error("a present key with a 17-character VIN must read as configured");
             return false;

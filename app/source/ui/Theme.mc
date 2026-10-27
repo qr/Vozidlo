@@ -26,7 +26,9 @@ module Theme {
     const POSITIVE = 0x00FF00;
     // Unlocked, open, stale, connect cable; always paired with an icon or "!".
     const WARNING = 0xFFAA00;
-    // Failed request, phone offline, stop-type confirmations; always with "!".
+    // Failed request, phone offline; always with "!". Also the action pill of
+    // a stop command on the confirmation screen, without "!": a stop is not
+    // a failure (CommandConfirm.isStop, style guide token table).
     const DESTRUCTIVE = 0xFF0000;
 
     // Default side margin inside the chord (TextBlock.MARGIN), and the wider

@@ -71,8 +71,9 @@ same list START opens, unless START has a primary action of its own (the map,
 retry, continue). A left swipe means nothing else anywhere.
 
 **Garmin components first.** Lists are `CustomMenu`s, so scrolling, focus
-animation and key handling are Garmin's. Confirmations, toasts and the action
-menu indicator stay native. Custom drawing is for the hero, chips, icons and
+animation and key handling are Garmin's; so is the confirmation before a
+command. Toasts, the action menu indicator and the clear-data and navigate
+confirmations stay native. Custom drawing is for the hero, chips, icons and
 the bezel, and nothing else.
 
 **One accent, words before colour.** The accent marks focus and titles; it
@@ -111,7 +112,7 @@ is one colour on every watch.
 | `Theme.EMERALD` | `0x005555` | Sub-label on the focused (accent) row | Only on the accent pill |
 | `Theme.POSITIVE` | `0x00FF00` | Garmin's success green | Transient success only; never text |
 | `Theme.WARNING` | `0xFFAA00` | Unlocked, open, stale, plug in, quota low | Always with "!" or an icon |
-| `Theme.DESTRUCTIVE` | `0xFF0000` | Failed request, phone not connected, quota spent | Always with "!" |
+| `Theme.DESTRUCTIVE` | `0xFF0000` | Failed request, phone not connected, quota spent; the action pill of a stop command's confirmation | Always with "!", except that pill, where the word "Stop" carries it |
 
 ![Swatches of the nine Night Panel colour tokens with names and hex values](style/palette.png)
 
@@ -378,19 +379,34 @@ to use on another watch:
 | Charging (`ChargingDetailView`) | title 34, hero 58, state chip 134, detail rows 160 and 180, age 202 |
 | Find my car (`FindCarLayout`) | address 46, distance 88, "Waiting for GPS" 112, age 172; moving: hero 90, "Last parked" 130, address 150 |
 
-**A list shows three rows, close together.** The row height from `Geo` is
-max(h / 4, `FONT_MEDIUM` + 16), a quarter of the display on every current
-watch (65 on a 260 face), and a `CustomMenu` draws only the focused row in the middle and
-one row above and one below (`NightMenuLayout.isShown()`); every other row,
-and the title once the first row has scrolled up, is left blank. Which row
-has the focus is tracked by `NightMenuFocus`: it starts at the focus the
-list opens on and follows only the row being drawn reporting its own
-`isFocused()`, because the watch does not answer that reliably for the
-other rows (1.1.2 asked every row, and lists opened blank). Rows sized
-from the font (53 to 55 px in 1.1.0) showed five, the outer two cut off by
-the round edge; rows of 80 px (1.1.1) kept three but spread them over the
-whole face. When the focus moves, the list scrolls a row: the row at one end
-leaves and the next one comes in at the other. The focus pill follows its
+**A list shows three rows, close together, on the button watches.** The row
+height from `Geo` is max(h / 4, `FONT_MEDIUM` + 16), a quarter of the
+display on every current watch (65 on a 260 face). Every row is drawn, and
+on the watches whose menus centre the focused row (Garmin's `touchButton`
+menus: every five-button watch) `NightMenu.drawForeground()` covers the
+screen beyond a row and a half from the centre with black
+(`NightMenuLayout.maskBands()`, 0 to 32 and 228 to 260 on a 260 face). So
+the focused row sits in the middle with one row above and one below, the
+rows two away and the title once the first row has scrolled up lie under
+the mask, and while the list moves a row slides into and out of the edge by
+where it is. Up to 1.3.0 a row was left blank by its index instead (within
+one of the focus or not), and rows that Garmin's scroll animation still had
+on screen went blank. The top band is off while the first row has the
+focus, for the title. Which row has the focus is tracked by
+`NightMenuFocus`: it starts at the focus the list opens on and follows only
+the row being drawn reporting its own `isFocused()`, because the watch does
+not answer that reliably for the other rows (1.1.2 asked every row, and
+lists opened blank). On the seven watches whose menus scroll freely (Venu 3
+and 3S, vívoactive 5 and 6, Venu 4 41 and 45 mm, Venu X1: profiles B and C,
+Garmin's `scroll` menus) nothing is masked: the list rests wherever the
+drag leaves it, four to five rows in view, and every row in view is drawn.
+Rows sized from the font (53 to 55 px in 1.1.0) showed five, the outer two
+cut off by the round edge; rows of 80 px (1.1.1) kept three but spread them
+over the whole face. When the focus moves, the list scrolls a row: the row
+at one end slides out under the mask and the next one slides in at the
+other. Each row fits its text once and keeps it until `setText()`,
+`setSub()` or `setChecked()` changes it, because a scroll draws every
+frame. The focus pill follows its
 text (`NightMenuLayout.pillHeight()`: `FONT_MEDIUM` + 14, 51 px on the
 fēnix 7 Pro and 59 with a sub-label, at most the row minus 6 px) and sits
 centred in the row. The pill is 212·s wide (212 px on a 260 face), also
@@ -406,8 +422,9 @@ on a 260 face, scaled with the row height on the others.
 chips above that, then the SoC in the largest of `FONT_NUMBER_MEDIUM`,
 `FONT_NUMBER_MILD` and `FONT_MEDIUM` whose digits stay below 12·s from the
 top (`HomeHero.MIN_DIGIT_TOP` on a 260 face) and fit the outline; in 98 px
-that is `FONT_NUMBER_MILD`. From the second row on, the hero is left blank like any
-row two away from the focus. Chips that do not fit are dropped from the end; the lock chip
+that is `FONT_NUMBER_MILD`. From the second row on, the hero lies under the mask on the
+button watches, like any row two away from the focus; on the scroll watches it scrolls
+away with the list. Chips that do not fit are dropped from the end; the lock chip
 comes first and goes last (`HomeHero.chipsToKeep()`).
 
 **Text hints at the bottom are gone.** In 1.0 a hint at `height - 20` had
@@ -515,7 +532,9 @@ are ours ([B6](ui-improvements.md#b6-navigation-model)).
   `FONT_XTINY`) and check. `checked`
   `null` means no check column; `true` or `false` make it a
   choice row. `setText()`, `setSub()` and `setChecked()` update a row in
-  place, so the focus survives.
+  place, so the focus survives. `setPill(color)` gives the focus pill
+  another fill (null is the accent); only the stop commands' confirmation
+  uses it, with `Theme.DESTRUCTIVE`.
 - `NightMenuDelegate(popOnSelect)`: override `onPick(id)`. Pass `true` for
   pickers and action lists whose result appears on the screen underneath
   (the menu pops first, so a confirmation or toast lands there); `false`
@@ -523,9 +542,10 @@ are ours ([B6](ui-improvements.md#b6-navigation-model)).
 
 ![A NightMenu with the focused row as an accent pill with an emerald sub-label, and grey rows with accent icons above and below](style/menu.png)
 
-*Three rows close together: the focused pill with a sub-label, and one grey
-row above and below with accent icons. The fourth row (Profiles) and the
-title are off screen until the focus reaches them.*
+*Three rows close together, as on the button watches: the focused pill with
+a sub-label, and one grey row above and below with accent icons. The fourth
+row (Profiles) and the title lie under the mask until the list scrolls them
+in.*
 
 ```monkeyc
 function openMenu() as Void {
@@ -671,25 +691,62 @@ it is thinner than 3 px. It is an original drawing, not the Škoda arrow
 
 *The app icon at 40 px and enlarged.*
 
-### Native parts that stay native
+### Confirming a command
 
-**Confirmations go through `ConfirmationPolicy`.** Never push a
-`WatchUi.Confirmation` for a command yourself. `ConfirmationPolicy.run()`
-asks first for the actions that interrupt something or burn fuel (stop
-charging, start and stop the auxiliary heater, clear data) and for every
-action once the quota is low, sends straight away otherwise, vibrates once,
-and calls your announce method either way.
+**Commands go through `ConfirmationPolicy`.** Never push a confirmation for a
+command yourself. `ConfirmationPolicy.run()` asks first for every command
+while "Confirm commands" is on (the default) and for none while it is off,
+with no exception for stop charging, the auxiliary heater or a low quota
+([decisions.md](../decisions.md#every-command-is-confirmed-unless-the-user-switches-it-off)).
+It vibrates once and calls your announce method once the command is sent.
 
 ```monkeyc
 ConfirmationPolicy.run(ConfirmationPolicy.STOP_CHARGING, "Stop charging?",
     method(:_send), method(:_announce));
 ```
 
-The one confirmation outside it is `NavigateConfirm`, because navigating
-closes the app; it is pushed with `Theme.SLIDE_DIALOG`.
+The screen is the app's own, `CommandConfirm` in `ui/CommandConfirm.mc`,
+pushed and popped with `Theme.SLIDE_DIALOG`:
 
-On a touch watch Garmin's confirmation is one tap on Yes, as on the touch
-fēnix; the app keeps it native rather than drawing its own.
+- A `NightMenu` whose title area runs down to row 0, as home's hero does. The
+  question is in it in accent `FONT_TINY`, one line where it fits, else two,
+  else two in `FONT_XTINY`, each fitted to the outline with the 12 px margin,
+  the last 6 px above the rule.
+- Row 0 is the action, in the home row's words ("Stop charging", "Start aux
+  heat"), and has the focus, so the question stays in view (from row 1 on the
+  mask covers the title on the button watches). The charge limit and mode
+  say "Set limit" and "Set mode" and keep the value in the question. Row 1
+  is "Cancel".
+- The action row ignores a pick in the first 0.5 s after the screen opens
+  (`CommandConfirm.PICK_GUARD_MS`), so the second half of a double tap or a
+  double START sends nothing. After that, START or a tap where home's
+  focused row was confirms: the guard does not stop someone who keeps
+  pressing.
+- BACK always cancels. The four stops (climate, ventilation, aux heat,
+  charging) have a red action pill, `Theme.DESTRUCTIVE`, without the "!"
+  that red has elsewhere: the word "Stop" says it. The starts, the charge
+  limit and the charge mode keep the accent; under the monochrome test every
+  pill is white.
+- One command is in flight at a time across home and both charging menus
+  (`CommandFlight`): while one is on its way, a second pick stays silent
+  and shows no confirmation.
+
+The proof of concept draws it as card `home-confirm`, the devices page on
+every watch.
+
+| Profile | Send | Cancel |
+|---|---|---|
+| A, five buttons and touch | START, or a tap on the action | BACK, DOWN then START, or a tap on Cancel |
+| A0, five buttons, no touch | START | BACK, or DOWN then START |
+| B and C, START, BACK and touch | START, or a tap on the action | BACK, a swipe right, a swipe up then START, or a tap on Cancel |
+
+### Native parts that stay native
+
+**Two confirmations stay Garmin's.** Clearing stored data
+(`OnboardingClearConfirmDelegate`, `SettingsClearConfirmDelegate`) and
+`NavigateConfirm`, because navigating closes the app; both are pushed with
+`Theme.SLIDE_DIALOG`. They are not commands and do not depend on "Confirm
+commands".
 
 **Toasts are a bonus, guarded with `has`.** The status line carries the
 feedback that matters; the toast repeats it where the firmware has one.
@@ -723,7 +780,8 @@ it, and nothing opens until START.
 
 *Rendered from the proof of concept (card `home-mock`, variant b), which
 follows the app's home geometry: the hero in the 98 px above the focused
-row, rows of 65 px with only the focused one and its neighbours drawn.*
+row, rows of 65 px with only the focused one and its neighbours clear of the
+mask.*
 
 ![Status, Lock and doors page: page dots, padlock with Locked, a 2 by 3 chip grid and the age](style/screen-status.png)
 
@@ -780,6 +838,7 @@ watch, under each drawing.
 | Charging detail | | Opens the charging list: Refresh, Set charge limit, Set charge mode, Charging profiles | Same list | Back | A tap opens the same list |
 | Charging profiles | Previous and next profile | Retry, after an error | | Back | Swipes page; a tap does nothing |
 | Menus (`NightMenu`) | Move the focus | Picks the row | | Closes, sliding right | Swipe scrolls; a tap picks |
+| Command confirmation (`CommandConfirm`) | Move between the action and Cancel | Picks the focused row, the action on open (not in the first 0.5 s) | | Cancels | A tap picks the row; the action not in the first 0.5 s |
 | Find my car | | Parked and the watch has a map: opens the map (accent arc); otherwise opens the Find my car list | The Find my car list: Navigate (when parked and the watch can save a waypoint), Refresh | Back | A tap arrives as START |
 | Map | | Pan and zoom mode | Navigate to car | Pan and zoom mode to preview, then back | The map's own |
 | Target temperature (`NightMenu`) | Move the focus, 16 to 30 °C or 60 to 86 °F | Sets the focused value and goes back | | Back | Swipe scrolls; a tap sets |
@@ -823,9 +882,11 @@ retry and Blocked screens consume it too, since 1.3.0 (before, a tap there
 retried and spent quota). In a list, one tap on a row runs it, the same as
 START.
 
-**Ask only when it costs something.** Confirmations come from
-`ConfirmationPolicy` (see [Native parts](#native-parts-that-stay-native)) and
-from `NavigateConfirm`. Phrase them as a yes or no question.
+**Every command asks first.** Command confirmations come from
+`ConfirmationPolicy` (see [Confirming a command](#confirming-a-command)), the
+others from the clear-data delegates and `NavigateConfirm`. Phrase the
+question as a yes or no question, sentence case, naming the action: "Stop
+charging?", "Set limit to 80%?".
 
 ## 8. Copy and wording
 
@@ -968,10 +1029,10 @@ exception. Paths are under `app/source/`.
 - [x] **The quota text is repeated as a literal.** The charging menus,
   profiles and Status use `Commands.QUOTA_SPENT` and `Commands.SENT`
   (through `Refusal` where a refusal is worded).
-- [ ] **Two slides are literals.** `ui/MapPreviewView.mc:149` pops with
-  `WatchUi.SLIDE_RIGHT` instead of `Theme.SLIDE_OUT`, and
-  `api/ConfirmationPolicy.mc:80` pushes its confirmation with
-  `WatchUi.SLIDE_IMMEDIATE` instead of `Theme.SLIDE_DIALOG`.
+- [ ] **A slide is a literal.** `ui/MapPreviewView.mc:149` pops with
+  `WatchUi.SLIDE_RIGHT` instead of `Theme.SLIDE_OUT`. (The command
+  confirmation pushed with `WatchUi.SLIDE_IMMEDIATE` up to 1.3; its own
+  screen uses `Theme.SLIDE_DIALOG`.)
 - [x] **Find my car's empty states point at MENU.** Resolved in 1.3.0:
   every empty state names the action, not the button ("Refresh from the
   menu", "Try again from the menu", as Charging already did), and START
@@ -1059,7 +1120,7 @@ most for screens:
 | `partial-data`, `unknown-enum` | hidden pages and humanised unknown values |
 | `charging-profiles`, `empty-charge-modes` | profile pages, the hidden mode row |
 | `parked-with-address`, `parked-no-address`, `in-motion` | find my car states |
-| `rate-limit-exceeded`, `quota-nearly-spent`, `503` | errors, confirmations when quota is low |
+| `rate-limit-exceeded`, `quota-nearly-spent`, `503` | errors and the low-quota warning |
 | `api-key-expired`, `expires-in-20-days` | onboarding screens |
 
 **The monochrome test is a switch, not a script.** In the simulator, open

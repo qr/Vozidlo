@@ -118,13 +118,13 @@
   // Shared action dispatch for both NEW variants; focus is kept (A11, A12).
   function runNew(label, s) {
     const fire = () => { s.msg = { text: "Sent", kind: "sent" }; return sent(); };
-    if (label === "Stop charging") return { confirm: { text: "Stop charging?", then: fire } };
     if (label === "Charging") return openCharging(s);
     if (label === "Status") return openStatus(s);
     if (label === "Find my car") return { push: "new:findCar", o: opts(s) };
     if (label === "Settings") return { push: "native:menu2", o: { title: "Tile order", items: NEW_TILE_ORDER, style: "new" } };
     if (label === "More") return { push: "native:menu2", o: { style: "new", title: "More", items: NH.moreItems(s.all || NH.TILES).map(l => ({ label: l, icon: NH.ICON[l], result: [{ pop: true }, runNew(l, s)] })) } };
-    return fire();
+    // Every command asks first (US-062, NH.confirm); the 0.5 s guard on the action row is not simulated.
+    return { confirm: { text: label + "?", action: label, night: true, then: fire } };
   }
   const baseInit = (o = {}) => ({ variant: o.variant || "b", d2: o.d2 || "separate", d4: o.d4 || "refresh", d7: o.d7 || "arc", focus: 0, scroll: 0, msg: null });
   SIM_VIEWS["new:homeGrid"] = {
@@ -165,10 +165,18 @@
     draw(dc) { dc.setColor(T.TEXT_1, T.BG); dc.clear(); dc.setColor(T.TEXT_2); dc.drawText(130, 100, "small", "Not built yet", J.CENTER); dc.drawText(130, 136, "xtiny", Ui.fit(dc, name, "xtiny", 180), J.CENTER); },
     key() { return undefined; }
   });
+  // Garmin's Confirmation, or with night set the app's own (NH.confirm): the action focused, Cancel below.
   const CONFIRM = {
     title: "Confirmation", init(o) { return { text: o.text, then: o.then }; },
-    draw(dc, s) { Native.confirmation(dc, s.text); },
-    key(k) { return k === "START" ? "yes" : (k === "DOWN" || k === "BACK") ? "no" : null; }
+    draw(dc, s) { if (s.night) NH.confirm(dc, { question: s.text, action: s.action, focus: s.focus }); else Native.confirmation(dc, s.text); },
+    key(k, s) {
+      if (s && s.night) {
+        if (k === "DOWN" || k === "SWIPE_UP") { s.focus = 1; return null; }
+        if (k === "UP" || k === "SWIPE_DOWN") { s.focus = 0; return null; }
+        return k === "START" || k === "TAP" ? (s.focus === 0 ? "yes" : "no") : k === "BACK" ? "no" : null;
+      }
+      return k === "START" ? "yes" : (k === "DOWN" || k === "BACK") ? "no" : null;
+    }
   };
   const viewOf = name => name === "__confirm" ? CONFIRM : (SIM_VIEWS[name] || placeholder(name));
   function countError(e) { window.__jsErrors = (window.__jsErrors || 0) + 1; try { document.body.dataset.jsErrors = window.__jsErrors; } catch (x) {} console.error(e); }
@@ -188,7 +196,7 @@
     if (res.pop) { if (w.stack.length > 1) { w.stack.pop(); resume(w); } else w.note = "exit app"; }
     if (res.replace) w.stack[w.stack.length - 1] = makeEntry(res.replace, Object.assign({}, w.opts, res.o));
     if (res.push) w.stack.push(makeEntry(res.push, Object.assign({}, w.opts, res.o)));
-    if (res.confirm) w.stack.push({ name: "__confirm", state: { text: res.confirm.text, then: res.confirm.then } });
+    if (res.confirm) w.stack.push({ name: "__confirm", state: Object.assign({ focus: 0 }, res.confirm) });
     if (res.toast) w.toast = { text: res.toast.text, icon: res.toast.icon, at: Date.now() };
   }
   // Sends one input; returns true when a toast was raised (the DOM layer arms its 2 s timer).
@@ -198,7 +206,7 @@
     const t = SIM.top(w), v = viewOf(t.name);
     if (t.state && t.state.__err) { if (k === "BACK") apply(w, { pop: true }); return false; }
     if (t.name === "__confirm") {
-      const r = CONFIRM.key(k);
+      const r = CONFIRM.key(k, t.state);
       if (r) {
         const then = t.state.then; w.stack.pop(); resume(w);
         if (r === "yes" && then) { try { apply(w, typeof then === "function" ? then(SIM.top(w).state) : then); } catch (e) { countError(e); } }

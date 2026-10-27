@@ -230,21 +230,30 @@ module UiTests {
         return true;
     }
 
-    // Every list shows three rows (Geo.Display.rowH), close together: the
-    // three fit with room to spare, and the rows two away, whose text would
-    // still land inside the circle at this pitch, are not drawn. The home
-    // hero has the whole area above the focused row. The values are logged
-    // per device.
+    // On the button watches a list shows three rows (Geo.Display.rowH),
+    // close together: the three fit with room to spare, and the rows two
+    // away, whose text would still land inside the circle at this pitch, lie
+    // under the mask (NightMenuLayout.maskBands), whose window is those three
+    // rows. Up to 1.3.0 the rows two away were not drawn instead. The scroll
+    // watches show every row in view. The home hero has the whole area above
+    // the focused row. The values are logged per device.
     (:test)
     function listsShowThreeRows(logger as Logger) as Boolean {
         var g = Geo.current();
         var h = g.rowH;
         var screen = System.getDeviceSettings().screenHeight;
+        var bands = NightMenuLayout.maskBands(screen, h, 1);
         logger.debug(System.getDeviceSettings().partNumber + ": FONT_MEDIUM " + Graphics.getFontHeight(Graphics.FONT_MEDIUM).toString()
             + ", screen " + screen.toString()
-            + " -> rowH " + h.toString() + ", heroBottom " + g.heroBottom.toString());
+            + " -> rowH " + h.toString() + ", heroBottom " + g.heroBottom.toString()
+            + (NightMenuLayout.masks(g.input) ? ", mask " + bands[0].toString() + " to " + bands[1].toString() : ", no mask"));
         if (3 * h > screen * 4 / 5) {
             logger.error("three rows of " + h.toString() + " should take at most four fifths of " + screen.toString());
+            return false;
+        }
+        var window = bands[1] - bands[0];
+        if (window < 3 * h || window > 3 * h + 1) {
+            logger.error("the mask must leave three rows, " + (3 * h).toString() + " px, got " + window.toString());
             return false;
         }
         var block = Graphics.getFontHeight(Graphics.FONT_TINY) + Graphics.getFontHeight(Graphics.FONT_XTINY);
@@ -261,25 +270,43 @@ module UiTests {
         return true;
     }
 
-    // Only the focused row and one either side are drawn; the title counts
-    // as row -1, and before the first draw (focus -1) everything is.
+    // Was onlyTheFocusAndItsNeighboursAreDrawn (culling by index, up to
+    // 1.3.0). Now every row is drawn and the mask covers the screen beyond a
+    // row and a half from the centre: on every screen, whichever way a
+    // centred focused row is rounded, the focused row and both neighbours
+    // keep every pixel and the rows two away are covered but for at most a
+    // pixel. The top band is off at focus 0 (the title above row 0), and
+    // only the button watches are masked.
     (:test)
-    function onlyTheFocusAndItsNeighboursAreDrawn(logger as Logger) as Boolean {
-        if (!NightMenuLayout.isShown(3, 3) || !NightMenuLayout.isShown(2, 3) || !NightMenuLayout.isShown(4, 3)) {
-            logger.error("the focus and its neighbours must be drawn");
-            return false;
-        }
-        if (NightMenuLayout.isShown(1, 3) || NightMenuLayout.isShown(5, 3)) {
-            logger.error("rows two away must be blank");
-            return false;
-        }
-        if (!NightMenuLayout.isShown(-1, 0) || NightMenuLayout.isShown(-1, 1)) {
-            logger.error("the title shows at focus 0 only");
-            return false;
-        }
-        if (!NightMenuLayout.isShown(7, -1)) {
-            logger.error("an unknown focus must show every row");
-            return false;
+    function theMaskCoversOnlyTheRowsTwoAway(logger as Logger) as Boolean {
+        var all = GeoTests.all();
+        for (var i = 0; i < all.size(); i += 1) {
+            var g = all[i] as Geo.Display;
+            var rowH = g.rowH;
+            var bands = NightMenuLayout.maskBands(g.h, rowH, 1);
+            var tops = [(g.h - rowH) / 2, (g.h - rowH + 1) / 2] as Array<Number>;
+            var label = g.w.toString() + "x" + g.h.toString() + ", rows of " + rowH.toString();
+            for (var k = 0; k < tops.size(); k += 1) {
+                var top = tops[k] as Number;
+                if (top - rowH < bands[0] || top + 2 * rowH > bands[1]) {
+                    logger.error(label + ": the mask " + bands[0].toString() + " to " + bands[1].toString()
+                        + " covers part of a neighbour of the row at " + top.toString());
+                    return false;
+                }
+                if (top - rowH - bands[0] > 1 || bands[1] - (top + 2 * rowH) > 1) {
+                    logger.error(label + ": the rows two away show more than a pixel past the mask");
+                    return false;
+                }
+            }
+            if (NightMenuLayout.maskBands(g.h, rowH, 0)[0] != 0) {
+                logger.error(label + ": no top band while row 0 has the focus");
+                return false;
+            }
+            var scroll = g.input == Geo.INPUT_B || g.input == Geo.INPUT_C;
+            if (NightMenuLayout.masks(g.input) == scroll) {
+                logger.error(label + ": the button watches are masked, the scroll watches are not");
+                return false;
+            }
         }
         return true;
     }

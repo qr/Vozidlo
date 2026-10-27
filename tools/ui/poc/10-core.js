@@ -437,26 +437,33 @@ const Native = {
 // itself: on the watch this is a WatchUi.CustomMenu with CustomMenuItem.draw(), which keeps Garmin's own
 // scrolling, focus animation and key/touch handling. Same geometry as Menu2 (title 78, focused 87, rows 55).
 Ui.menu = function (dc, o) {
-  // Mirrors app/source/ui/NightMenu.mc: rows of 65 px (Ui.ROW_H), and only the focused row and one
-  // above and one below are drawn (NightMenuLayout.isShown), so three sit close together in the
-  // middle and the rest stays off screen. The title is the platform's 78 px area directly above
-  // row 0 and counts as row -1. The pill follows its text and sits centred.
-  // o.shift (px) moves every row during the simulator's slide (Ui.slideShift). The row leaving the
-  // screen is not drawn, as in the app (its focus has already moved): sliding out it would pass
-  // through the round edge with its text cut. The row coming in slides into place.
+  // Mirrors app/source/ui/NightMenu.mc: rows of 65 px (Ui.ROW_H). Every row is drawn, then the mask
+  // covers what lies beyond a row and a half from the centre (Ui.menuMask, NightMenuLayout.maskBands),
+  // so three sit close together in the middle and the rest stays under the mask. The title is the
+  // platform's 78 px area directly above row 0; the mask's top band is off at focus 0. The pill
+  // follows its text and sits centred. Here a row or title wholly under the mask is not drawn at all.
+  // o.shift (px) moves every row during the simulator's slide (Ui.slideShift): the row leaving
+  // slides out under the mask, the row coming in slides in from under it, whichever focus is set,
+  // as in the app since the mask replaced index culling (up to 1.3.0 the row leaving was not drawn).
+  // On the scroll watches the app draws no mask; this reference shows them at rest, centred on the
+  // focus like the button watches, so the picture is the same (docs/design/style-guide.md section 5).
   const H = Ui.ROW_H, items = o.items, focus = o.focus || 0, shift = o.shift || 0, label = it => String(it.label).replace(/\n/g, " ");
+  const mask = Ui.menuMask(focus), inView = (top, bottom) => bottom > mask[0] + 1 && top < mask[1] - 1;
   dc.setColor(T.TEXT_1, T.BG); dc.clear();
   const titleBottom = 130 - Math.floor(H / 2) - focus * H + shift;
-  if (o.title && focus === 0 && titleBottom - 78 / 2 - 14 >= 6) {
+  // A title whose text would sit above the screen edge is left out at any focus: in the app it is
+  // under the mask or scrolled away.
+  if (o.title && inView(titleBottom - 78, titleBottom) && titleBottom - 78 / 2 - 14 >= 6) {
     const cy = titleBottom - 39;
     dc.setColor(T.ACCENT); dc.drawText(130, cy, "tiny", Ui.fit(dc, o.title, "tiny", Ui.usable(cy - 14, cy + 15)), J.CENTER | J.VCENTER);
     dc.setColor(T.RULE); dc.fillRectangle(60, titleBottom - 2, 140, 1);
   }
-  for (let i = Math.max(0, focus - 1); i <= Math.min(items.length - 1, focus + 1); i++) {
+  for (let i = Math.max(0, focus - 2); i <= Math.min(items.length - 1, focus + 2); i++) {
     const it = items[i], cy = Math.round(130 + (i - focus) * H + shift);
+    if (!inView(cy - H / 2, cy + H / 2)) continue;
     if (i === focus) {
       const ph = Math.min(it.sub ? FM.small.h + FM.xtiny.h + 14 : FM.medium.h + 14, H - 6), px = 24, pw = 212, py = Math.round(cy - ph / 2);
-      dc.setColor(dc.mono ? T.TEXT_1 : T.ACCENT); dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);
+      dc.setColor(dc.mono ? T.TEXT_1 : it.pill || T.ACCENT); dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);   // it.pill: NightMenuItem.setPill()
       const right = it.toggle != null || it.check != null ? 34 : 0;
       let x = px + 20; if (it.icon) { NIcons.draw(dc, it.icon, x + 8, cy, 9, T.BLACK); x += 26; }
       const maxW = px + pw - 20 - right - x;
@@ -475,6 +482,18 @@ Ui.menu = function (dc, o) {
       if (s2) dc.drawText(x0 + iconW, top + FM.tiny.h + Math.round(FM.xtiny.h / 2), "xtiny", s2, J.LEFT | J.VCENTER);
     }
   }
+  Ui.drawMenuMask(dc, mask);
+};
+// The mask over a list (NightMenuLayout.maskBands): [bottom of the top band, top of the bottom band],
+// a row and a half from the centre rounded outwards, no top band while row 0 has the focus.
+Ui.menuMask = function (focus) {
+  const half = Math.floor((3 * Ui.ROW_H + 1) / 2);
+  return [focus === 0 ? 0 : Math.max(0, 130 - half), Math.min(260, 130 + half)];
+};
+Ui.drawMenuMask = function (dc, mask) {
+  dc.setColor(T.BG);
+  if (mask[0] > 0) dc.fillRectangle(0, 0, 260, mask[0]);
+  if (mask[1] < 260) dc.fillRectangle(0, mask[1], 260, 260 - mask[1]);
 };
 // Row pitch of every NEW list (Theme.rowHeight(): a quarter of the 260 px display).
 Ui.ROW_H = 65;

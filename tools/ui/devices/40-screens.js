@@ -346,6 +346,10 @@ const DEV_SCREENS = (function () {
   // ------------------------------------------------------------ intents
   // What each behaviour does on a screen; 45-input.js turns this into the controls per watch.
   const LIST = (select, back = "Close") => ({ select, tap: select, next: "Next row", prev: "Previous row", back });
+  // Lists on the two-button watches: Garmin's menus there scroll freely (menu2 mode "scroll"), so the app
+  // draws every row and masks nothing (NightMenuLayout.masks). Where a dragged list comes to rest is not
+  // measured; the cards show it at rest centred on the focus, as the app lays it out.
+  const SCROLL_LIST = "Scroll menu: every row is drawn and nothing is masked; after a drag 4 to 5 rows can be in view, not only the three shown here (not measured on a watch).";
   const all = () => true, hasMap = P => !!P.map;
 
   // ------------------------------------------------------------ catalogue
@@ -375,21 +379,36 @@ const DEV_SCREENS = (function () {
         "No action menu indicator: home is a Menu, and onActionMenu only exists on BehaviorDelegate.",
         "One chip (Locked) instead of two where the chord at the chip row is too narrow for both: the plug chip drops first by design. Which watches keep both: \"Home chips\" in the watch table.",
         "At font size 1.4× the chips give way when no number font fits above them; the ring still shows the SoC (M14)."],
-      B: ["No wrap on touch: onWrap only fires for buttons. Status stays reachable by its row and the hero tap."],
-      C: ["Same as Venu 3: there is no MENU action on home, so nothing is lost without the MENU key."],
+      B: ["No wrap on touch: onWrap only fires for buttons. Status stays reachable by its row and the hero tap.", SCROLL_LIST],
+      C: ["Same as Venu 3: there is no MENU action on home, so nothing is lost without the MENU key.", SCROLL_LIST],
       X1: ["Ring becomes a frame along the display edge, filling clockwise from top centre (M3)."] } });
   add("home", { id: "home-scrolled", name: "Home, scrolled to Settings", src: "ui/HomeMenu.mc", kind: "scaled",
     today: dc => NH.hero(dc, { rows: TODAY_ROWS, focus: TODAY_ROWS.length - 1 }), prop: (dc, G) => DS.home(dc, G, { focus: HOME_ROWS.length - 1 }),
     todayKeys: { START: "Run focused row", "UP / DOWN": "Rows, wrapping", BACK: "Leave the app" }, intents: homeIntents,
-    notes: { all: ["Three rows only (focused ± 1); neighbour rows capped at 193·s."] } });
+    notes: { all: ["Three rows in view on the button watches (focused ± 1, the rest under the mask); neighbour rows capped at 193·s."], B: [SCROLL_LIST], C: [SCROLL_LIST] } });
   add("home", { id: "home-sent", name: "Home, after a command", src: "ui/HomeHero.mc", kind: "adapted",
     today: dc => NH.hero(dc, { rows: TODAY_ROWS, msg: { text: "Sent", kind: "sent" } }), prop: (dc, G) => DS.home(dc, G, { msg: { text: "Sent", kind: "sent" } }),
     todayKeys: { START: "Run focused row" }, intents: homeIntents, notes: { all: ["Feedback stays in the hero's status line on every watch."] } });
-  add("home", { id: "home-confirm", name: "Confirmation (native)", src: "api/ConfirmationPolicy.mc", kind: "scaled", tags: ["sys"],
-    today: dc => Native.confirmation(dc, "Stop charging?"), prop: (dc, G) => DevNative.confirmation(dc, G, "Stop charging?"),
-    todayKeys: { START: "Yes, send", DOWN: "No", BACK: "No" }, intents: P => ({ select: "Yes, send", tap: "Yes or No, by the half tapped", back: "No", extra: P.five ? [["DOWN", "No"]] : [] }),
-    notes: { all: ["Native WatchUi.Confirmation stays (decided). Garmin draws it; positions on the AMOLED watches are approximate."],
-      B: ["On touch a confirmation is one tap on Yes. Accepted: same as the touch fēnix today."], C: ["Same as Venu 3."] } });
+  const confirmIntents = () => ({ select: "Picks the focused row: the action on open (not in its first 0.5 s)", tap: "Picks the row tapped (the action not in its first 0.5 s)", next: "The Cancel row", prev: "Back to the action", back: "Cancel, nothing sent" });
+  add("home", { id: "home-confirm", name: "Confirmation", src: "ui/CommandConfirm.mc", kind: "adapted", fenix: "changed",
+    today: dc => Native.confirmation(dc, "Stop charging?"), prop: dc => NH.confirm(dc, {}),
+    todayKeys: { START: "Yes, send", DOWN: "No", BACK: "No" }, intents: confirmIntents,
+    notes: { today: ["Garmin's WatchUi.Confirmation, up to 1.3 only for stop charging, the auxiliary heater and a low quota; every other command went out on one tap."],
+      all: ["Every command asks (US-062), unless \"Confirm commands\" is off; then none does. A NightMenu: the question in the title area (down to Theme heroBottom, as home's hero), the action focused as row 0 so the question stays in view, Cancel below.",
+        "A second START, or a second tap where home's focused row was, lands on the action, which ignores a pick in its first 0.5 s: a double tap or double press sends nothing, but someone who keeps pressing confirms after that.",
+        "Same screen for the charge limit and mode, over Charging detail.",
+        "Stop commands get a red action pill (DESTRUCTIVE), no \"!\"; starts, the limit and the mode keep the accent."],
+      A0: ["Buttons only: START sends; BACK, or DOWN then START, cancels."],
+      B: ["No UP / DOWN: START sends; BACK, a tap on Cancel, or a swipe up then START cancels."], C: ["Same as Venu 3. No indicator: a menu has none, and the screen has no action list."] } });
+  add("home", { id: "home-confirm-cancel", name: "Confirmation, Cancel focused", src: "ui/CommandConfirm.mc", kind: "adapted", newOnly: true,
+    today: null, prop: dc => NH.confirm(dc, { focus: 1 }), intents: () => Object.assign(confirmIntents(), { select: "Cancel, nothing sent" }),
+    notes: { all: ["From row 1 on the question is under the mask on the button watches, like every NightMenu title; the action row above carries the home row's words."] } });
+  add("home", { id: "home-confirm-long", name: "Confirmation, two-line question", src: "ui/CommandConfirm.mc", kind: "adapted", newOnly: true,
+    today: null, prop: dc => NH.confirm(dc, { question: "Stop the auxiliary heater?", action: "Stop aux heat" }), intents: confirmIntents,
+    notes: { all: ["One line where it fits the outline, else two, each fitted at its own height; the second is cut with \"…\" only if two do not hold it."] } });
+  add("home", { id: "home-confirm-value", name: "Confirmation, charge mode", src: "ui/ChargingModeView.mc, ui/CommandConfirm.mc", kind: "adapted", newOnly: true, tags: ["ex"],
+    today: null, prop: dc => NH.confirm(dc, { question: "Set mode to Immediate discharging?", action: "Set mode" }), intents: confirmIntents,
+    notes: { all: ["The longest question: the value stays in the question, the row says only \"Set mode\"."] } });
 
   // status
   const statusIntents = page => P => ({ select: "Actions: Refresh" + (page === "charging" ? ", Charging details" : ""), tap: "Nothing (a tap never spends quota)", next: "Next page (wraps)", prev: "Previous page", back: "Home", menu: "Actions (same list)" });
@@ -491,15 +510,17 @@ const DEV_SCREENS = (function () {
 
   // settings
   add("settings", { id: "set-menu", name: "Settings", src: "ui/screens/SettingsScreen.mc", kind: "adapted", newOnly: true,
-    today: null, prop: menu("Settings", [{ label: "Tile order" }, { label: "Clear stored data" }]), intents: () => LIST("Open", "Back to home"),
+    today: null, prop: menu("Settings", [{ label: "Tile order" }, { label: "Confirmation", sub: "On" }, { label: "Clear stored data" }], 1), intents: () => LIST("Open; on Confirmation: switch it", "Back to home"),
     notes: { all: ["Home's Settings row opens this list (new in 1.3.0): Tile order, and Clear stored data, which up to 1.2 was only in the onboarding menu (US-007).",
+      "Confirmation (US-062), On or Off under it: START or a tap switches it in place, on the same property as \"Confirm commands\" in Garmin Connect (that title does not fit the focused pill).",
       "Clear stored data asks first, as in onboarding; Yes erases the key, VIN, S-PIN and everything stored about the car, then closes the app, and the next start opens onboarding."] } });
   add("settings", { id: "set-temp", name: "Target temperature", src: "ui/TemperatureMenu.mc", kind: "adapted", fenix: "changed",
     today: dc => NSet.temp(dc), prop: dc => DS.tempList(dc),
     todayKeys: { UP: "+1, saved at once", DOWN: "−1", "Swipe up / down": "+1 / −1", Tap: "Nothing", BACK: "Done" }, intents: () => LIST("Set, back to settings", "Back"),
     notes: { today: [{ flag: "Stepper on UP/DOWN with + and − glyphs at buttons the two-button watches do not have." }],
       all: ["A list on every watch, the same move as the charge limit (decided, M6): 16 to 30 °C, current value focused and checked.",
-        "List title shortened to \"Temperature\": \"Target temperature\" does not fit the NightMenu title area on any round watch (the stepper could move its title down; a menu title cannot)."] } });
+        "List title shortened to \"Temperature\": \"Target temperature\" does not fit the NightMenu title area on any round watch (the stepper could move its title down; a menu title cannot)."],
+      B: [SCROLL_LIST], C: [SCROLL_LIST] } });
   add("settings", { id: "set-temp-top", name: "Target temperature, top of the list", src: "ui/TemperatureMenu.mc", kind: "adapted", fenix: "changed", newOnly: true,
     today: null, prop: dc => DS.tempListTop(dc), intents: () => LIST("Set, back to settings", "Back"), notes: { all: ["Title in the NightMenu title area, visible at the top of the list."] } });
   add("settings", { id: "set-order", name: "Tile order", src: "ui/TileOrderView.mc", kind: "scaled",

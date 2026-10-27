@@ -68,6 +68,26 @@ hands back `-400`. Every successful command would report as an error.
 header. A mock that added a `Content-Type` "to be helpful" would make the bug
 untestable.
 
+### On iOS, a command's `-400` counts as sent.
+
+Garmin Connect on iOS hands back `-400` for that same `202`, with
+`:responseType` omitted, and the car does get the command. Android and the
+simulator return the `202`. Measured on 2026-10-26 and 2026-10-27 through a
+proxy on an iPad: `HTTP_RESPONSE_CONTENT_TYPE_TEXT_PLAIN` does not help, so
+there is no client-side fix. Garmin has acknowledged it (CIQQA-4818) without a
+date.
+
+So on iOS the command screens treat `-400` as sent (`Commands.isSent()`), and
+the check after a command says whether the car acted. The cost: on iOS a
+command Škoda refuses with a problem+json error is also a `-400`, so with the
+check switched off it reads as sent. A `429` on a command would be the same if
+iOS hands it back as `-400` (not measured: the quota is shared over several
+keys): it reads as sent and the rate limit is not recorded, so with the check
+off the app does not block until the hour is over; with the check on, its own
+read gets the readable `429`. Other codes, and `-400` on Android, stay
+failures. Once Garmin fixes it, iOS gets the `202` and this branch is no longer
+reached.
+
 ### Commands report "sent", never "succeeded".
 
 The API is fire-and-forget. A `202` means Škoda accepted the request for
@@ -268,9 +288,12 @@ the grid, decided per the options in
   `StatusPager.SWITCH_VIEWS`, should switching views misbehave on a watch.
 - **All menus are `CustomMenu`s in the accent.** `Menu2` cannot be recoloured
   on these watches, so a native menu would have drawn the system colour next
-  to our green. Only confirmations and toasts stay native, and since 1.3.0
-  Garmin's action menu indicator on the watches without MENU (see
+  to our green. Only toasts, the clear-data and navigate confirmations, and
+  since 1.3.0 Garmin's action menu indicator on the watches without MENU
+  stay native (see
   [Three input profiles](#three-input-profiles-and-every-action-reachable-in-each)).
+  The confirmation before a command is a `CustomMenu` too since 2026-10-27
+  ([Every command is confirmed](#every-command-is-confirmed-unless-the-user-switches-it-off)).
 - **Stale data is amber**, `! 17 h ago`, not red. This amends US-009: red is
   kept for errors, so an old reading no longer looks like a failure.
 
@@ -302,11 +325,68 @@ Up to 1.2 the default order put climate first and home focused the primary
 action, so it opened on "Start climate" with the hero in view. Since 1.3.0
 the default order is Status, Find my car, then the rest (climate, charging,
 Charging, Settings), and home focuses its first row, so it opens on Status
-with the hero in view: the hero is only drawn while row 0 has the focus. A
-stray START now opens a screen instead of sending a command. This amends
+with the hero in view: the hero sits above row 0 and scrolls out with the
+list. A stray START now opens a screen instead of sending a command. This amends
 US-037: the primary action still comes first within the climate rows, two
 rows down by default. An order the user saved is kept. Decided 2026-10-10 by
 the owner.
+
+### Every command is confirmed, unless the user switches it off.
+
+Up to 1.3 only stopping a charge and the auxiliary heater asked first, and
+every command once the quota was nearly spent; everything else went out on one
+tap. Then a user kept tapping the same command row, and every tap after the
+first sent the command again and spent one of the 20 requests an hour. So every
+command now asks first: climate, ventilation, the auxiliary heater, charging,
+the charge limit and the charge mode (US-062).
+
+- **One setting, both ways.** "Confirm commands" is on by default and is
+  switched in Garmin Connect or on the watch, where Settings calls it
+  "Confirmation" (the longer title does not fit a row); both write the same
+  property. Off, nothing asks: no exception for stopping a charge, the heater
+  or a low quota. A watch that has not synced the property yet asks.
+- **The app's own screen, not Garmin's.** It is now the screen users see
+  most, and `WatchUi.Confirmation` cannot be recoloured, so it showed system
+  colours and hints next to the accent. It is a `NightMenu`
+  (`ui/CommandConfirm.mc`): the question in the title area in up to two lines,
+  the action in the home row's words focused, "Cancel" below it. Garmin keeps
+  the scrolling, focus, buttons and touch on every input profile. This
+  replaces, for commands, the 2026-10-10 decision to keep the confirmation
+  native ([Three input profiles](#three-input-profiles-and-every-action-reachable-in-each));
+  clearing stored data and navigating to the car keep Garmin's.
+- **The action has the focus, behind a 0.5 s guard.** The action is row 0,
+  so the question stays in view: on the button watches NightMenu masks the
+  title as soon as the focus is on row 1 or lower. Confirming is one more
+  press of the same button. That also means a second START, or a second tap
+  where home's focused row was, lands on the action, so the action ignores a
+  pick in the first 0.5 s after the screen opens: the second half of a double
+  tap or double press sends nothing. The guard is all there is: someone who
+  keeps pressing or tapping confirms with the first press after it. A tap
+  where home's row above the focus was lands on the question, which does
+  nothing; one where the row below was lands on Cancel. Cancel focused was
+  proposed first, so that a repeated press could never confirm, and the
+  owner chose the action on 2026-10-27. Reasoned from Garmin's input model,
+  not measured: the simulator here draws no panel.
+- **BACK is always no, and stop commands are red.** Stopping climate,
+  ventilation, the auxiliary heater or a charge ends something running, so
+  its action pill is `Theme.DESTRUCTIVE` (`NightMenuItem.setPill()`); the
+  starts, the charge limit and the charge mode keep the accent. The pill
+  carries no "!", unlike red everywhere else: "!" means a failure or a
+  warning, a stop is neither, and the word "Stop" is the first signal.
+  Under the monochrome test it is white, as every pill. Owner's choice,
+  2026-10-27; the first proposal kept the accent, because red otherwise
+  means a failed request.
+- **One command in flight, for every screen.** Home, the charge limit and
+  the charge mode share one flag (`ui/CommandFlight.mc`), set when a request
+  goes out and cleared by its answer, whatever it is. Up to 1.3 each kept its
+  own, and the charging menus build a new delegate on every open, so a menu
+  reopened while its command was on its way could send a second. A
+  confirmation answered with Cancel or BACK sends nothing and sets nothing.
+  A stuck flag would block every command until a restart, so it stops
+  blocking after two minutes, a backstop only.
+
+The rule and the setting were decided 2026-10-27 by the owner; the screen is
+the design on the proof-of-concept and devices pages (card `home-confirm`).
 
 ---
 
@@ -400,7 +480,9 @@ sits at BACK only where MENU is the only route (Onboarding). A tap that would
 spend quota is consumed (Charging profiles' retry, Onboarding's retry and
 Blocked), which fixes it on the fēnix too. The native
 `WatchUi.Confirmation` stays: on touch that is one tap on Yes, as on the
-touch fēnix already. Decided 2026-10-10 by the owner.
+touch fēnix already. Decided 2026-10-10 by the owner. For commands it is
+replaced since 2026-10-27 by the app's own screen
+([Every command is confirmed](#every-command-is-confirmed-unless-the-user-switches-it-off)).
 
 ### Connect IQ 5.1 is the floor, because nothing needs more.
 

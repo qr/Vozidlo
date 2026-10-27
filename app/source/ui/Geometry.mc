@@ -85,14 +85,15 @@ module Geo {
         public var chargingAgeTop as Number = 0;
         // Chips.height(): at least 20 px (B4), more when FONT_XTINY is taller.
         public var chipH as Number = 0;
-        // NightMenu row pitch. Every list shows three rows: the focused one
-        // in the middle and one above and below. Rows sized from the font
-        // (53 to 55 px, 1.1.0) fitted five on a 260 px display with the
-        // outer two in the round edge; a third of the display (80 px,
-        // 1.1.1) spread three over the whole face. A quarter of the display
-        // (65 px) keeps them close; the rows two away would show in the
-        // edge at that pitch, so NightMenu leaves them blank
-        // (NightMenuLayout.isShown). System fonts scale on fēnix 8/9 (0.8
+        // NightMenu row pitch. On the button watches a list shows three
+        // rows: the focused one in the middle and one above and below. Rows
+        // sized from the font (53 to 55 px, 1.1.0) fitted five on a 260 px
+        // display with the outer two in the round edge; a third of the
+        // display (80 px, 1.1.1) spread three over the whole face. A quarter
+        // of the display (65 px) keeps them close; the rows two away would
+        // show in the edge at that pitch, so NightMenu masks that edge
+        // (NightMenuLayout.maskBands). The scroll watches show every row
+        // (NightMenuLayout.masks). System fonts scale on fēnix 8/9 (0.8
         // to 1.45), so the row never drops under FONT_MEDIUM plus 16 px for
         // the focus pill.
         public var rowH as Number = 0;

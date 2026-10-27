@@ -43,7 +43,6 @@ module ChargingLimitMenu {
 class ChargingLimitMenuDelegate extends NightMenuDelegate {
 
     private var _detail as WeakReference;
-    private var _sending as Boolean = false;
     private var _value as Number = 0;
 
     function initialize(detail as ChargingDetailView) {
@@ -61,9 +60,10 @@ class ChargingLimitMenuDelegate extends NightMenuDelegate {
     // The menu has already closed (A14), so a refused pick says why in a
     // toast instead of doing nothing visible; a spent quota also stays on
     // the detail screen's status line, which has no quota bar of its own.
-    // A second pick while one is on its way stays silent, as on home.
+    // A second pick while any command is on its way (CommandFlight) stays
+    // silent, as on home.
     function send(value as Number) as Void {
-        var verdict = Refusal.current(_sending);
+        var verdict = Refusal.current(CommandFlight.busy());
         if (verdict != :ok) {
             var text = Refusal.commandText(verdict, Quota.secondsUntilReset());
             Refusal.toast(text);
@@ -73,10 +73,8 @@ class ChargingLimitMenuDelegate extends NightMenuDelegate {
             return;
         }
         _value = value;
-        // US-024 carries no explicit "always confirm" entry in
-        // ConfirmationPolicy's table: it is reversible and low-stakes like
-        // the climate/charging start commands, so ConfirmationPolicy.run()
-        // sends it immediately unless the quota is nearly spent, exactly the
+        // ConfirmationPolicy.run() owns whether a confirmation appears
+        // (US-062: for every command, unless the user switched it off), the
         // same rule every other command in this app follows. Never a second,
         // hand-rolled confirmation here.
         ConfirmationPolicy.run(ConfirmationPolicy.SET_CHARGE_LIMIT, "Set limit to " + value.toString() + "%?",
@@ -84,7 +82,7 @@ class ChargingLimitMenuDelegate extends NightMenuDelegate {
     }
 
     function _sendLimit() as Void {
-        _sending = true;
+        CommandFlight.start();
         var settings = getApp().getSettings();
         var body = { "targetStateOfChargeInPercent" => _value } as Dictionary<Object, Object>;
         ApiClient.setChargingLimit(settings.vin, body, settings.apiKey, method(:_onCommandResponse));
@@ -95,11 +93,13 @@ class ChargingLimitMenuDelegate extends NightMenuDelegate {
     // code with the problem+json body unreadable (see ApiClient.mc). That
     // still means the car refused this limit; it never means "we don't know
     // what happened", so this is worded as a refusal, not a generic failure,
-    // and never claims to know the specific reason.
+    // and never claims to know the specific reason. The one exception is a
+    // -400 on iOS, which is how Garmin Connect there reports Škoda's 202:
+    // sent, see Commands.isSent().
     function _onCommandResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null) as Void {
-        _sending = false;
+        CommandFlight.done();
 
-        if (responseCode >= 200 && responseCode < 300) {
+        if (Commands.isSent(responseCode, Commands.phoneIsIos())) {
             Quota.recordHeaders(null, null, null);
             // One read 15 s later says whether the car took it (CommandCheck).
             var detail = _detail.get() as ChargingDetailView?;

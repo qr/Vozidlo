@@ -1,9 +1,11 @@
+import Toybox.Communications;
 import Toybox.Lang;
 import Toybox.Test;
 
 // Unit tests for the pure half of ui/Commands.mc: the guards in their old
 // order, the request bodies (US-016, US-018, US-021), the cable warning
-// (US-022) and the failure text (US-043). The sends themselves need a phone.
+// (US-022), the failure text (US-043), which answers count as sent, and
+// CommandFlight, the one in-flight flag. The sends themselves need a phone.
 module CommandsTests {
 
     (:test)
@@ -26,6 +28,34 @@ module CommandsTests {
         }
         if (Commands.guard(false, true, true, true, true) != :ok) {
             logger.error("everything in place must send");
+            return false;
+        }
+        return true;
+    }
+
+    // CommandFlight: one command in flight for home and both charging
+    // menus. A start blocks until done(); the backstop lets go after
+    // STALE_MS, and a wrapped timer (negative) never blocks.
+    (:test)
+    function oneCommandInFlightForEveryScreen(logger as Logger) as Boolean {
+        if (!CommandFlight.blocks(0) || !CommandFlight.blocks(CommandFlight.STALE_MS - 1)) {
+            logger.error("a command just started must block the next");
+            return false;
+        }
+        if (CommandFlight.blocks(CommandFlight.STALE_MS) || CommandFlight.blocks(-1)) {
+            logger.error("a stale or wrapped start must not block");
+            return false;
+        }
+        CommandFlight.done();
+        if (CommandFlight.busy()) {
+            logger.error("nothing sent, nothing in flight");
+            return false;
+        }
+        CommandFlight.start();
+        var during = CommandFlight.busy();
+        CommandFlight.done();
+        if (!during || CommandFlight.busy()) {
+            logger.error("start() must block until done()");
             return false;
         }
         return true;
@@ -123,6 +153,31 @@ module CommandsTests {
         var at = Commands.failureText(401, "x").find("401");
         if (at == null || at > 12) {
             logger.error("the status must sit at the start of the line");
+            return false;
+        }
+        return true;
+    }
+
+    // Garmin Connect on iOS reports Škoda's empty 202 as -400; only there,
+    // and only that code, counts as sent.
+    (:test)
+    function isSentReadsMinus400AsSentOnIosOnly(logger as Logger) as Boolean {
+        var invalidBody = Communications.INVALID_HTTP_BODY_IN_NETWORK_RESPONSE;
+        if (!Commands.isSent(202, false) || !Commands.isSent(202, true) || !Commands.isSent(200, false)) {
+            logger.error("a 2xx is sent on every phone");
+            return false;
+        }
+        if (!Commands.isSent(invalidBody, true)) {
+            logger.error("-400 on iOS is Škoda's 202 and must count as sent");
+            return false;
+        }
+        if (Commands.isSent(invalidBody, false)) {
+            logger.error("-400 on Android must stay a failure");
+            return false;
+        }
+        if (Commands.isSent(Communications.BLE_CONNECTION_UNAVAILABLE, true) || Commands.isSent(429, true)
+                || Commands.isSent(401, true) || Commands.isSent(300, true)) {
+            logger.error("other codes on iOS must stay failures");
             return false;
         }
         return true;

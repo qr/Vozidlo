@@ -679,26 +679,33 @@ const Native = {
 // itself: on the watch this is a WatchUi.CustomMenu with CustomMenuItem.draw(), which keeps Garmin's own
 // scrolling, focus animation and key/touch handling. Same geometry as Menu2 (title 78, focused 87, rows 55).
 Ui.menu = function (dc, o) {
-  // Mirrors app/source/ui/NightMenu.mc: rows of 65 px (Ui.ROW_H), and only the focused row and one
-  // above and one below are drawn (NightMenuLayout.isShown), so three sit close together in the
-  // middle and the rest stays off screen. The title is the platform's 78 px area directly above
-  // row 0 and counts as row -1. The pill follows its text and sits centred.
-  // o.shift (px) moves every row during the simulator's slide (Ui.slideShift). The row leaving the
-  // screen is not drawn, as in the app (its focus has already moved): sliding out it would pass
-  // through the round edge with its text cut. The row coming in slides into place.
+  // Mirrors app/source/ui/NightMenu.mc: rows of 65 px (Ui.ROW_H). Every row is drawn, then the mask
+  // covers what lies beyond a row and a half from the centre (Ui.menuMask, NightMenuLayout.maskBands),
+  // so three sit close together in the middle and the rest stays under the mask. The title is the
+  // platform's 78 px area directly above row 0; the mask's top band is off at focus 0. The pill
+  // follows its text and sits centred. Here a row or title wholly under the mask is not drawn at all.
+  // o.shift (px) moves every row during the simulator's slide (Ui.slideShift): the row leaving
+  // slides out under the mask, the row coming in slides in from under it, whichever focus is set,
+  // as in the app since the mask replaced index culling (up to 1.3.0 the row leaving was not drawn).
+  // On the scroll watches the app draws no mask; this reference shows them at rest, centred on the
+  // focus like the button watches, so the picture is the same (docs/design/style-guide.md section 5).
   const H = Ui.ROW_H, items = o.items, focus = o.focus || 0, shift = o.shift || 0, label = it => String(it.label).replace(/\n/g, " ");
+  const mask = Ui.menuMask(focus), inView = (top, bottom) => bottom > mask[0] + 1 && top < mask[1] - 1;
   dc.setColor(T.TEXT_1, T.BG); dc.clear();
   const titleBottom = 130 - Math.floor(H / 2) - focus * H + shift;
-  if (o.title && focus === 0 && titleBottom - 78 / 2 - 14 >= 6) {
+  // A title whose text would sit above the screen edge is left out at any focus: in the app it is
+  // under the mask or scrolled away.
+  if (o.title && inView(titleBottom - 78, titleBottom) && titleBottom - 78 / 2 - 14 >= 6) {
     const cy = titleBottom - 39;
     dc.setColor(T.ACCENT); dc.drawText(130, cy, "tiny", Ui.fit(dc, o.title, "tiny", Ui.usable(cy - 14, cy + 15)), J.CENTER | J.VCENTER);
     dc.setColor(T.RULE); dc.fillRectangle(60, titleBottom - 2, 140, 1);
   }
-  for (let i = Math.max(0, focus - 1); i <= Math.min(items.length - 1, focus + 1); i++) {
+  for (let i = Math.max(0, focus - 2); i <= Math.min(items.length - 1, focus + 2); i++) {
     const it = items[i], cy = Math.round(130 + (i - focus) * H + shift);
+    if (!inView(cy - H / 2, cy + H / 2)) continue;
     if (i === focus) {
       const ph = Math.min(it.sub ? FM.small.h + FM.xtiny.h + 14 : FM.medium.h + 14, H - 6), px = 24, pw = 212, py = Math.round(cy - ph / 2);
-      dc.setColor(dc.mono ? T.TEXT_1 : T.ACCENT); dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);
+      dc.setColor(dc.mono ? T.TEXT_1 : it.pill || T.ACCENT); dc.fillRoundedRectangle(px, py, pw, ph, ph / 2);   // it.pill: NightMenuItem.setPill()
       const right = it.toggle != null || it.check != null ? 34 : 0;
       let x = px + 20; if (it.icon) { NIcons.draw(dc, it.icon, x + 8, cy, 9, T.BLACK); x += 26; }
       const maxW = px + pw - 20 - right - x;
@@ -717,6 +724,18 @@ Ui.menu = function (dc, o) {
       if (s2) dc.drawText(x0 + iconW, top + FM.tiny.h + Math.round(FM.xtiny.h / 2), "xtiny", s2, J.LEFT | J.VCENTER);
     }
   }
+  Ui.drawMenuMask(dc, mask);
+};
+// The mask over a list (NightMenuLayout.maskBands): [bottom of the top band, top of the bottom band],
+// a row and a half from the centre rounded outwards, no top band while row 0 has the focus.
+Ui.menuMask = function (focus) {
+  const half = Math.floor((3 * Ui.ROW_H + 1) / 2);
+  return [focus === 0 ? 0 : Math.max(0, 130 - half), Math.min(260, 130 + half)];
+};
+Ui.drawMenuMask = function (dc, mask) {
+  dc.setColor(T.BG);
+  if (mask[0] > 0) dc.fillRectangle(0, 0, 260, mask[0]);
+  if (mask[1] < 260) dc.fillRectangle(0, mask[1], 260, 260 - mask[1]);
 };
 // Row pitch of every NEW list (Theme.rowHeight(): a quarter of the 260 px display).
 Ui.ROW_H = 65;
@@ -1135,17 +1154,18 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
 
   // ---------------------------------------------------------------- (b) hero + action list, C1b
   // o: {rows, focus, strip, msg, ageMin}. Ring margin 12 for every line.
-  // Mirrors app/source/ui/HomeMenu.mc + HomeHero.mc: a CustomMenu with rows of ROW_H, of which only
-  // the focused row and its two neighbours are drawn, the hero in the 98 px title area above row 0
-  // (drawn at focus 0 only, so it slides in coming back to row 0 and is blank once row 1 has the focus), laid out bottom-up: status line, chips, then the SoC in the largest
+  // Mirrors app/source/ui/HomeMenu.mc + HomeHero.mc: a CustomMenu with rows of ROW_H under the list
+  // mask (Ui.menuMask), so the focused row and its two neighbours are in view, the hero in the 98 px
+  // title area above row 0 (it slides out under the mask going to row 1 and back in coming back to
+  // row 0), laid out bottom-up: status line, chips, then the SoC in the largest
   // font whose digits clear y 12 and fit the chord (HomeHero.HeroFit). o.shift: see Ui.menu.
   NH.ROW_H = Ui.ROW_H;
   NH.HERO_BOTTOM = 130 - Math.floor(NH.ROW_H / 2);
   NH.hero = function (dc, o = {}) {
     dc.setColor(T.TEXT_1, T.BG); dc.clear();
     const rows = o.rows || NH.TILES, f = Math.max(0, Math.min(rows.length - 1, o.focus || 0)), s = o.strip || NH.mockStrip();
-    const H = NH.ROW_H, shift = o.shift || 0, heroDy = Math.round(-f * H + shift);
-    if (f === 0) {
+    const H = NH.ROW_H, shift = o.shift || 0, heroDy = Math.round(-f * H + shift), mask = Ui.menuMask(f);
+    if (NH.HERO_BOTTOM + heroDy > mask[0] + 1) {
       dc.translate(0, heroDy);
       const statusTop = NH.HERO_BOTTOM - FM.xtiny.h;
       const chips = [lockChip(s.lock), chargeChip(s.charging)].filter(Boolean);
@@ -1172,16 +1192,18 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
       }
       dc.translate(0, -heroDy);
     }
-    // Rows: centre y = 130 + (i - f) * H; only the focused row and its neighbours are drawn. While
-    // o.shift is set they slide into place; the hero and the row leaving are blank (see Ui.menu).
-    for (let i = Math.max(0, f - 1); i <= Math.min(rows.length - 1, f + 1); i++) {
+    // Rows: centre y = 130 + (i - f) * H, under the mask. While o.shift is set they slide into place,
+    // and the hero and the row leaving slide out under the mask (see Ui.menu).
+    for (let i = Math.max(0, f - 2); i <= Math.min(rows.length - 1, f + 2); i++) {
       const cy = Math.round(130 + (i - f) * H + shift);
+      if (cy + H / 2 <= mask[0] + 1 || cy - H / 2 >= mask[1] - 1) continue;
       if (i === f) Ui.focusPill(dc, 24, cy - 25, 212, 51, rows[i], "medium");
       else {
         const at = 130 + (i - f) * H, w = Ui.usable(at - 14, at + 15, 8);   // fitted where it settles, as in the app
         dc.setColor(T.TEXT_2); dc.drawText(130, cy, "tiny", Ui.fit(dc, rows[i], "tiny", Math.min(193, w)), J.CENTER | J.VCENTER);
       }
     }
+    Ui.drawMenuMask(dc, mask);
     Ui.drawRing(dc, s.soc == null ? 0 : s.soc / 100, { fill: s.charging === "CHARGING" ? T.ACCENT : T.TEXT_1 });
   };
 
@@ -1209,7 +1231,7 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
         "(a) Outline tiles, focused tile accent with black label (A21).",
         "(a) Scroll arc on the right bezel replaces the carets.",
         "No text hint and no UP/DOWN glyphs; START hint arc only.",
-        "(b) SoC ring, hero \"100%\", chips and the age in the title area, the focused row as accent pill, one row below (rows of 65 px; only the focused row and its neighbours are drawn, so three sit close together and the rest stays off screen)."],
+        "(b) SoC ring, hero \"100%\", chips and the age in the title area, the focused row as accent pill, one row below (rows of 65 px; every row is drawn and a mask covers all but the focused row and its neighbours, so three sit close together and the rest slides in and out under the mask)."],
       notes: REACH.concat(["Default order since 1.3.0: Status, Find my car, then the commands; home opens on Status, so the hero is in view and a stray START opens a screen instead of sending a command.",
         "Mock: 8 tiles fill four rows, so no More. Rule chosen: up to 8 tiles shown as is, above 8 the first 7 plus More.",
         { flag: "D1 open: (a) keeps the custom grid; (b) needs a CustomMenu with the hero as title area." }]) },
@@ -1264,10 +1286,41 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
       notes: ["Unlocked and open use the same amber chip; Locked stays a plain padlock."] }
   );
 
-  // Sample card (lead): the confirmation is Garmin's own; the NEW text keeps it a yes/no question.
+  // ---------------------------------------------------------------- command confirmation (US-062)
+  // Mirrors app/source/ui/CommandConfirm.mc: a NightMenu whose title area runs down to row 0, as home's
+  // hero does, holding the question in accent tiny: one line where it fits, else two, else two in xtiny (the
+  // second cut with "…" only then), 12 px from the outline, the last line NH.CONFIRM_GAP above the rule. Rows: the action, focused on open, then "Cancel".
+  // o: {question, action, stop, focus, shift}; stop: the action pill in DESTRUCTIVE (CommandConfirm.isStop).
+  NH.CONFIRM_GAP = 6;
+  NH.confirm = function (dc, o = {}) {
+    const q = o.question || "Stop charging?", focus = o.focus || 0;
+    const action = o.action || "Stop charging", stop = o.stop != null ? o.stop : /^Stop /.test(action);
+    Ui.menu(dc, { items: [{ label: action, pill: stop ? T.DESTRUCTIVE : null }, { label: "Cancel" }], focus, shift: o.shift });
+    if (focus !== 0) return;
+    const hb = 130 - Math.floor(Ui.ROW_H / 2), bottom = hb - NH.CONFIRM_GAP;
+    const widths = f => { const h = FM[f].h; return [Ui.usable(bottom - 2 * h, bottom - h, 12), Ui.usable(bottom - h, bottom, 12)]; };
+    let font = "tiny", lines = dc.getTextWidthInPixels(q, "tiny") <= widths("tiny")[1] ? [q] : TB.wrap(q, widths("tiny"), s => dc.getTextWidthInPixels(s, "tiny"));
+    if (lines.length > 2) { font = "xtiny"; lines = Ui.wrap(dc, q, "xtiny", widths("xtiny"), 2); }
+    dc.setColor(T.ACCENT); lines.forEach((l, i) => dc.drawText(130, bottom - (lines.length - i) * FM[font].h, font, l, J.CENTER));
+    dc.setColor(T.RULE); dc.fillRectangle(60, hb - 2, 140, 1);
+  };
+  const CONFIRM_KEYS = { START: "Picks the focused row: the action on open (not in its first 0.5 s)", "UP/DOWN": "Move between the action and Cancel", Tap: "Picks the row tapped", BACK: "Cancel, nothing sent" };
   CARDS.push({ id: "home-confirm", section: "home", name: "Confirmation",
-    neu: [{ label: "", draw: dc => Native.confirmation(dc, "Stop charging?"), keys: { START: "Yes, send", DOWN: "No" } }],
-    fixes: ["B6"], changed: ["Drawn from the device files: green check at START, red cross at DOWN (personality.mss)."], notes: [] });
+    neu: [{ label: "Opens on the action", draw: dc => NH.confirm(dc, {}), keys: CONFIRM_KEYS, fitcheck: true },
+      { label: "After DOWN", draw: dc => NH.confirm(dc, { focus: 1 }), keys: { START: "Cancel, nothing sent", UP: "Back to the action", BACK: "Cancel, nothing sent" }, fitcheck: true },
+      { label: "Two lines", draw: dc => NH.confirm(dc, { question: "Start the auxiliary heater?", action: "Start aux heat" }), keys: CONFIRM_KEYS, fitcheck: true },
+      { label: "With a value", draw: dc => NH.confirm(dc, { question: "Set mode to Immediate discharging?", action: "Set mode" }), keys: CONFIRM_KEYS, fitcheck: true },
+      { label: "A start", draw: dc => NH.confirm(dc, { question: "Start climate?", action: "Start climate" }), keys: CONFIRM_KEYS, fitcheck: true }],
+    fixes: ["B6"],
+    changed: ["Every command asks first (US-062), on a NightMenu instead of Garmin's Confirmation: the question in the title area, the action focused, \"Cancel\" below it.",
+      "With \"Confirm commands\" off (Garmin Connect, or Settings on the watch) nothing asks: no exception for stop charging, the auxiliary heater or a low quota.",
+      "The question wraps to two lines where one does not fit; the action row uses the home row's words, and the charge limit and mode keep their value in the question."],
+    notes: ["The action is row 0 so the question stays in view: from row 1 on the mask covers the title on the button watches. Confirming is one more press of the same button.",
+      "A second START, or a second tap where home's focused row was, lands on the action, so it ignores a pick in the first 0.5 s after the screen opens: a double tap or double press sends nothing. Someone who keeps pressing confirms with the first press after that. Not measured on a watch.",
+      "A tap where home's row above the focus was lands on the question and does nothing; where the row below was, on Cancel.",
+      "BACK always cancels. Pushed and popped with SLIDE_IMMEDIATE (Theme.SLIDE_DIALOG).",
+      "Stop commands (climate, ventilation, aux heat, charging) get a red action pill, without the \"!\" red carries elsewhere: \"!\" means a failure or warning, and the word Stop says it. Starts, the charge limit and the charge mode keep the accent. Monochrome: white, as every pill.",
+      "Clear stored data and Navigate keep Garmin's confirmation (they are not commands)."] });
   window.NH = NH;
 })();
 // ================================================================ NEW status + charging (agent C)
@@ -1746,6 +1799,9 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
     { label: "Find my car", sub: "Position 3", icon: "pin" }, { label: "Status", sub: "Position 4", icon: "list" }];
   NSet.order = (dc, focus = 0) => nmenu(dc, { title: "Tile order", items: NSet.ORDER, focus });
   NSet.orderMoved = dc => nmenu(dc, { title: "Tile order", items: NSet.ORDER_MOVED, focus: 1 });
+  // ui/screens/SettingsScreen.mc: "Confirmation" with On or Off as its sub-label, switched in place on START or a tap.
+  // ("Confirm commands", the Garmin Connect title, is cut with "…" in the focused pill on every watch.)
+  NSet.menu = (dc, focus = 1, on = true) => nmenu(dc, { title: "Settings", items: [{ label: "Tile order" }, { label: "Confirmation", sub: on ? "On" : "Off" }, { label: "Clear stored data" }], focus });
   NSet.item = (dc, focus = 1) => nmenu(dc, { title: "Climate", items: [{ label: "Move up" }, { label: "Move down" }, { label: "Hide" }], focus });
   NSet.temp = function (dc, v = NMOCK.targetTemp) {
     blank(dc);
@@ -1846,6 +1902,12 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
       fixes: ["B6"], changed: ["New: hold UP on the map opens a one-item Menu2 \"Navigate to car\"; OLD had no MENU handler."],
       notes: ["Same confirmation as from the Find my car screen."] },
 
+    { id: "set-menu", section: "settings", order: 499, name: "Settings",
+      neu: [{ label: "Confirmation on", draw: dc => NSet.menu(dc, 1, true), keys: { START: "Switch it off (saved at once)", "UP/DOWN": "Move focus", BACK: "Home" }, fitcheck: true },
+        { label: "Switched off", draw: dc => NSet.menu(dc, 1, false), keys: { START: "Switch it on" }, fitcheck: true }],
+      fixes: [], changed: ["New row \"Confirmation\" (US-062) with On or Off under it: the same property as \"Confirm commands\" in Garmin Connect, so both show the same value.",
+        "Named \"Confirmation\" because \"Confirm commands\" does not fit the focused pill on any watch."],
+      notes: ["On by default; a watch that has not synced the property yet asks too.", "Takes effect with the next command, no restart (VozidloApp.onSettingsChanged)."] },
     { id: "set-order", section: "settings", name: "Tile order",
       neu: [{ label: "", draw: dc => NSet.order(dc), keys: { START: "Edit item", "UP/DOWN": "Move focus" }, fitcheck: true }],
       fixes: ["B6"], changed: ["IconMenuItem with the category icons.", "\"Status detail\" becomes \"Status\"."], notes: ["Hidden categories show \"Hidden\" as sub-label."] },
@@ -2103,13 +2165,13 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
   // Shared action dispatch for both NEW variants; focus is kept (A11, A12).
   function runNew(label, s) {
     const fire = () => { s.msg = { text: "Sent", kind: "sent" }; return sent(); };
-    if (label === "Stop charging") return { confirm: { text: "Stop charging?", then: fire } };
     if (label === "Charging") return openCharging(s);
     if (label === "Status") return openStatus(s);
     if (label === "Find my car") return { push: "new:findCar", o: opts(s) };
     if (label === "Settings") return { push: "native:menu2", o: { title: "Tile order", items: NEW_TILE_ORDER, style: "new" } };
     if (label === "More") return { push: "native:menu2", o: { style: "new", title: "More", items: NH.moreItems(s.all || NH.TILES).map(l => ({ label: l, icon: NH.ICON[l], result: [{ pop: true }, runNew(l, s)] })) } };
-    return fire();
+    // Every command asks first (US-062, NH.confirm); the 0.5 s guard on the action row is not simulated.
+    return { confirm: { text: label + "?", action: label, night: true, then: fire } };
   }
   const baseInit = (o = {}) => ({ variant: o.variant || "b", d2: o.d2 || "separate", d4: o.d4 || "refresh", d7: o.d7 || "arc", focus: 0, scroll: 0, msg: null });
   SIM_VIEWS["new:homeGrid"] = {
@@ -2150,10 +2212,18 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
     draw(dc) { dc.setColor(T.TEXT_1, T.BG); dc.clear(); dc.setColor(T.TEXT_2); dc.drawText(130, 100, "small", "Not built yet", J.CENTER); dc.drawText(130, 136, "xtiny", Ui.fit(dc, name, "xtiny", 180), J.CENTER); },
     key() { return undefined; }
   });
+  // Garmin's Confirmation, or with night set the app's own (NH.confirm): the action focused, Cancel below.
   const CONFIRM = {
     title: "Confirmation", init(o) { return { text: o.text, then: o.then }; },
-    draw(dc, s) { Native.confirmation(dc, s.text); },
-    key(k) { return k === "START" ? "yes" : (k === "DOWN" || k === "BACK") ? "no" : null; }
+    draw(dc, s) { if (s.night) NH.confirm(dc, { question: s.text, action: s.action, focus: s.focus }); else Native.confirmation(dc, s.text); },
+    key(k, s) {
+      if (s && s.night) {
+        if (k === "DOWN" || k === "SWIPE_UP") { s.focus = 1; return null; }
+        if (k === "UP" || k === "SWIPE_DOWN") { s.focus = 0; return null; }
+        return k === "START" || k === "TAP" ? (s.focus === 0 ? "yes" : "no") : k === "BACK" ? "no" : null;
+      }
+      return k === "START" ? "yes" : (k === "DOWN" || k === "BACK") ? "no" : null;
+    }
   };
   const viewOf = name => name === "__confirm" ? CONFIRM : (SIM_VIEWS[name] || placeholder(name));
   function countError(e) { window.__jsErrors = (window.__jsErrors || 0) + 1; try { document.body.dataset.jsErrors = window.__jsErrors; } catch (x) {} console.error(e); }
@@ -2173,7 +2243,7 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
     if (res.pop) { if (w.stack.length > 1) { w.stack.pop(); resume(w); } else w.note = "exit app"; }
     if (res.replace) w.stack[w.stack.length - 1] = makeEntry(res.replace, Object.assign({}, w.opts, res.o));
     if (res.push) w.stack.push(makeEntry(res.push, Object.assign({}, w.opts, res.o)));
-    if (res.confirm) w.stack.push({ name: "__confirm", state: { text: res.confirm.text, then: res.confirm.then } });
+    if (res.confirm) w.stack.push({ name: "__confirm", state: Object.assign({ focus: 0 }, res.confirm) });
     if (res.toast) w.toast = { text: res.toast.text, icon: res.toast.icon, at: Date.now() };
   }
   // Sends one input; returns true when a toast was raised (the DOM layer arms its 2 s timer).
@@ -2183,7 +2253,7 @@ SECTION_META.garmin = { title: "Garmin UI", src: "Toybox.WatchUi", blurb: "Nativ
     const t = SIM.top(w), v = viewOf(t.name);
     if (t.state && t.state.__err) { if (k === "BACK") apply(w, { pop: true }); return false; }
     if (t.name === "__confirm") {
-      const r = CONFIRM.key(k);
+      const r = CONFIRM.key(k, t.state);
       if (r) {
         const then = t.state.then; w.stack.pop(); resume(w);
         if (r === "yes" && then) { try { apply(w, typeof then === "function" ? then(SIM.top(w).state) : then); } catch (e) { countError(e); } }

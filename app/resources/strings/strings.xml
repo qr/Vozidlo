@@ -26,6 +26,11 @@
     <string id="SettingCheckAfterCommandTitle">Check the car after a command</string>
     <string id="SettingCheckAfterCommandHelp">About 15 seconds after a command, read the car once to show whether it changed. Uses one of your 20 requests per hour.</string>
 
+    <!-- US-062. On the watch the same switch is the row "Confirmation" in Settings
+         (ui/screens/SettingsScreen.mc): "Confirm commands" does not fit a row there. -->
+    <string id="SettingConfirmCommandsTitle">Confirm commands</string>
+    <string id="SettingConfirmCommandsHelp">Ask before a command is sent to the car. Switched off, every command goes out on one tap. Also in Settings on the watch.</string>
+
     <!-- Task 5 (onboarding): US-002, US-003, US-004, US-007. No button hints
          in the copy ("Menu for more.", "Select to continue."): the screens
          show bezel glyphs at UP and START instead (C7). -->

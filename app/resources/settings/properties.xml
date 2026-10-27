@@ -36,6 +36,15 @@
     <property id="CheckAfterCommand" type="boolean">true</property>
 
     <!--
+        Ask before every command is sent (US-062, ConfirmationPolicy). On by
+        default; off, every command goes out on one tap. Also switched on the
+        watch, as "Confirmation" in Settings (ui/screens/SettingsScreen.mc),
+        which writes this same property. Settings.resolveConfirmCommands()
+        treats a missing value as on, the same as this default.
+    -->
+    <property id="ConfirmCommands" type="boolean">true</property>
+
+    <!--
         Debug-only base URL override, so the app can be pointed at mock/ without
         editing source. Empty means "use the real API". It is deliberately NOT
         exposed as a <setting>, so it never appears in the phone UI, and

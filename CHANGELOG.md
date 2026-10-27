@@ -3,6 +3,47 @@
 Notable changes, newest first. Versions match what is published to the Connect
 IQ Store.
 
+## 1.4.0: 2026-10-27
+
+### Changed
+
+- **Every command asks first.** Climate, ventilation, the auxiliary heater,
+  charging, the charge limit and the charge mode now show a confirmation
+  before anything is sent, so a command no longer goes out on a single tap,
+  and a quick double tap sends nothing. It is drawn in the app's own
+  colours: the question, the command with the focus, and "Cancel" below it;
+  a command that stops something is red. To send on one tap, switch off
+  "Confirm commands" in the app settings in Garmin Connect, or
+  "Confirmation" in Settings on the watch; then no command asks, not even
+  stopping a charge or the auxiliary heater.
+
+### Fixed
+
+- **Commands no longer look failed on an iPhone or iPad.** Garmin Connect on
+  iOS reports Škoda's empty `202` as `-400`, so every command said "Not sent
+  (-400): The car's answer could not be read" although the car did get it.
+  On iOS that answer now reads as "Command sent", and the check after a
+  command says whether the car acted. Android is unchanged.
+
+- **A second command no longer goes out while the first is on its way.**
+  The charge limit and charge mode menus each tracked only their own
+  request, so reopening one before the car's answer came back could send
+  again, and home did not know about either. Now no command of any kind is
+  sent until the previous one has been answered.
+
+- **Rows no longer go blank while a list scrolls.** A list only drew the
+  focused row and the one above and below it, chosen by which row had the
+  focus rather than by where the rows were. Garmin's scroll animation still
+  moves rows on screen while the focus is the old one or already the new
+  one, so a row in view went blank, the hero on home vanished at the first
+  step, and on the Venu 3 and 3S, vívoactive 5 and 6, Venu 4 and Venu X1,
+  where four to five rows are in view, the app drew three. Every row is now
+  drawn. On the watches with five buttons the edge beyond the three middle
+  rows is covered instead, so rows slide in and out of it and the hero
+  stays on screen at the first step instead of vanishing; on the others
+  every row in view shows. Rows also lay out their text once instead of on every frame of a
+  scroll, which makes scrolling smoother.
+
 ## 1.3.0: 2026-10-23
 
 ### Added

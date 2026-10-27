@@ -139,8 +139,8 @@ module Cache {
         return ages.get(sectionName) as Number?;
     }
 
-    // Test-only, and a legitimate building block for a future "clear stored
-    // data" action (US-062 lists it as one of the confirm-first commands).
+    // Used by "Clear stored data" (US-007, StoredData.clearAll()) and by
+    // the tests.
     function clear() as Void {
         Storage.deleteValue(STORAGE_KEY);
     }

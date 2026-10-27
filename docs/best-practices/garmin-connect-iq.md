@@ -199,6 +199,13 @@ interrupts; use it for actions with real consequences, not for everything. Phras
 it as an explicit yes/no question.
 → [Confirmations](https://developer.garmin.com/connect-iq/user-experience-guidelines/confirmations/)
 
+*In this app:* every command costs one of 20 requests an hour and a repeated
+tap sent it again, so every command asks first, unless the user switches
+"Confirm commands" off; the question stays a yes/no question. The screen is a
+`CustomMenu` in the accent rather than `WatchUi.Confirmation`, because it is
+the one users see most. See
+[decisions.md](../decisions.md#every-command-is-confirmed-unless-the-user-switches-it-off).
+
 **Show progress for every asynchronous action, and always offer a way out.**
 Determinate when the end is known, infinite otherwise. Chained steps get one
 continuous indicator, not several. Every web request in this app needs this.

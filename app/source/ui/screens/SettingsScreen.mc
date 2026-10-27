@@ -1,19 +1,42 @@
+import Toybox.Application.Properties;
 import Toybox.Lang;
 import Toybox.System;
 import Toybox.WatchUi;
 
 // Entry point for the on-device settings reached from home (US-061): a
-// NightMenu with the tile order (ui/TileOrderView.mc) and "Clear stored
-// data" (US-007), which up to 1.2 was only reachable before setup.
+// NightMenu with the tile order (ui/TileOrderView.mc), the confirmation
+// before a command (US-062) and "Clear stored data" (US-007), which up to
+// 1.2 was only reachable before setup.
 module SettingsScreen {
 
     // A drill-in from a home row, so it slides in from the right (B6).
     function open() as Void {
         var menu = new NightMenu("Settings", 0, null);
         menu.addItem(new NightMenuItem(:tileOrder, "Tile order", null, null, null));
+        // Garmin Connect calls it "Confirm commands"; in the focused pill
+        // that is cut with "…" on every watch (PoC set-menu, fitcheck), so
+        // the row is "Confirmation" with the value as a word under it.
+        menu.addItem(new NightMenuItem(:confirmCommands, "Confirmation",
+            confirmCommandsSub(getApp().getSettings().confirmCommands), null, null));
         menu.addItem(new NightMenuItem(:clearData,
             WatchUi.loadResource(Rez.Strings.OnboardingMenuClearData) as String, null, null, null));
-        WatchUi.pushView(menu, new SettingsMenuDelegate(), Theme.SLIDE_IN);
+        WatchUi.pushView(menu, new SettingsMenuDelegate(menu), Theme.SLIDE_IN);
+    }
+
+    // Writes the property Garmin Connect edits, so the phone shows what the
+    // watch set. A write from inside the app does not trigger
+    // onSettingsChanged() (TemperatureMenuDelegate has the same note), so it
+    // is called here: the next command reads the new Config. Returns the new
+    // value.
+    function toggleConfirmCommands() as Boolean {
+        var on = !getApp().getSettings().confirmCommands;
+        Properties.setValue("ConfirmCommands", on);
+        getApp().onSettingsChanged();
+        return on;
+    }
+
+    function confirmCommandsSub(on as Boolean) as String {
+        return on ? "On" : "Off";
     }
 
     function openTileOrder() as Void {
@@ -24,16 +47,24 @@ module SettingsScreen {
 }
 
 // The menu stays up on select (popOnSelect false): the tile order is a
-// drill-in, and "No" on the confirmation returns to this list.
+// drill-in, "Confirmation" switches in place, and "No" on the clear-data
+// confirmation returns to this list.
 class SettingsMenuDelegate extends NightMenuDelegate {
 
-    function initialize() {
+    // Weak: the menu owns this delegate (docs/best-practices "Break
+    // reference cycles").
+    private var _menu as WeakReference;
+
+    function initialize(menu as NightMenu) {
         NightMenuDelegate.initialize(false);
+        _menu = menu.weak();
     }
 
     function onPick(id as Object?) as Void {
         if (id == :tileOrder) {
             SettingsScreen.openTileOrder();
+        } else if (id == :confirmCommands) {
+            _showConfirmCommands(SettingsScreen.toggleConfirmCommands());
         } else if (id == :clearData) {
             // US-007: erases the key, so it is confirmed first, the same
             // dialog as in onboarding.
@@ -42,6 +73,20 @@ class SettingsMenuDelegate extends NightMenuDelegate {
             );
             WatchUi.pushView(dialog, new SettingsClearConfirmDelegate(), Theme.SLIDE_DIALOG);
         }
+    }
+
+    // Updates the row in place, so the focus stays on it.
+    function _showConfirmCommands(on as Boolean) as Void {
+        var menu = _menu.get() as NightMenu?;
+        if (menu == null) {
+            return;
+        }
+        var index = menu.findItemById(:confirmCommands);
+        var row = index >= 0 ? menu.itemAt(index) : null;
+        if (row != null) {
+            row.setSub(SettingsScreen.confirmCommandsSub(on));
+        }
+        WatchUi.requestUpdate();
     }
 
 }
