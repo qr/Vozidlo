@@ -3,7 +3,7 @@
 Notable changes, newest first. Versions match what is published to the Connect
 IQ Store.
 
-## Unreleased
+## 1.5.0: 2026-11-08
 
 ### Added
 
