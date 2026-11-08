@@ -38,6 +38,7 @@ It is a spare-time project. Issues get answered in days, not hours.
 | Start and stop the air conditioning | Yes, with a target temperature |
 | Start and stop charging | Yes, plus charge limit and mode |
 | Check that a command took effect | Yes, one read of the car 15 s later (a setting, on by default) |
+| Refresh when you open the app | Yes, once the last refresh is older than a period you choose (a setting, off by default) |
 | Find where the car is parked | Yes, address, distance and bearing; a map on watches with onboard maps; navigation where the watch supports it |
 | Glance and complications | Yes, on an existing watch face |
 | **Lock or unlock the car** | **No.** The API has no such endpoint |

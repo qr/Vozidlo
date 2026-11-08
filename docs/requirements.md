@@ -83,8 +83,9 @@ what ships: say so in an issue and it will get fixed in one place or the other.
 - **US-043**: Understand what happened after sending a command (since 1.2.0 one check of the car 15 s after it, see decisions.md "One check after a command")
 - **US-044**: Read errors in plain language
 - **US-045**: Know when my phone is the problem
-- **US-046**: Never poll (the one check after a command is caused by the user's command and can be switched off)
+- **US-046**: Never poll (the one check after a command is caused by the user's command and can be switched off; the refresh on open of US-063 is caused by opening the app and is off by default)
 - **US-062**: Confirm every command before it is sent, unless switched off (since 2026-10-27, see decisions.md "Every command is confirmed, unless the user switches it off."; up to 1.3 only what deserved confirming)
+- **US-063**: Optionally refresh once when I open the app and the last refresh is older than a period I choose (off by default; since 2026-11-08, see decisions.md "Refresh on open is the user's choice, off by default.")
 
 ## Developer experience
 

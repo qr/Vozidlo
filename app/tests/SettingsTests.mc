@@ -71,4 +71,27 @@ module SettingsTests {
         return true;
     }
 
+    // Refresh on open is off unless a period was picked; a watch that has
+    // not synced the property yet (null) stays off, as the default does.
+    (:test)
+    function refreshOnOpenDefaultsToOff(logger as Logger) as Boolean {
+        if (Settings.resolveRefreshOnOpenHours(null) != 0) {
+            logger.error("null must mean off (0)");
+            return false;
+        }
+        if (Settings.resolveRefreshOnOpenHours(-1) != 0) {
+            logger.error("a negative value must mean off (0)");
+            return false;
+        }
+        var periods = [0, 1, 2, 4, 8, 12] as Array<Number>;
+        for (var i = 0; i < periods.size(); i += 1) {
+            var hours = periods[i];
+            if (Settings.resolveRefreshOnOpenHours(hours) != hours) {
+                logger.error(hours.toString() + " must pass through");
+                return false;
+            }
+        }
+        return true;
+    }
+
 }

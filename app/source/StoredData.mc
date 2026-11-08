@@ -11,7 +11,7 @@ import Toybox.PersistedContent;
 //
 // Left alone on purpose: preferences that say nothing about the user or
 // the car (TemperatureUnit, TargetTemperature, CheckAfterCommand,
-// ConfirmCommands), the developer's MockBaseUrl, and the monochrome test
+// ConfirmCommands, RefreshOnOpenHours), the developer's MockBaseUrl, and the monochrome test
 // switch.
 module StoredData {
 
@@ -22,6 +22,7 @@ module StoredData {
 
         Cache.clear();
         Quota.clear();
+        RefreshOnOpen.clear();
         KeyLifetime.clear();
         LastParked.clear();
         ParkingFeature.clear();

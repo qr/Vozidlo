@@ -6,8 +6,9 @@ import Toybox.Time;
 // The home hero (PoC NH.hero, variant b; ui-improvements.md C1b): state of
 // charge, up to three chips and one status line, drawn in the title area of
 // the home CustomMenu, plus the SoC ring drawn over the whole menu. Data
-// comes from Cache.mc only: the home never makes a request of its own, like
-// the glance (US-034/041), so it appears instantly, cached data or none.
+// comes from Cache.mc only, so it appears instantly, cached data or none. The
+// one request home can make is the optional refresh on open
+// (RefreshOnOpen.mc); the hero then redraws from the cache it filled.
 //
 // Layout runs from the bottom of the title up (plan "Facts": only
 // Geo.Display.heroBottom px of the title are on screen at focus 0, the rest is

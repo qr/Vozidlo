@@ -26,8 +26,15 @@ class HomeMenu extends NightMenu {
     private var _feedbackKind as Symbol = :sent;
     private var _feedbackDrawn as Boolean = false;
     private var _runner as CommandRunner;
+    // Refresh on open (RefreshOnOpen.mc): asked once, at the first onShow()
+    // of the home the app starts on; not after onboarding, which has just
+    // read the car. The model lives here while its request is out, so its
+    // callback has somewhere to land; the hero says "Refreshing" meanwhile.
+    private var _refreshOnOpenPending as Boolean;
+    private var _openRefresh as StatusModel? = null;
 
-    function initialize() {
+    function initialize(refreshOnOpen as Boolean) {
+        _refreshOnOpenPending = refreshOnOpen;
         var built = HomeRows.build();
         // Home opens on its first row (Status by default), so the hero is in
         // view at launch (decisions.md "Home opens on its first row.").
@@ -40,14 +47,19 @@ class HomeMenu extends NightMenu {
 
     // Every time home becomes the top view again: returning from Status (a
     // live refresh), from settings or from a command must show at once.
-    // Cache.mc is Storage-backed and effectively instant, never a request.
+    // Cache.mc is Storage-backed and effectively instant, never a request;
+    // the one request home can start is the refresh on open below.
     function onShow() as Void {
         NightMenu.onShow();
         _feedback = HomeHero.feedbackAfterShow(_feedback, _feedbackDrawn);
         if (_feedback == null) {
             _feedbackDrawn = false;
         }
-        _hero = HomeHero.fromCache(_feedback, _feedbackKind);
+        if (_refreshOnOpenPending) {
+            _refreshOnOpenPending = false;
+            _startRefreshOnOpen();
+        }
+        _hero = _buildHero();
         var built = HomeRows.build();
         var signature = ControlTiles.signature(built[0]);
         // A11: the rows are rebuilt only when they changed (operations[]
@@ -73,6 +85,15 @@ class HomeMenu extends NightMenu {
     // watches (NightMenu.drawForeground). Feedback counts as seen only while
     // row 0 has the focus.
     function drawTitle(dc as Dc) as Void {
+        var refresh = _openRefresh;
+        if (refresh != null && !refresh.isFetching()) {
+            // The refresh on open landed (or failed, which leaves the cache
+            // and its age as they were): show what is cached now.
+            _openRefresh = null;
+            RefreshOnOpen.logDone(refresh.lastResponseCode());
+            _hero = _buildHero();
+            VehicleComplications.publish();
+        }
         dc.setColor(Theme.TEXT_1, Theme.BG);
         dc.clear();
         MenuTrace.title(dc.getWidth(), dc.getHeight());
@@ -95,13 +116,36 @@ class HomeMenu extends NightMenu {
         _feedback = text;
         _feedbackKind = kind;
         _feedbackDrawn = false;
-        _hero = HomeHero.fromCache(_feedback, _feedbackKind);
+        _hero = _buildHero();
     }
 
     // CommandChecker's report: what the car said 15 s after a command. The
     // read has refreshed the cache, so the hero is rebuilt from it too.
     function commandChecked(text as String, kind as Symbol) as Void {
         showFeedback(text, kind);
+    }
+
+    // One status read when the setting asks for it and the period is up;
+    // a refusal (no phone, quota, not set up) stays silent here, the hero
+    // line already shows a missing phone and the age.
+    function _startRefreshOnOpen() as Void {
+        var hours = getApp().getSettings().refreshOnOpenHours;
+        if (hours <= 0) {
+            return;
+        }
+        var model = new StatusModel();
+        if (RefreshOnOpen.run(model, hours, Refusal.current(false)) == :started) {
+            _openRefresh = model;
+        }
+    }
+
+    // A command's feedback wins; with none, a running refresh on open.
+    function _buildHero() as HomeHero.Data {
+        var refresh = _openRefresh;
+        if (_feedback == null && refresh != null && refresh.isFetching()) {
+            return HomeHero.fromCache("Refreshing" + Labels.ELLIPSIS, :age);
+        }
+        return HomeHero.fromCache(_feedback, _feedbackKind);
     }
 
     function run(action as Symbol) as Void {

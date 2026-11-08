@@ -31,6 +31,17 @@
     <string id="SettingConfirmCommandsTitle">Confirm commands</string>
     <string id="SettingConfirmCommandsHelp">Ask before a command is sent to the car. Switched off, every command goes out on one tap. Also in Settings on the watch.</string>
 
+    <!-- RefreshOnOpen.mc. Counted from the app's own last status refresh,
+         not from the car's timestamp. -->
+    <string id="SettingRefreshOnOpenTitle">Refresh on open</string>
+    <string id="SettingRefreshOnOpenHelp">When you open the app and its last refresh is older than this, read the car once. Costs at most one of your 20 requests per hour, once per period. Škoda only has what the car last sent, so the data can still be old.</string>
+    <string id="RefreshOnOpenOff">Off</string>
+    <string id="RefreshOnOpen1h">After 1 hour</string>
+    <string id="RefreshOnOpen2h">After 2 hours</string>
+    <string id="RefreshOnOpen4h">After 4 hours</string>
+    <string id="RefreshOnOpen8h">After 8 hours</string>
+    <string id="RefreshOnOpen12h">After 12 hours</string>
+
     <!-- Task 5 (onboarding): US-002, US-003, US-004, US-007. No button hints
          in the copy ("Menu for more.", "Select to continue."): the screens
          show bezel glyphs at UP and START instead (C7). -->

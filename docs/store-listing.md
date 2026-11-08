@@ -76,7 +76,9 @@ year you will need to create a new one and type it in again.
 Škoda allows 20 requests per hour per vehicle, shared with anything else you run
 against the same car, such as Home Assistant. That is roughly one every three
 minutes, which sounds tight and mostly is not, as long as the app never polls in
-the background. It does not. Everything happens when you ask for it.
+the background. It does not. Everything happens when you ask for it. If you
+switch on "Refresh on open", opening the app reads the car once when its last
+refresh is older than the period you chose, and never more often.
 
 One consequence worth knowing: the data comes from whatever your car last
 reported, not from a live reading. Sometimes that is minutes old, sometimes

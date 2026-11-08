@@ -497,7 +497,7 @@ module NightMenuFocusTests {
     // home ends with the menu trace row (MenuTrace); a release build has none.
     (:test)
     function theHomeMenuCanBeBuilt(logger as Logger) as Boolean {
-        var home = new HomeMenu();
+        var home = new HomeMenu(false);
         if (home.getItem(0) == null) {
             logger.error("home must have at least one row (Settings)");
             return false;

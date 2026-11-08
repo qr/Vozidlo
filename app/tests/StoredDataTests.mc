@@ -12,14 +12,14 @@ module StoredDataTests {
     // so a renamed key cannot make this test pass by writing a key nobody
     // reads.
     function _keys() as Array<String> {
-        return [Cache.STORAGE_KEY, Quota.STORAGE_KEY, KeyLifetime.STORAGE_KEY, LastParked.STORAGE_KEY,
+        return [Cache.STORAGE_KEY, Quota.STORAGE_KEY, RefreshOnOpen.STORAGE_KEY, KeyLifetime.STORAGE_KEY, LastParked.STORAGE_KEY,
             ParkingFeature.STORAGE_KEY, TileOrder._ORDER_STORAGE_KEY, TileOrder._HIDDEN_STORAGE_KEY] as Array<String>;
     }
 
     (:test)
     function clearAllLeavesNoUserOrCarDataBehind(logger as Logger) as Boolean {
         var saved = {} as Dictionary<String, Properties.ValueType>;
-        var props = ["ApiKey", "Vin", "Spin", "TemperatureUnit"] as Array<String>;
+        var props = ["ApiKey", "Vin", "Spin", "TemperatureUnit", "RefreshOnOpenHours"] as Array<String>;
         for (var i = 0; i < props.size(); i += 1) {
             saved.put(props[i], Properties.getValue(props[i]));
         }
@@ -32,6 +32,7 @@ module StoredDataTests {
         Properties.setValue("Vin", "VIN");
         Properties.setValue("Spin", "1234");
         var unit = Properties.getValue("TemperatureUnit") as Number;
+        Properties.setValue("RefreshOnOpenHours", 2);
 
         StoredData.clearAll();
 
@@ -51,6 +52,10 @@ module StoredDataTests {
         }
         if ((Properties.getValue("TemperatureUnit") as Number) != unit) {
             logger.error("TemperatureUnit is a preference and must stay");
+            ok = false;
+        }
+        if ((Properties.getValue("RefreshOnOpenHours") as Number) != 2) {
+            logger.error("RefreshOnOpenHours is a preference and must stay");
             ok = false;
         }
 

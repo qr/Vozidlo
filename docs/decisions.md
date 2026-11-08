@@ -121,10 +121,35 @@ that has not answered yet has not failed.
 20 requests per hour per vehicle, shared with everything else the owner runs
 against the same car: Home Assistant, the official app, this. A background
 refresh would spend somebody else's budget. Every request in this app is caused
-by a user action: a refresh, a command, or the one check that follows a
-command the user just sent (above), which the user can switch off.
+by a user action: a refresh, a command, the one check that follows a
+command the user just sent (above), which the user can switch off, or opening
+the app with "Refresh on open" switched on (below).
 `api/Quota.mc` tracks what it can locally, because Connect IQ exposes no
 response headers, so `RateLimit-*` is unreadable from a watch app.
+
+### Refresh on open is the user's choice, off by default.
+
+Since 2026-11-08 the app can read the car once when it opens, if the user picks
+a period (1, 2, 4, 8 or 12 hours) in the phone settings. Opening the app is the
+user action; nothing runs in the background or from the glance.
+
+- **Counted from our own last status refresh, not from the car's timestamp.**
+  A parked car keeps an old `carCapturedTimestamp`, so a car-based age would
+  fire on every open and change nothing. A refresh on Status restarts the
+  period too.
+- **Recorded before the request goes out, whatever the outcome.** At most one
+  automatic request per period, also when requests fail (a `5xx` counts
+  against the quota).
+- **Silent when refused.** No phone, a spent quota or no key: nothing is sent,
+  nothing recorded, no error; the next open tries again. A failed refresh is
+  silent too: the cached data stays as it was, with its age.
+- **One at a time.** While it is out, a refresh on Status is refused as
+  already running, so it cannot send a second request.
+- **Not after onboarding.** Onboarding has just read the car, and its
+  successful check restarts the period as well.
+- **Phone only.** The watch's Settings list has only on/off rows.
+- **Does not wake the car.** The API has no such call; the refresh can still
+  bring back old data.
 
 ### Data is not live, and every section ages separately.
 

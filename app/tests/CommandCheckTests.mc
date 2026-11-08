@@ -271,7 +271,7 @@ module CommandCheckTests {
     // the pending check rather than adding one.
     (:test)
     function homesAcceptedCommandStartsTheCheck(logger as Logger) as Boolean {
-        var home = new HomeMenu();
+        var home = new HomeMenu(false);
         var runner = new CommandRunner(home);
         var allowed = CommandCheck.shouldCheck(getApp().getSettings().checkAfterCommand,
             System.getDeviceSettings().phoneConnected, Quota.canSpend(), Quota.isLow());

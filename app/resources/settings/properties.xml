@@ -45,6 +45,14 @@
     <property id="ConfirmCommands" type="boolean">true</property>
 
     <!--
+        Refresh on open (source/model/RefreshOnOpen.mc): hours after the app's
+        own last attempt before opening the app reads the car once. 0 is off,
+        the default. A `list` setting, so a `number` property.
+        Settings.resolveRefreshOnOpenHours() treats a missing value as off.
+    -->
+    <property id="RefreshOnOpenHours" type="number">0</property>
+
+    <!--
         Debug-only base URL override, so the app can be pointed at mock/ without
         editing source. Empty means "use the real API". It is deliberately NOT
         exposed as a <setting>, so it never appears in the phone UI, and

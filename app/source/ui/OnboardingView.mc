@@ -141,6 +141,8 @@ class OnboardingView extends WatchUi.View {
         var settings = getApp().getSettings();
 
         if (responseCode >= 200 && responseCode < 300) {
+            // The car was just read: the refresh on open waits a full period.
+            RefreshOnOpen.record();
             // US-004: the only place a key's estimated start date is ever
             // set: the first successful request, exactly as the story
             // asks for.

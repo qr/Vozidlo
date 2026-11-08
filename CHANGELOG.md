@@ -3,6 +3,18 @@
 Notable changes, newest first. Versions match what is published to the Connect
 IQ Store.
 
+## Unreleased
+
+### Added
+
+- **Refresh on open.** A new setting in Garmin Connect, off by default: when
+  you open the app and its last refresh is older than 1, 2, 4, 8 or 12 hours,
+  the app reads the car once and Home shows "Refreshing…" meanwhile. The period
+  counts from the app's own last refresh, also one on Status, so it costs at
+  most one request per period, also when the request fails. Nothing runs in the
+  background or from the glance. A missing phone or a spent quota skips it
+  silently, and a failed refresh leaves the cached data as it was.
+
 ## 1.4.0: 2026-10-27
 
 ### Changed

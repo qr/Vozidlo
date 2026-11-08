@@ -77,6 +77,7 @@ Then open the app's settings in Garmin Connect and fill in:
 | **VIN** | Exactly 17 characters |
 | **Temperature unit** | Optional; defaults to the watch's own setting |
 | **S-PIN** | Optional. Only needed for the auxiliary heater, which many models do not have. It is stored unencrypted, see [SECURITY.md](SECURITY.md) |
+| **Refresh on open** | Optional, off by default. Opening the app reads the car once when its last refresh is older than 1, 2, 4, 8 or 12 hours |
 
 Open the app, and keep your phone with you: every request travels over Bluetooth
 through Garmin Connect, so out of range means no data.
@@ -144,7 +145,9 @@ changes nothing is normal.
 
 **Twenty requests per hour, per vehicle**, shared with anything else you run
 against the same car. This app never polls, so you spend requests only when you
-ask. A command costs one, and checking whether it worked costs another.
+ask. A command costs one, and checking whether it worked costs another. With
+"Refresh on open" switched on, opening the app costs at most one per period you
+chose.
 
 **A command reports "sent", not "succeeded".** The API is fire-and-forget.
 
@@ -158,6 +161,10 @@ identifies the problem outright. Note its `ConnectIQ-Version` field is the SDK
 the app was built with, not your firmware version: easy to misread.
 
 `System.println()` output only reaches the watch if you first create
-`GARMIN/APPS/LOGS/VOZIDLO.TXT` by hand. Logs rotate at 5 KB.
+`GARMIN/APPS/LOGS/VOZIDLO.TXT` by hand (named after the `.prg`; an app from the
+store has a generated name, see `GARMIN/APPS`). Logs rotate at 5 KB. With
+"Refresh on open" switched on, every open writes one `RO open` line and every
+refresh it sends one `RO done` line: times, ages and response codes only (see
+`app/source/model/RefreshOnOpen.mc`).
 
 **Check that log for your VIN before pasting it into an issue.**

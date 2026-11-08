@@ -27,6 +27,7 @@ module Settings {
         var targetTemperature = Properties.getValue("TargetTemperature") as Number?;
         var checkAfterCommand = Properties.getValue("CheckAfterCommand") as Boolean?;
         var confirmCommands = Properties.getValue("ConfirmCommands") as Boolean?;
+        var refreshOnOpenHours = Properties.getValue("RefreshOnOpenHours") as Number?;
 
         return new Config(
             apiKey != null ? apiKey : "",
@@ -35,7 +36,8 @@ module Settings {
             spin != null ? spin : "",
             targetTemperature,
             resolveCheckAfterCommand(checkAfterCommand),
-            resolveConfirmCommands(confirmCommands)
+            resolveConfirmCommands(confirmCommands),
+            resolveRefreshOnOpenHours(refreshOnOpenHours)
         );
     }
 
@@ -49,6 +51,13 @@ module Settings {
     // has not synced the property yet asks, as the default does.
     function resolveConfirmCommands(value as Boolean?) as Boolean {
         return value != false;
+    }
+
+    // Refresh on open (RefreshOnOpen.mc): off unless the user picked a
+    // period. A watch that has not synced the property yet (null) stays off,
+    // as the default does; a negative value is not a period either.
+    function resolveRefreshOnOpenHours(value as Number?) as Number {
+        return (value != null && value > 0) ? value : 0;
     }
 
     // US-018: 0 is the "never set" sentinel (see properties.xml). 0 degrees,
@@ -100,10 +109,13 @@ module Settings {
         public var checkAfterCommand as Boolean;
         // Ask before every command (ConfirmationPolicy).
         public var confirmCommands as Boolean;
+        // Hours after our last attempt before opening the app refreshes
+        // (RefreshOnOpen); 0 is off.
+        public var refreshOnOpenHours as Number;
 
         function initialize(key as String, vinValue as String, unit as String, spinValue as String,
                             targetTemperatureValue as Number?, checkAfterCommandValue as Boolean,
-                            confirmCommandsValue as Boolean) {
+                            confirmCommandsValue as Boolean, refreshOnOpenHoursValue as Number) {
             apiKey = key;
             vin = vinValue;
             vinValid = Settings.isVinValid(vinValue);
@@ -115,6 +127,7 @@ module Settings {
             targetTemperature = Settings.isTargetTemperatureSet(targetTemperatureValue) ? targetTemperatureValue : null;
             checkAfterCommand = checkAfterCommandValue;
             confirmCommands = confirmCommandsValue;
+            refreshOnOpenHours = refreshOnOpenHoursValue;
         }
 
     }

@@ -55,4 +55,18 @@
         <settingConfig type="boolean" />
     </setting>
 
+    <!-- Refresh on open (RefreshOnOpen.mc). Off by default; the help text
+         names its quota cost. Phone only: the watch's Settings list has
+         only on/off rows. -->
+    <setting propertyKey="@Properties.RefreshOnOpenHours" title="@Strings.SettingRefreshOnOpenTitle" prompt="@Strings.SettingRefreshOnOpenHelp">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.RefreshOnOpenOff</listEntry>
+            <listEntry value="1">@Strings.RefreshOnOpen1h</listEntry>
+            <listEntry value="2">@Strings.RefreshOnOpen2h</listEntry>
+            <listEntry value="4">@Strings.RefreshOnOpen4h</listEntry>
+            <listEntry value="8">@Strings.RefreshOnOpen8h</listEntry>
+            <listEntry value="12">@Strings.RefreshOnOpen12h</listEntry>
+        </settingConfig>
+    </setting>
+
 </settings>

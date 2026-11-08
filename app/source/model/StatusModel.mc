@@ -39,6 +39,8 @@ class StatusModel {
     // Bumped whenever _vehicle is replaced, so the pager knows to recompute
     // its pages without the model holding a reference back to it.
     private var _version as Number = 0;
+    // The last response code, 0 before any; for the refresh-on-open log.
+    private var _lastCode as Number = 0;
 
     function initialize() {
     }
@@ -70,6 +72,10 @@ class StatusModel {
         return _lastError;
     }
 
+    function lastResponseCode() as Number {
+        return _lastCode;
+    }
+
     // ------------------------------------------------------------- refresh
 
     // Returns why nothing was sent (:busy, :offline, :quota, :unconfigured)
@@ -78,12 +84,17 @@ class StatusModel {
     // detail and Find my car through Refusal: US-012/US-013 want the action
     // disabled rather than failing when pressed.
     function refresh() as Symbol {
-        var verdict = Refusal.current(_fetching);
+        // A refresh on open still out (another StatusModel, on home) makes
+        // this one wait: one status request at a time.
+        var verdict = Refusal.current(_fetching || RefreshOnOpen.busy());
         if (verdict != :ok) {
             return verdict;
         }
         var settings = getApp().getSettings();
 
+        // A refresh by hand restarts the period of the refresh on open too,
+        // so opening the app right after one does not read the car again.
+        RefreshOnOpen.record();
         _fetching = true;
         _lastError = null;
         WatchUi.requestUpdate();
@@ -93,6 +104,7 @@ class StatusModel {
 
     function _onVehicleResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null) as Void {
         _fetching = false;
+        _lastCode = responseCode;
 
         if (responseCode == 200) {
             var body = (data instanceof Dictionary) ? (data as Dictionary) : null;
