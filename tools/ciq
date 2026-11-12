@@ -58,7 +58,7 @@ LOG_DIR="$APP_DIR/bin/logs"
 # version we ship (descentmk351mm, 5.1), enforced by
 # tools/checks.py. Building runs on every product; the simulator is slow, so
 # tests run on this representative set.
-VERIFY_DEVICES=(fenix7pro fenix7s fenix7xpro fr255 fr255s venu3s venu445mm vivoactive6 venux1 descentmk351mm fr265)
+VERIFY_DEVICES=(fenix7pro fenix7s fenix7xpro fr255 fr255s venu3s venu445mm vivoactive6 venux1 descentmk351mm fr265 fenix9pro51mm)
 
 # FR255 and FR255S have 512 KB for a watch app. The app fits, but the test
 # binary carries every test on top of it and may not. Their Music models have

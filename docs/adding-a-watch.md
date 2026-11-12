@@ -86,6 +86,7 @@ The layouts have been through these families:
 | `round-390x390` | 390 round, AMOLED | epix Pro (Gen 2) 42mm, MARQ (Gen 2), MARQ (Gen 2) Aviator, Descent Mk3 43mm, Descent G2, Venu 3S, vívoactive 5, vívoactive 6, Venu 4 41mm |
 | `round-416x416` | 416 round, AMOLED | epix Pro (Gen 2) 47mm, fēnix 8 43mm, Forerunner 265 |
 | `round-454x454` | 454 round, AMOLED | fēnix 8 47mm and 51mm, fēnix 8 Pro 47mm and 51mm, fēnix 9 47mm and 51mm, fēnix 9 Pro 47mm, Forerunner 965, Forerunner 970, D2 Mach 2, D2 Mach 2 Pro, epix Pro (Gen 2) 51mm, Descent Mk3i 51mm, Venu 3, Venu 4 45mm |
+| `round-466x466` | 466 round, AMOLED | fēnix 9 Pro 51mm |
 | `rectangle-448x486` | 448×486 rounded rectangle, AMOLED | Venu X1 |
 <!-- devicelists families end -->
 
@@ -93,7 +94,7 @@ And the budget:
 
 | | |
 |---|---|
-| `deviceFamily` | one of the six above |
+| `deviceFamily` | one of the families above |
 | `watchApp` memory | at least 524,288 (512 KB): the Forerunner 255 has exactly that, and the app fits |
 | `glance` memory | 65,536 |
 | Connect IQ | 5.1.0 or higher, matching `minApiLevel` in `app/manifest.xml` |
@@ -445,6 +446,7 @@ bytes.
 | `descentmk351mm` | Descent Mk3i 51mm (Connect IQ 5.1.0) | 454 round, AMOLED | A | yes |
 | `venu3` | Venu 3 | 454 round, AMOLED | B | no |
 | `venu445mm` | Venu 4 45mm, D2 Air X15 | 454 round, AMOLED | C | no |
+| `fenix9pro51mm` | fēnix 9 Pro 51mm | 466 round, AMOLED | A | yes |
 | `venux1` | Venu X1 | 448×486 rectangle, AMOLED | C | yes |
 <!-- devicelists end -->
 

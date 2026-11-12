@@ -52,4 +52,5 @@ epix2pro47mm.resourcePath = $(epix2pro47mm.resourcePath);resources-launcher-60
 fenix843mm.resourcePath = $(fenix843mm.resourcePath);resources-launcher-60
 fr265.excludeAnnotations = map
 fr265.resourcePath = $(fr265.resourcePath);resources-launcher-60
+fenix9pro51mm.resourcePath = $(fenix9pro51mm.resourcePath);resources-launcher-65
 # devicelists end

@@ -3,6 +3,16 @@
 Notable changes, newest first. Versions match what is published to the Connect
 IQ Store.
 
+## 1.6.0: 2026-11-12
+
+### Added
+
+- **The fēnix 9 Pro 51mm.** Vozidlo now runs on 44 watches. It is the first
+  with a 466 round screen: the layout follows the screen as on the other
+  watches, and nothing changes on those. Not worn yet: it is built and
+  unit-tested with `tools/ciq verify` and checked on the devices design
+  page.
+
 ## 1.5.0: 2026-11-08
 
 ### Added

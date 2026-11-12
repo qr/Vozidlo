@@ -145,6 +145,7 @@ left, shown by Garmin's action menu indicator at the right edge.
 | Descent Mk3i 51mm | `descentmk351mm` | 454 round, AMOLED | Five buttons, touch | Yes | 5.1.0 |
 | Venu 3 | `venu3` | 454 round, AMOLED | Touch, MENU is hold BACK | No | 5.2.0 |
 | Venu 4 45mm, incl. D2 Air X15 | `venu445mm` | 454 round, AMOLED | Touch, no MENU: swipe left | No | 6.0.2 |
+| fēnix 9 Pro 51mm | `fenix9pro51mm` | 466 round, AMOLED | Five buttons, touch | Yes | 6.0.3 |
 | Venu X1 | `venux1` | 448×486 rectangle, AMOLED | Touch, no MENU: swipe left | Yes | 6.0.2 |
 <!-- devicelists end -->
 

@@ -402,7 +402,8 @@ CIQ = ROOT / "tools/ciq"
 # here. See docs/adding-a-watch.md.
 KNOWN_FAMILIES = {
     "round-218x218", "round-240x240", "round-260x260", "round-280x280",
-    "round-390x390", "round-416x416", "round-454x454", "rectangle-448x486",
+    "round-390x390", "round-416x416", "round-454x454", "round-466x466",
+    "rectangle-448x486",
 }
 PROFILES = {"A", "A0", "B", "C"}
 API_KEYS = ("MapView", "Complications", "PersistedContent", "GlanceView",

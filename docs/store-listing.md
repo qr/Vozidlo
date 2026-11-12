@@ -105,7 +105,7 @@ complications you can put on your own watch face.
 ## Requirements
 
 <!-- devicelists begin -->
-<!-- products: fenix7pro="fēnix 7 Pro"; fenix7="fēnix 7"; fenix7pronowifi="fēnix 7 Pro Solar Edition (no Wi-Fi)"; fenix8solar47mm="fēnix 8 Solar 47mm"; fenix9prosolar47mm="fēnix 9 Pro Solar 47mm"; fr955="Forerunner 955"; venu3s="Venu 3S"; venu3="Venu 3"; vivoactive6="vívoactive 6"; venu441mm="Venu 4 41mm"; venu445mm="Venu 4 45mm"; venux1="Venu X1"; fenix7s="fēnix 7S"; fenix7spro="fēnix 7S Pro"; fenix7x="fēnix 7X"; fenix7xpro="fēnix 7X Pro"; fenix7xpronowifi="fēnix 7X Pro Solar Edition (no Wi-Fi)"; fenix8solar51mm="fēnix 8 Solar 51mm"; fenix9prosolar51mm="fēnix 9 Pro Solar 51mm"; fr255="Forerunner 255"; fr255m="Forerunner 255 Music"; enduro3="Enduro 3"; epix2pro42mm="epix Pro (Gen 2) 42mm"; marq2="MARQ (Gen 2)"; marq2aviator="MARQ (Gen 2) Aviator"; descentmk343mm="Descent Mk3 43mm"; fenix847mm="fēnix 8 47mm and 51mm"; fenix8pro47mm="fēnix 8 Pro 47mm and 51mm"; fenix947mm="fēnix 9 47mm and 51mm"; fenix9pro47mm="fēnix 9 Pro 47mm"; fr965="Forerunner 965"; fr970="Forerunner 970"; d2mach2="D2 Mach 2"; d2mach2pro="D2 Mach 2 Pro"; epix2pro51mm="epix Pro (Gen 2) 51mm"; descentmk351mm="Descent Mk3i 51mm"; fr255s="Forerunner 255S"; fr255sm="Forerunner 255S Music"; vivoactive5="vívoactive 5"; descentg2="Descent G2"; epix2pro47mm="epix Pro (Gen 2) 47mm"; fenix843mm="fēnix 8 43mm"; fr265="Forerunner 265" -->
+<!-- products: fenix7pro="fēnix 7 Pro"; fenix7="fēnix 7"; fenix7pronowifi="fēnix 7 Pro Solar Edition (no Wi-Fi)"; fenix8solar47mm="fēnix 8 Solar 47mm"; fenix9prosolar47mm="fēnix 9 Pro Solar 47mm"; fr955="Forerunner 955"; venu3s="Venu 3S"; venu3="Venu 3"; vivoactive6="vívoactive 6"; venu441mm="Venu 4 41mm"; venu445mm="Venu 4 45mm"; venux1="Venu X1"; fenix7s="fēnix 7S"; fenix7spro="fēnix 7S Pro"; fenix7x="fēnix 7X"; fenix7xpro="fēnix 7X Pro"; fenix7xpronowifi="fēnix 7X Pro Solar Edition (no Wi-Fi)"; fenix8solar51mm="fēnix 8 Solar 51mm"; fenix9prosolar51mm="fēnix 9 Pro Solar 51mm"; fr255="Forerunner 255"; fr255m="Forerunner 255 Music"; enduro3="Enduro 3"; epix2pro42mm="epix Pro (Gen 2) 42mm"; marq2="MARQ (Gen 2)"; marq2aviator="MARQ (Gen 2) Aviator"; descentmk343mm="Descent Mk3 43mm"; fenix847mm="fēnix 8 47mm and 51mm"; fenix8pro47mm="fēnix 8 Pro 47mm and 51mm"; fenix947mm="fēnix 9 47mm and 51mm"; fenix9pro47mm="fēnix 9 Pro 47mm"; fr965="Forerunner 965"; fr970="Forerunner 970"; d2mach2="D2 Mach 2"; d2mach2pro="D2 Mach 2 Pro"; epix2pro51mm="epix Pro (Gen 2) 51mm"; descentmk351mm="Descent Mk3i 51mm"; fr255s="Forerunner 255S"; fr255sm="Forerunner 255S Music"; vivoactive5="vívoactive 5"; descentg2="Descent G2"; epix2pro47mm="epix Pro (Gen 2) 47mm"; fenix843mm="fēnix 8 43mm"; fr265="Forerunner 265"; fenix9pro51mm="fēnix 9 Pro 51mm" -->
 
 - One of these Garmin watches, with Connect IQ 5.1 or later:
   - Forerunner 255S, Forerunner 255S Music
@@ -127,6 +127,7 @@ complications you can put on your own watch face.
     Pro 47mm, Forerunner 965, Forerunner 970, D2 Mach 2, D2 Mach 2 Pro, epix
     Pro (Gen 2) 51mm (also D2 Mach 1 Pro and tactix 7 AMOLED Edition),
     Descent Mk3i 51mm, Venu 3, Venu 4 45mm (also D2 Air X15)
+  - fēnix 9 Pro 51mm
   - Venu X1
 <!-- devicelists end -->
 - The map in Find my car needs a watch with onboard maps; on the others Find

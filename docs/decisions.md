@@ -443,7 +443,7 @@ the build was clean.
 Up to 1.2 every supported watch was `round-260x260`, and the bezel
 (`ui/Bezel.mc`) and the page coordinates were plain constants for that face.
 Since 1.3.0 the app runs on round screens of 218, 240, 260 and 280 px
-(memory-in-pixel), round 390, 416 and 454 (AMOLED), and the 448×486
+(memory-in-pixel), round 390, 416, 454 and 466 (AMOLED), and the 448×486
 rectangle of the Venu X1. The per-watch design is
 [docs/design/vozidlo-devices.html](design/vozidlo-devices.html).
 

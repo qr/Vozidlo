@@ -274,6 +274,7 @@ there are several screens, with one layout for all of them
 | Round 390, AMOLED | epix Pro (Gen 2) 42mm, MARQ (Gen 2), MARQ (Gen 2) Aviator, Descent Mk3 43mm, Descent G2; Venu 3S, vívoactive 5; vívoactive 6, Venu 4 41mm | A; B; C |
 | Round 416, AMOLED | epix Pro (Gen 2) 47mm, fēnix 8 43mm, Forerunner 265 | A |
 | Round 454, AMOLED | fēnix 8 47mm and 51mm, fēnix 8 Pro 47mm and 51mm, fēnix 9 47mm and 51mm, fēnix 9 Pro 47mm, Forerunner 965, Forerunner 970, D2 Mach 2, D2 Mach 2 Pro, epix Pro (Gen 2) 51mm, Descent Mk3i 51mm; Venu 3; Venu 4 45mm | A; B; C |
+| Round 466, AMOLED | fēnix 9 Pro 51mm | A |
 | Rectangle 448×486, AMOLED | Venu X1 | C |
 <!-- devicelists end -->
 

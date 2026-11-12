@@ -76,6 +76,11 @@ module GeoTests {
         return Geo.make(454, 454, true, Geo.INPUT_C, true, new Geo.Fonts(37, 47, 53, 61, 112, 152));
     }
 
+    // fēnix 9 Pro 51mm: 466 round, five buttons.
+    function fenix9pro51mm() as Geo.Display {
+        return Geo.make(466, 466, true, Geo.INPUT_A, true, new Geo.Fonts(37, 47, 53, 61, 113, 153));
+    }
+
     // Venu X1: 448 x 486 rounded rectangle, no MENU key.
     function venux1() as Geo.Display {
         return Geo.make(448, 486, false, Geo.INPUT_C, true, new Geo.Fonts(37, 47, 53, 61, 112, 152));
@@ -85,7 +90,7 @@ module GeoTests {
     // A new screen gets its fixture here and is then checked everywhere.
     function all() as Array<Geo.Display> {
         return [fenix7pro(), fenix7s(), fenix7xpro(), fr255(), fr255s(), venu3s(), vivoactive5(), fr265(), venu3(),
-            vivoactive6(), venu445mm(), venux1()] as Array<Geo.Display>;
+            vivoactive6(), venu445mm(), fenix9pro51mm(), venux1()] as Array<Geo.Display>;
     }
 
     // ------------------------------------------------------------ helpers
@@ -188,7 +193,7 @@ module GeoTests {
     (:test)
     function heroFontFollowsTheChargingWorstCase(logger as Logger) as Boolean {
         var med = [fenix7pro(), venu3s(), venu3(), venux1(), fenix7xpro(), fr255(), vivoactive5()] as Array<Geo.Display>;
-        var mild = [vivoactive6(), venu445mm(), fenix7s(), fr255s(), fr265()] as Array<Geo.Display>;
+        var mild = [vivoactive6(), venu445mm(), fenix7s(), fr255s(), fr265(), fenix9pro51mm()] as Array<Geo.Display>;
         for (var i = 0; i < med.size(); i += 1) {
             var g = med[i] as Geo.Display;
             if (g.heroFont != Graphics.FONT_NUMBER_MEDIUM || g.unitFont != Graphics.FONT_MEDIUM) {

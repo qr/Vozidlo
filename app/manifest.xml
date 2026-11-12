@@ -109,6 +109,8 @@
                           Connect IQ 5.2.0.
       venu445mm           Venu 4 45mm; also D2 Air X15. 454 round, AMOLED,
                           input C, no map, Connect IQ 6.0.2.
+      fenix9pro51mm       fēnix 9 Pro 51mm. 466 round, AMOLED, input A,
+                          Connect IQ 6.0.3.
       venux1              Venu X1. 448×486 rectangle, AMOLED, input C,
                           Connect IQ 6.0.2.
     [devicelists end]
@@ -157,10 +159,10 @@
       and saga watches
       venu2, venu2s,      Connect IQ 5.0, below our minApiLevel.
       venu2plus
-      fenix9pro51mm,      Round 466x466 and 360x360: screen families the
-      fr265s, ...         layout has not been through yet. Each needs a
-                          layout pass first (docs/adding-a-watch.md, "A new
-                          screen family").
+      fr265s, ...         Round 360x360: a screen family the layout has
+                          not been through yet. Each needs a layout pass
+                          first (docs/adding-a-watch.md, "A new screen
+                          family").
       fenix943mm, epix2,  Round 416x416, the family the epix Pro 47mm, fēnix 8
       fenixe, d2mach1,    43mm and Forerunner 265 brought in: not added yet,
       ...                 no known blocker. Each needs its device facts
@@ -214,6 +216,7 @@
             <iq:product id="epix2pro47mm"/>
             <iq:product id="fenix843mm"/>
             <iq:product id="fr265"/>
+            <iq:product id="fenix9pro51mm"/>
         </iq:products>
         <iq:permissions>
             <!--
